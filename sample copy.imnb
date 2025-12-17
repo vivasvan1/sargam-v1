@@ -1,0 +1,33 @@
+{
+  "imnb_version": 1,
+  "metadata": {
+    "title": "Raag Yaman Demo"
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# Raag Yaman",
+        "",
+        "Yaman is a heptatonic (Sampurna) Hindustani classical raga of the Kalyan Thaat.",
+        "It is traditionally performed in the evening."
+      ]
+    },
+    {
+      "cell_type": "music",
+      "metadata": {
+        "language": "sargam-v1"
+      },
+      "source": [
+        "@raga Yaman",
+        "@tala Tintal",
+        "",
+        "#voice melody",
+        "N, R G M | P M G R | G R S . ||",
+        "S R G M | P D N S' | S' N D P | M G R S ||",
+        "",
+        "asddafs"
+      ]
+    }
+  ]
+}
