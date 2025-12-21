@@ -1,179 +1,40 @@
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  background-color: #f5f5f7;
-  color: #1d1d1f;
-  margin: 0;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.app-container {
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-}
-
-.sidebar {
-  width: 250px;
-  background-color: #f0f0f5;
-  border-right: 1px solid #d2d2d7;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar h3 {
-  margin-top: 0;
-  font-size: 14px;
-  color: #86868b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.file-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.file-list li {
-  padding: 8px 12px;
-  margin-bottom: 4px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #333;
-}
-
-.file-list li:hover {
-  background-color: #e5e5ea;
-}
-
-.file-list li.active {
-  background-color: #0071e3;
-  color: white;
+/* Clean slate for main App layout */
+html, body, #root {
+  height: 100%;
 }
 
 .main-content {
-  flex-grow: 1;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  background-color: #fff;
+  min-width: 0;
 }
 
-.notebook-wrapper {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 40px;
-  width: 100%;
-  box-sizing: border-box;
+/* ScrollArea specific styles */
+[data-radix-scroll-area-viewport] {
+  scroll-behavior: smooth;
 }
 
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  border-bottom: 1px solid #e5e5ea;
-  padding-bottom: 20px;
+/* Prose refinements for Sargam */
+.prose-headings\:font-bold :is(h1, h2, h3, h4) {
+  font-weight: 700;
+  letter-spacing: -0.025em;
 }
 
-.notebook-container {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding-bottom: 100px; /* Space for scrolling */
+/* Custom scrollbar for better visibility in dark mode */
+::-webkit-scrollbar {
+  width: 8px;
 }
 
-/* Add Cell Controls */
-.add-cell-controls {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 20px;
-  opacity: 0; 
-  transition: opacity 0.2s;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.notebook-container:hover .add-cell-controls,
-.add-cell-controls:hover {
-  opacity: 1;
+::-webkit-scrollbar-thumb {
+  background: hsla(var(--muted-foreground), 0.2);
+  border-radius: 4px;
 }
 
-.add-cell-btn {
-  background-color: #f5f5f7;
-  color: #333;
-  border: 1px solid #d2d2d7;
-  font-size: 12px;
-  padding: 6px 12px;
-}
-
-.add-cell-btn:hover {
-  background-color: #e5e5ea;
-}
-
-.cell {
-  background: white;
-  border: 1px solid #e5e5ea;
-  border-radius: 8px;
-  padding: 0; /* Let inner content handle padding */
-  overflow: hidden;
-  position: relative;
-}
-
-.cell:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-
-.cell.editing {
-  border-color: #0071e3;
-  box-shadow: 0 0 0 2px rgba(0,113,227,0.2);
-}
-
-.cell-header {
-    background: #fafafa;
-    padding: 6px 12px;
-    border-bottom: 1px solid #f0f0f0;
-    font-size: 11px;
-    color: #888;
-    text-transform: uppercase;
-    display: flex;
-    justify-content: space-between;
-}
-
-.markdown-cell-content {
-    padding: 20px;
-}
-
-.music-cell-content {
-    padding: 10px;
-}
-
-.music-controls {
-  padding: 8px;
-  background: #f9f9f9;
-  border-bottom: 1px solid #eee;
-  display: flex;
-  justify-content: flex-end;
-}
-
-button {
-  background-color: #0071e3;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
-}
-
-button:hover {
-  background-color: #0077ed;
-}
-
-.unknown-cell {
-  color: red;
-  padding: 20px;
+::-webkit-scrollbar-thumb:hover {
+  background: hsla(var(--muted-foreground), 0.3);
 }

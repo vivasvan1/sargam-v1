@@ -1,28 +1,27 @@
-# Sargam Notebook Implementation Plan
+# Implementation Plan - User Preferences & Light Mode
 
-## Goal Description
-Fix playback control (Stop button), add Taal/Metronome playback, and address sub-beat notation.
+We will change the default theme to "light" and add a modal for user preferences.
 
 ## Proposed Changes
 
-### Frontend (React/Vite)
-- **File**: `frontend/src/App.jsx`
-    - **Stop Bug**: Refactor `playMusic` to use `Tone.Transport` instead of raw `Tone.now()`.
-        - Use `Tone.Transport.schedule()` for notes.
-        - `handlePlay` should call `Tone.Transport.start()` and `Tone.Transport.stop()`.
-        - Ensure `Tone.Transport.cancel()` is called on stop to clear events.
-    - **Taal Playback**:
-        - Check `parsedData.directives.tala`.
-        - Parse format like `Name(Count)` (e.g., `Tintal(16)`).
-        - Create a `Tone.Loop` or schedule beats on the Transport.
-        - Use a percussive sound (e.g., `Tone.MembraneSynth` or just a click).
-    - **Sub-beats**:
-        - No code change for basic support (use `@default_duration`).
-        - *Optional*: Add visual indication or grouping support if needed, but for now just documentation.
+### [Frontend]
+#### [MODIFY] [App.jsx](file:///Users/vivasvan.patel/Work/sargam-v1/frontend/src/App.jsx)
+- Change `document.documentElement.classList.add('dark')` to allow for light mode by default.
+- State management for theme (`light` | `dark`).
+- Add `Settings` button and `PreferenceModal` component.
+
+#### [MODIFY] [index.css](file:///Users/vivasvan.patel/Work/sargam-v1/frontend/src/index.css)
+- Ensure base colors work well in light mode (verify against Radix/Tailwind defaults).
+
+#### [NEW] [PreferenceModal.jsx](file:///Users/vivasvan.patel/Work/sargam-v1/frontend/src/PreferenceModal.jsx) [NEW]
+- Create a reusable modal using `@radix-ui/react-dialog`.
+- Include a theme toggle (Light/Dark).
 
 ## Verification Plan
+### Automated Tests
+- `bun run build` to verify production assets.
 
 ### Manual Verification
-1.  **Stop Button**: Play a long sequence -> Click Stop -> Sound should stop immediately.
-2.  **Taal**: Add `@tala Tintal(16)` to a cell -> Play -> Should hear a distinct beat/click.
-3.  **Sub-beats**: Write `@default_duration 0.5` -> Verify faster playback compared to default.
+- Open the modal via the settings icon.
+- Toggle between Light and Dark mode.
+- Verify that "Light" is the initial state on fresh load.

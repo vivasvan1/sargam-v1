@@ -1,28 +1,8 @@
-# Task: Develop Sargam Notebook Application
+# Task: User Preferences & Light Mode Default
 
-- [ ] Project Setup <!-- id: 0 -->
-    - [x] Create `backend` directory and initialize FastAPI app <!-- id: 1 -->
-    - [x] Create `frontend` directory and initialize Vite React app <!-- id: 2 -->
-- [x] Backend Implementation <!-- id: 3 -->
-    - [x] Implement API to load/save `.imnb` files <!-- id: 4 -->
-    - [x] Implement API to parse music cells (using `sargam_parser.py`) <!-- id: 5 -->
-- [x] Frontend Implementation <!-- id: 6 -->
-    - [x] Create Notebook UI (cell list) <!-- id: 7 -->
-    - [x] Implement Markdown cell rendering <!-- id: 8 -->
-    - [x] Implement Music cell editor <!-- id: 9 -->
-    - [x] Implement Music playback logic (Tone.js) <!-- id: 10 -->
-- [x] Integration & Testing <!-- id: 11 -->
-    - [x] Verify loading/saving notebooks <!-- id: 12 -->
-    - [x] Verify parsing and playback of music cells <!-- id: 13 -->
-- [x] UI Enhancements <!-- id: 14 -->
-    - [x] Backend: API to list `.imnb` files <!-- id: 15 -->
-    - [x] Frontend: Sidebar for file explorer <!-- id: 16 -->
-    - [x] Frontend: Add cell buttons (+Music, +Markdown) <!-- id: 17 -->
-    - [x] Frontend: Layout improvements (sidebar, centering, spacing) <!-- id: 18 -->
-- [x] Fixes & Features <!-- id: 19 -->
-    - [x] Bug: Fix Stop button (use Tone.Transport) <!-- id: 20 -->
-    - [x] Feature: Play Taal/Metronome (Tone.js) <!-- id: 21 -->
-    - [x] Feature: Grouping syntax or simple sub-beat explanation <!-- id: 22 -->
-    - [x] Feature: Add option to delete a cell <!-- id: 23 -->
-- [x] Content Creation <!-- id: 24 -->
-    - [x] Create Raag Khamaj demo notebook <!-- id: 25 -->
+- [x] Install Radix UI Dialog, Label, and Switch
+- [x] Set "Light" as the default mode in App.jsx and index.css
+- [x] Implement PreferenceModal using Radix UI Dialog
+- [x] Add theme toggle and potentially other settings to the modal
+- [x] Add trigger button in the Sidebar
+- [x] Verify functionality and HMR

@@ -7,7 +7,7 @@
     {
       "cell_type": "markdown",
       "source": [
-        "# Raag Khamaj",
+        "### Raag Khamaj",
         "",
         "**Thaat**: Khamaj  ",
         "**Vadi**: Ga  ",
@@ -30,6 +30,7 @@
         "language": "sargam-v1"
       },
       "source": [
+        "@sa C4",
         "@raga Khamaj",
         "@default_duration 1",
         "",
@@ -53,6 +54,7 @@
         "language": "sargam-v1"
       },
       "source": [
+        "@sa D4",
         "@tala Tintal(16)",
         "@tempo 100",
         "",
@@ -76,6 +78,7 @@
         "language": "sargam-v1"
       },
       "source": [
+        "@sa D4",
         "@tempo 100",
         "",
         "# Ornamentation",
@@ -101,6 +104,7 @@
         "language": "sargam-v1"
       },
       "source": [
+        "@sa D4",
         "@tempo 120",
         "",
         "#voice melody",

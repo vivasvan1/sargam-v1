@@ -47,13 +47,15 @@ def serialize_notebook(notebook: ParsedNotebook):
 # Editing happens on the source text.
 # Playing happens on the parsed events.
 
+ROOT_DIR = os.getenv("ROOT_DIR", "examples")
+
 @app.get("/api/files")
-def list_files(root: str = ".."):
+def list_files(root: str = ROOT_DIR):
     """List all .imnb files in the directory."""
     try:
         files = []
         if not os.path.exists(root):
-             # Fallback to current dir if .. doesn't exist or permission issue
+             # Fallback to current dir if root doesn't exist or permission issue
              root = "."
         # Walk or just listdir?
         # Let's just list files in the current directory or specified root

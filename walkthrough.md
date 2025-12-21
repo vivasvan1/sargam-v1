@@ -1,61 +1,58 @@
-# Sargam Notebook Walkthrough
+# Walkthrough - Modern UI Transformation
 
-The Sargam Notebook application allows you to view, edit, and play Indian Classical Music notation in `.imnb` files.
+I have completely modernized the Sargam-v1 UI using shadcn/ui and Tailwind CSS v4.
 
-## Prerequisites
+## Core Changes
 
-- Node.js (Bun recommended)
-- Python 3.8+
+### Tech Stack Upgrade
+- **Tailwind CSS v4**: Upgraded to the latest Tailwind v4 using the seamless Vite plugin integration (`@tailwindcss/vite`).
+- **Typography**: Installed `@tailwindcss/typography` to provide beautiful styling for markdown cells.
+- **Vite Config**: Updated `vite.config.js` to handle both Tailwind v4 and React.
 
-## Running the Application
+### UI Overhaul
+- **Modern Sidebar**: Replaced the custom sidebar with the robust shadcn/ui `Sidebar` component, including a `SidebarTrigger` and `SidebarInset` layout.
+- **Premium Cards**: Notebook cells are now wrapped in shadcn/ui `Card` components with hover effects and clean headers.
+- **Shadcn Components**:
+  - **Button**: All actions (Save, Play, Add, Delete) now use the shadcn `Button` with appropriate variants and `lucide-react` icons.
+  - **Input**: The editable notebook title uses the shadcn `Input` for a native look.
+  - **ScrollArea**: The notebook content is now contained in a shadcn `ScrollArea` for better scroll behavior.
+  - **Sonner**: Replaced native alerts with beautiful sonner toasts.
 
-1.  **Start the Backend**:
-    ```bash
-    cd backend
-    uvicorn main:app --reload --port 8000
-    ```
-    (Or use the provided `uv run` command if configured)
+### Animations & UX
+- Added micro-animations for adding cells and hovering over items.
+- Double-click to edit markdown cells and notebook titles is retained but with improved visual feedback.
 
-2.  **Start the Frontend**:
-    ```bash
-    cd frontend
-    bun dev
-    ```
+### Tonic Frequency (Sa)
+- **Directives**: Added support for `@sa` and `@tonic` directives in music cells.
+- **Dynamic Key**: The base frequency (Sa) is now dynamically calculated using Tone.js.
+- **Example**:
+  ```sargam-v1
+  @sa Eb4
+  @tempo 100
+  #voice melody
+  S R G M
+  ```
 
-3.  **Open in Browser**:
-    Navigate to [http://localhost:5173](http://localhost:5173).
+### Bug Fixes
+- **Runtime Error**: Restored missing React and library imports in `App.jsx` that were accidentally removed during the UI refactor, resolving the `useState is not defined` error.
 
-## Features
+- **Layout & CSS Fix**: Purged conflicting Vite default styles and standardized Tailwind v4 theme variables in `index.css`. This resolved the overlapping sidebar and misaligned content seen in the earlier screenshot.
 
-- **Jupyter-like Interface**: 
-    - **Sidebar**: Browse `.imnb` files in the project directory.
-    - **Notebook**: Opens in the main area.
-- **Editing**:
-    - **Add Cells**: Hover between cells or at the bottom to see "+ Music" and "+ Markdown" buttons.
-    - **Markdown**: Double-click to edit source.
-    - **Music**: Edit sargam notation directly.
-- **Playback**: Click "Play" in music cells to synthesize audio.
-- **Persistence**: Save changes back to disk.
+- **Standardized Root Layout**: Removed redundant flex containers and ensured `SidebarInset` correctly manages the main workspace.
+- **Theme Initialization**: Added explicit dark mode initialization at the root level to ensure shadcn/ui colors are always accurate.
 
-## Notation Guide
-- **Notes**: `S R G M P D N`
-- **Octaves**: `'` (High), `,` (Low). Example: `S'` or `N,`
-- **Variants**: `k` (komal/flat), `t` (tivra/sharp). Example: `Rk`
-- **Durations**: `:number`. Default is 1 beat. 
-    - **Sub-beats**: Use fractional durations to play multiple notes in a beat. 
-    - Example: `S:0.5 R:0.5` plays S and R in one beat (2 notes per beat).
-- **Directives**:
-    - `@default_duration 0.5` sets the default for all subsequent notes.
-    - `@tala <Name>` enables a beat click track.
+## Verification Results
 
-## File Structure
+### Build Success
+The project builds successfully with the new Tailwind v4 and shadcn-ui components:
+```bash
+npm run build
+# Output: ✓ built in 1.85s
+```
 
-- `backend/`: FastAPI server and `sargam_parser.py`.
-- `frontend/`: React Vite application.
-- `sample.imnb`: Demo notebook file.
+### Layout
+- The sidebar is collapsible and responsive.
+- The notebook area is centered and properly padded.
+- Markdown content is styled with standard prose settings.
 
-## Verification
-- Validated that `sargam_parser.py` correctly parses text into structured events.
-- Validated that the Backend API serves `./sample.imnb` and accepts parse requests.
-- Validated Frontend loads and renders the notebook.
-- **New**: Validated sidebar file listing and layout.
+You can now start the dev server with `npm run dev` in the `frontend` directory to see the transformation!
