@@ -48,6 +48,7 @@ class NoteEvent:
     variant: Optional[str] = None
     microtone: Optional[Tuple[float, str]] = None
     duration: float = 1.0
+    line_index: int = 0
     ornaments: List[Ornament] = field(default_factory=list)
     lyric: Optional[str] = None
 
@@ -57,6 +58,7 @@ class RestEvent:
     """Represents a rest (silence) with a given duration."""
 
     duration: float
+    line_index: int = 0
 
 
 @dataclass
@@ -64,6 +66,7 @@ class HoldEvent:
     """Represents an extension of the previous note."""
 
     duration: float
+    line_index: int = 0
 
 
 @dataclass
@@ -71,6 +74,7 @@ class BarEvent:
     """Represents a bar or cycle marker."""
 
     double: bool = False  # True for '||', False for '|'
+    line_index: int = 0
 
 
 Event = Union[NoteEvent, RestEvent, HoldEvent, BarEvent]
@@ -152,14 +156,19 @@ def parse_music_cell(lines: List[str]) -> MusicCell:
     directives: Dict[str, str] = {}
     voices: Dict[str, Voice] = {}
     current_voice: Optional[Voice] = None
+    logical_line_index = 0
 
     # Default duration if not overridden by @default_duration
     default_duration = 1.0
 
-    for raw_line in lines:
+    for idx, raw_line in enumerate(lines):
         line = raw_line.strip('\n')
         if not line.strip():
             continue  # skip empty lines
+        
+        # Increment logical line for each new text line (unless it's the very first one)
+        if idx > 0:
+            logical_line_index += 1
         if line.startswith('@'):
             key, *rest = line[1:].split(maxsplit=1)
             value = rest[0] if rest else ''
@@ -188,32 +197,42 @@ def parse_music_cell(lines: List[str]) -> MusicCell:
             content = line
         tokens = [tok for tok in content.strip().split() if tok]
         for token in tokens:
-            event = parse_token(token, default_duration)
+            event = parse_token(token, default_duration, line_index=logical_line_index)
             if event is not None:
                 current_voice.events.append(event)
+                # If we encounter a double bar, increment logical line index
+                if isinstance(event, BarEvent) and event.double:
+                    logical_line_index += 1
     return MusicCell(directives=directives, voices=voices)
 
 
-def parse_token(token: str, default_duration: float) -> Optional[Event]:
+def parse_token(token: str, default_duration: float, line_index: int = 0) -> Optional[Event]:
     """Parse a single token into an Event.
 
     Returns None if the token is not recognized.
     """
     # Bar markers
     if token == '|':
-        return BarEvent(double=False)
+        return BarEvent(double=False, line_index=line_index)
     if token == '||':
-        return BarEvent(double=True)
+        return BarEvent(double=True, line_index=line_index)
 
     # Rest or hold
-    if token.startswith('_'):
-        dur = token[1:]
-        duration = float(dur) if dur else default_duration
-        return RestEvent(duration=duration)
-    if token.startswith('.'):
-        dur = token[1:]
-        duration = float(dur) if dur else default_duration
-        return HoldEvent(duration=duration)
+    if token.startswith('_') or token.startswith('.'):
+        symbol = token[0]
+        remainder = token[1:]
+        if remainder.startswith(':'):
+            remainder = remainder[1:]
+        
+        try:
+            duration = float(remainder) if remainder else default_duration
+        except ValueError:
+            return None
+            
+        if symbol == '_':
+            return RestEvent(duration=duration, line_index=line_index)
+        else:
+            return HoldEvent(duration=duration, line_index=line_index)
 
     # Split lyric if present
     lyric = None
@@ -305,6 +324,7 @@ def parse_token(token: str, default_duration: float) -> Optional[Event]:
         variant=variant,
         microtone=microtone,
         duration=duration,
+        line_index=line_index,
         ornaments=ornaments,
         lyric=lyric,
     )

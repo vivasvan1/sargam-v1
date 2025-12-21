@@ -19,6 +19,11 @@ I have completely modernized the Sargam-v1 UI using shadcn/ui and Tailwind CSS v
   - **Sonner**: Replaced native alerts with beautiful sonner toasts.
 
 ### Animations & UX
+- **Responsive Grid**: Uses `ResizeObserver` to dynamically calculate `BEAT_WIDTH`, ensuring the grid fits perfectly on tablet and laptop screens without horizontal overflow.
+- **Strict Table Layout**: The visualizer is a true table where each beat is a distinct cell with visible borders and a subtle background.
+- **Beat Alignment**: Beat numbers are positioned at the top of each column, providing perfect alignment (e.g., 16 columns for Tintal).
+- **Logical Line Breaks**: Rows strictly break after every `||`, even if it's on the same text line in the editor.
+- **Backend Auto-Reload**: Updated `Dockerfile` with `--reload` to ensure future parser changes are picked up immediately.
 - Added micro-animations for adding cells and hovering over items.
 - Double-click to edit markdown cells and notebook titles is retained but with improved visual feedback.
 
