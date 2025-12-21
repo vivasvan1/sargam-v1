@@ -16,7 +16,7 @@ export function PreferenceModal({ theme, setTheme }) {
 
             <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-100 animate-in fade-in duration-200" />
-                <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6 z-[101] animate-in zoom-in-95 fade-in duration-200 focus:outline-none">
+                <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-background border border-border rounded-2xl shadow-2xl p-6 z-101 animate-in zoom-in-95 fade-in duration-200 focus:outline-none">
                     <div className="flex items-center justify-between mb-6">
                         <Dialog.Title className="text-xl font-bold">Preferences</Dialog.Title>
                         <Dialog.Close asChild>
@@ -58,10 +58,6 @@ export function PreferenceModal({ theme, setTheme }) {
                                 <div className="flex justify-between text-xs">
                                     <span className="text-muted-foreground">Version</span>
                                     <span className="font-mono">0.1.0</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-muted-foreground">Framework</span>
-                                    <span>React + Radix UI</span>
                                 </div>
                             </div>
                         </div>

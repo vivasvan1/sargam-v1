@@ -1,11 +1,17 @@
-import { Music2, FileText, ChevronRight } from 'lucide-react';
-import { cn } from './lib/utils';
+import { Music2, Upload, Plus } from 'lucide-react';
+import { useRef } from 'react';
 import { PreferenceModal } from './PreferenceModal';
 
-export function Sidebar({ files, activeFile, onFileSelect, theme, setTheme }) {
+export function Sidebar({ onFileUpload, onNew, theme, setTheme }) {
+  const fileInputRef = useRef(null);
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
     <aside className="w-64 border-r border-border bg-muted/30 flex flex-col h-screen">
-      <div className="p-6">
+      <div className="p-6 flex-1 flex flex-col min-h-0">
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <Music2 className="w-5 h-5 text-primary-foreground" />
@@ -13,28 +19,32 @@ export function Sidebar({ files, activeFile, onFileSelect, theme, setTheme }) {
           <span className="font-bold text-xl tracking-tight">Sargam</span>
         </div>
 
-        <nav className="space-y-1">
-          <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground px-3 mb-2">Notebooks</p>
-          {files.map((file) => (
+        <div className="flex flex-col gap-4 flex-1 overflow-hidden">
+          <div className="px-3 space-y-3">
             <button
-              key={file}
-              onClick={() => onFileSelect(file)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all group",
-                activeFile === file
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              )}
+              onClick={onNew}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:opacity-90 transition-all shadow-sm active:scale-95"
             >
-              <FileText className={cn(
-                "w-4 h-4 transition-colors",
-                activeFile === file ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-              )} />
-              <span className="truncate">{file.replace('.imnb', '')}</span>
-              {activeFile === file && <ChevronRight className="w-3 h-3 ml-auto" />}
+              <Plus className="w-3.5 h-3.5" />
+              New Notebook
             </button>
-          ))}
-        </nav>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={onFileUpload}
+              accept=".imnb,application/json"
+              className="hidden"
+            />
+            <button
+              onClick={handleUploadClick}
+              className="hover:cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-xs font-bold hover:bg-muted transition-all border border-border shadow-sm active:scale-95"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Upload Local File
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="mt-auto p-4 border-t border-border">
