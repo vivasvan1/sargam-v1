@@ -31,46 +31,32 @@ class Ornament:
 
 @dataclass
 class NoteEvent:
-    """Represents a single musical note.
-
-    Attributes:
-        swara:   The base swara (e.g. 'S', 'R', 'G', ... or 'R1' for Carnatic).
-        octave:  Relative octave offset; 0 = middle, 1 = one above, -1 = one below.
-        variant: Optional variant string ('k', 't', '#', 'b').
-        microtone: Optional (value, unit) where unit is 'c' (cents) or 'st' (semitones).
-        duration: Duration of the note in beats.  Default is 1.0.
-        ornaments: List of Ornament objects.
-        lyric: Optional lyric syllable.
-    """
-
     swara: str
     octave: int = 0
     variant: Optional[str] = None
     microtone: Optional[Tuple[float, str]] = None
     duration: float = 1.0
+    line_index: int = 0
     ornaments: List[Ornament] = field(default_factory=list)
     lyric: Optional[str] = None
 
 
 @dataclass
 class RestEvent:
-    """Represents a rest (silence) with a given duration."""
-
     duration: float
+    line_index: int = 0
 
 
 @dataclass
 class HoldEvent:
-    """Represents an extension of the previous note."""
-
     duration: float
+    line_index: int = 0
 
 
 @dataclass
 class BarEvent:
-    """Represents a bar or cycle marker."""
-
-    double: bool = False  # True for '||', False for '|'
+    double: bool = False
+    line_index: int = 0
 
 
 Event = Union[NoteEvent, RestEvent, HoldEvent, BarEvent]
@@ -152,14 +138,19 @@ def parse_music_cell(lines: List[str]) -> MusicCell:
     directives: Dict[str, str] = {}
     voices: Dict[str, Voice] = {}
     current_voice: Optional[Voice] = None
+    logical_line_index = 0
 
     # Default duration if not overridden by @default_duration
     default_duration = 1.0
 
-    for raw_line in lines:
+    for idx, raw_line in enumerate(lines):
         line = raw_line.strip('\n')
         if not line.strip():
             continue  # skip empty lines
+        
+        # Increment logical line for each new text line (unless it's the very first one)
+        if idx > 0:
+            logical_line_index += 1
         if line.startswith('@'):
             key, *rest = line[1:].split(maxsplit=1)
             value = rest[0] if rest else ''
@@ -188,32 +179,42 @@ def parse_music_cell(lines: List[str]) -> MusicCell:
             content = line
         tokens = [tok for tok in content.strip().split() if tok]
         for token in tokens:
-            event = parse_token(token, default_duration)
+            event = parse_token(token, default_duration, line_index=logical_line_index)
             if event is not None:
                 current_voice.events.append(event)
+                # If we encounter a double bar, increment logical line index
+                if isinstance(event, BarEvent) and event.double:
+                    logical_line_index += 1
     return MusicCell(directives=directives, voices=voices)
 
 
-def parse_token(token: str, default_duration: float) -> Optional[Event]:
+def parse_token(token: str, default_duration: float, line_index: int = 0) -> Optional[Event]:
     """Parse a single token into an Event.
 
     Returns None if the token is not recognized.
     """
     # Bar markers
     if token == '|':
-        return BarEvent(double=False)
+        return BarEvent(double=False, line_index=line_index)
     if token == '||':
-        return BarEvent(double=True)
+        return BarEvent(double=True, line_index=line_index)
 
     # Rest or hold
-    if token.startswith('_'):
-        dur = token[1:]
-        duration = float(dur) if dur else default_duration
-        return RestEvent(duration=duration)
-    if token.startswith('.'):
-        dur = token[1:]
-        duration = float(dur) if dur else default_duration
-        return HoldEvent(duration=duration)
+    if token.startswith('_') or token.startswith('.'):
+        symbol = token[0]
+        remainder = token[1:]
+        if remainder.startswith(':'):
+            remainder = remainder[1:]
+        
+        try:
+            duration = float(remainder) if remainder else default_duration
+        except ValueError:
+            return None
+            
+        if symbol == '_':
+            return RestEvent(duration=duration, line_index=line_index)
+        else:
+            return HoldEvent(duration=duration, line_index=line_index)
 
     # Split lyric if present
     lyric = None
@@ -227,56 +228,61 @@ def parse_token(token: str, default_duration: float) -> Optional[Event]:
     # Split ornaments if present
     base_part = note_part
     ornaments_part = None
-    if '+' in note_part:
-        base_part, ornaments_part = note_part.split('+', 1)
+    # Use regex to find + that is NOT part of a microtone (n+ or n-)
+    # Python re doesn't support variable length lookbehind, but (?<!n)\+ is fixed length.
+    orn_match = re.search(r"(?<!n)\+", note_part)
+    if orn_match:
+        base_part = note_part[:orn_match.start()]
+        ornaments_part = note_part[orn_match.start() + 1:]
+    
+    note_part = base_part
 
-    # Parse swara, octave, variant, microtone, duration
-    swara_match = re.match(r"([A-Za-z]+)([',]*)(.*)", base_part)
-    if not swara_match:
-        return None
-    swara = swara_match.group(1)
-    octave_marks = swara_match.group(2)
-    rest_part = swara_match.group(3)
+    # Split duration if present (colon at the end)
+    duration = None
+    if ':' in note_part:
+        # Find the LAST colon
+        last_colon = note_part.rfind(':')
+        dur_part = note_part[last_colon+1:]
+        try:
+            duration = float(dur_part)
+            note_part = note_part[:last_colon]
+        except ValueError:
+            pass
+
+    # Now we have swara + modifiers
+    # Modifiers are ', , k, t, #, b, n+, n-
+    modifier_match = re.search(r"[',#b]|n[+-]|[kt](?![a-z])", note_part)
+    if modifier_match:
+        swara = note_part[:modifier_match.start()]
+        mods_part = note_part[modifier_match.start():]
+    else:
+        swara = note_part
+        mods_part = ""
 
     # Determine octave offset
     octave = 0
-    for ch in octave_marks:
+    for ch in mods_part:
         if ch == "'":
             octave += 1
-        elif ch == ',':
+        elif ch == ",":
             octave -= 1
 
+    # Remove octave marks to find variant/microtone
+    remaining_mods = mods_part.replace("'", "").replace(",", "")
+    
     variant = None
-    microtone: Optional[Tuple[float, str]] = None
-    duration: Optional[float] = None
-
-    # Check for variant/microtone and duration in rest_part
-    # Duration appears at the end, starting with ':'
-    dur_match = _duration_re.search(rest_part)
-    if dur_match:
-        try:
-            duration = float(dur_match.group('value'))
-        except ValueError:
-            duration = None
-        # Remove duration spec from rest_part
-        rest_part = rest_part[:dur_match.start()]
-
-    # The remainder may be a variant or microtone
-    if rest_part:
-        # microtone?
-        m = _microtone_re.fullmatch(rest_part)
+    microtone = None
+    if remaining_mods:
+        m = _microtone_re.fullmatch(remaining_mods)
         if m:
             sign = 1.0 if m.group('sign') == '+' else -1.0
             value = float(m.group('value'))
-            unit = m.group('unit')  # 'c' or 'st'
+            unit = m.group('unit')
             microtone = (sign * value, unit)
-        elif rest_part in _variant_set:
-            variant = rest_part
         else:
-            # Unknown suffix – treat as variant
-            variant = rest_part
+            variant = remaining_mods
 
-    # Default duration
+    # Defaults
     duration = duration if duration is not None else default_duration
 
     # Parse ornaments
@@ -292,11 +298,9 @@ def parse_token(token: str, default_duration: float) -> Optional[Event]:
                 params_str = m.group(3)
                 params = []
                 if params_str:
-                    # naive split on comma; real parser could handle nested lists
                     params = [p.strip() for p in params_str.split(',') if p.strip()]
                 ornaments.append(Ornament(name=name, params=params))
             else:
-                # unknown ornament; store name only
                 ornaments.append(Ornament(name=part))
 
     return NoteEvent(
@@ -305,6 +309,7 @@ def parse_token(token: str, default_duration: float) -> Optional[Event]:
         variant=variant,
         microtone=microtone,
         duration=duration,
+        line_index=line_index,
         ornaments=ornaments,
         lyric=lyric,
     )

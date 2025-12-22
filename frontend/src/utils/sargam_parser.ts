@@ -16,21 +16,25 @@ export interface NoteEvent {
   duration: number;
   ornaments: Ornament[];
   lyric?: string;
+  line_index?: number;
 }
 
 export interface RestEvent {
   type: 'rest';
   duration: number;
+  line_index?: number;
 }
 
 export interface HoldEvent {
   type: 'hold';
   duration: number;
+  line_index?: number;
 }
 
 export interface BarEvent {
   type: 'bar';
   double: boolean;
+  line_index?: number;
 }
 
 export type Event = NoteEvent | RestEvent | HoldEvent | BarEvent;
@@ -47,28 +51,35 @@ export interface MusicCell {
 
 const SWARA_RE = /^[A-Za-z]+$/;
 const VARIANT_SET = new Set(['k', 't', '#', 'b']);
-const MICROTONE_RE = /n([+-])(\d+(?:\.\d+)?)(c|st)/;
+const MICROTONE_RE = /^n([+-])(\d+(?:\.\d+)?)(c|st)$/;
 const DURATION_RE = /:(\d+(?:\.\d+)?)$/;
 
 export function parseMusicCell(lines: string[]): MusicCell {
   const directives: Record<string, string> = {};
   const voices: Record<string, Voice> = {};
   let currentVoice: Voice | null = null;
+  let currentLineIndex = 0;
 
   let defaultDuration = 1.0;
 
-  for (let rawLine of lines) {
-    const line = rawLine.replace(/\n$/, '');
-    if (!line.trim()) continue;
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    if (i > 0) currentLineIndex++;
+
+    // Handle both \r\n and \n by trimming
+    const line = rawLine.trim().replace(/\r$/, '');
+    if (!line) continue;
 
     if (line.startsWith('@')) {
-      const parts = line.slice(1).split(/\s+/);
-      const key = parts[0].toLowerCase();
-      const value = parts.slice(1).join(' ');
-      directives[key] = value;
-      if (key === 'default_duration') {
-        const parsed = parseFloat(value);
-        if (!isNaN(parsed)) defaultDuration = parsed;
+      const match = line.slice(1).match(/^(\S+)\s*(.*)$/);
+      if (match) {
+        const key = match[1].toLowerCase();
+        const value = match[2].trim();
+        directives[key] = value;
+        if (key === 'default_duration') {
+          const parsed = parseFloat(value);
+          if (!isNaN(parsed)) defaultDuration = parsed;
+        }
       }
       continue;
     }
@@ -99,7 +110,11 @@ export function parseMusicCell(lines: string[]): MusicCell {
     for (const token of tokens) {
       const event = parseToken(token, defaultDuration);
       if (event) {
+        event.line_index = currentLineIndex;
         currentVoice.events.push(event);
+        if (event.type === 'bar' && event.double) {
+          currentLineIndex++;
+        }
       }
     }
   }
@@ -112,83 +127,83 @@ export function parseToken(token: string, defaultDuration: number): Event | null
   if (token === '||') return { type: 'bar', double: true };
 
   if (token.startsWith('_')) {
-    const durStr = token.slice(1);
+    let durStr = token.slice(1);
+    if (durStr.startsWith(':')) durStr = durStr.slice(1);
     const duration = durStr ? parseFloat(durStr) : defaultDuration;
     return { type: 'rest', duration };
   }
 
   if (token.startsWith('.')) {
-    const durStr = token.slice(1);
+    let durStr = token.slice(1);
+    if (durStr.startsWith(':')) durStr = durStr.slice(1);
     const duration = durStr ? parseFloat(durStr) : defaultDuration;
     return { type: 'hold', duration };
   }
 
   // 1. Split Lyric (=)
   let lyric: string | undefined;
-  let restToken = token;
+  let lyricPart = '';
+  let notePart = token;
   const lyricIdx = token.indexOf('=');
   if (lyricIdx !== -1) {
     lyric = token.slice(lyricIdx + 1).replace(/"/g, '');
-    restToken = token.slice(0, lyricIdx);
+    notePart = token.slice(0, lyricIdx);
   }
 
   // 2. Split Ornaments (+)
   // Ornaments start with +, but + can also be inside a microtone (e.g., n+25c)
-  // The ornament separator + will NOT be preceded by 'n'
   let ornamentsPart: string | undefined;
-  let basePart = restToken;
   
-  // Find the + that is not preceded by 'n'
-  const plusMatch = restToken.match(/(?<!n)\+/);
-  if (plusMatch && plusMatch.index !== undefined) {
-    basePart = restToken.slice(0, plusMatch.index);
-    ornamentsPart = restToken.slice(plusMatch.index + 1);
+  // Find the + that is not part of a microtone (preceded by 'n')
+  const ornMatch = notePart.match(/(?<!n)\+/);
+  if (ornMatch && ornMatch.index !== undefined) {
+    ornamentsPart = notePart.slice(ornMatch.index + 1);
+    notePart = notePart.slice(0, ornMatch.index);
   }
 
-  // 3. Parse Duration (:)
-  let duration: number | undefined;
-  const durMatch = basePart.match(DURATION_RE);
-  if (durMatch) {
-    duration = parseFloat(durMatch[1]);
-    basePart = basePart.slice(0, durMatch.index);
-  } else {
-    duration = defaultDuration;
+  // 3. Split Duration (:) from the end of notePart
+  let duration = defaultDuration;
+  const lastColon = notePart.lastIndexOf(':');
+  if (lastColon !== -1) {
+    const durStr = notePart.slice(lastColon + 1);
+    const parsedDur = parseFloat(durStr);
+    if (!isNaN(parsedDur)) {
+      duration = parsedDur;
+      notePart = notePart.slice(0, lastColon);
+    }
   }
 
-  // 4. Parse Swara, Octave, and Variant
-  // basePart contains Swara Octave? Variant?
-  // Swara ends where Octave (',') or Variant (k, t, #, b, n) starts.
-  const splitMatch = basePart.match(/[',kt#bn]/);
-  let swara = basePart;
-  let modifiers = '';
-  if (splitMatch && splitMatch.index !== undefined) {
-    swara = basePart.slice(0, splitMatch.index);
-    modifiers = basePart.slice(splitMatch.index);
+  // 4. Parse Swara, Octave, and the rest (Variant, Microtone)
+  // Find where swara ends
+  const modifierMatch = notePart.match(/[',#b]|n[+-]|[kt](?![a-z])/);
+  let swara = notePart;
+  let modsPart = '';
+  if (modifierMatch && modifierMatch.index !== undefined) {
+    swara = notePart.slice(0, modifierMatch.index);
+    modsPart = notePart.slice(modifierMatch.index);
   }
-
-  // Now modifiers contains Octave? Variant?
-  const modMatch = modifiers.match(/^([',]*)(.*)$/);
-  const octaveMarks = modMatch ? modMatch[1] : '';
-  let restPart = modMatch ? modMatch[2] : '';
 
   let octave = 0;
-  for (const ch of octaveMarks) {
+  let variant: string | undefined;
+  let microtone: [number, string] | undefined;
+
+  for (const ch of modsPart) {
     if (ch === "'") octave++;
     else if (ch === ',') octave--;
   }
 
-  let variant: string | undefined;
-  let microtone: [number, string] | undefined;
+  // Remove octave marks to find variant/microtone
+  const remainingMods = modsPart.replace(/'/g, '').replace(/,/g, '');
 
-  if (restPart) {
-    const m = restPart.match(MICROTONE_RE);
+  if (remainingMods) {
+    const m = remainingMods.match(MICROTONE_RE);
     if (m) {
       const sign = m[1] === '+' ? 1.0 : -1.0;
       const value = parseFloat(m[2]);
       const unit = m[3];
       microtone = [sign * value, unit];
     } else {
-      variant = restPart;
+      variant = remainingMods;
     }
   }
 

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import * as Tone from 'tone';
 import { toast } from 'sonner';
-import { Play, Square } from "lucide-react";
+import { Play, Square, Volume2, VolumeX, Settings2 } from "lucide-react";
 import { cn } from '../lib/utils';
 import { parseMusicCell } from '../utils/sargam_parser';
 import { MusicVisualizer } from './MusicVisualizer';
@@ -11,26 +11,59 @@ import { MusicVisualizer } from './MusicVisualizer';
 export function MusicCell({ cell, onChange, theme }) {
     const content = Array.isArray(cell.source) ? cell.source.join('\n') : cell.source;
     const [isPlaying, setIsPlaying] = useState(false);
-    const [parsedData, setParsedData] = useState(null);
+    const [lastParsedData, setLastParsedData] = useState(null);
+    const [voiceControls, setVoiceControls] = useState({});
+    const [showMixer, setShowMixer] = useState(false);
+    const activeNodesRef = useRef({});
 
     const handleChange = (val) => {
         onChange({ ...cell, source: val.split('\n') });
     };
 
+    // Parse content whenever it changes to update controls
+    useEffect(() => {
+        try {
+            const data = parseMusicCell(content.split('\n'));
+            setLastParsedData(data);
+
+            setVoiceControls(prev => {
+                const next = { ...prev };
+                let hasChanges = false;
+
+                // Sync voices
+                Object.keys(data.voices).forEach(v => {
+                    if (!next[v]) {
+                        next[v] = { volume: -5, muted: false };
+                        hasChanges = true;
+                    }
+                });
+
+                // Sync Tala
+                if (data.directives.tala && !next['__tala']) {
+                    next['__tala'] = { volume: -5, muted: false };
+                    hasChanges = true;
+                }
+
+                return hasChanges ? next : prev;
+            });
+        } catch (e) {
+            // silent fail on type; waiting for valid input
+        }
+    }, [content]);
+
     const handlePlay = async () => {
         if (isPlaying) {
-            Tone.getTransport().stop();
-            Tone.getTransport().cancel();
-            setIsPlaying(false);
+            stopPlayback();
             return;
         }
 
         await Tone.start();
 
         try {
+            // Re-parse to get the latest exact structure for playback
             const data = parseMusicCell(content.split('\n'));
-            setParsedData(data);
-            playMusic(data);
+            setLastParsedData(data);
+            playMusic(data, voiceControls);
             setIsPlaying(true);
         } catch (e) {
             console.error(e);
@@ -38,41 +71,91 @@ export function MusicCell({ cell, onChange, theme }) {
         }
     };
 
-    const playMusic = (parsedData) => {
+    const stopPlayback = () => {
         Tone.getTransport().stop();
         Tone.getTransport().cancel();
 
-        const synth = new Tone.PolySynth(Tone.Synth).toDestination();
-        const membrane = new Tone.MembraneSynth().toDestination();
+        Object.values(activeNodesRef.current).forEach(({ synth, volumeNode }) => {
+            try {
+                synth.releaseAll();
+                synth.dispose();
+                volumeNode?.dispose();
+            } catch (e) { /* ignore */ }
+        });
+        activeNodesRef.current = {};
+        setIsPlaying(false);
+    };
 
+    useEffect(() => {
+        // Apply real-time volume/mute changes
+        Object.entries(voiceControls).forEach(([voiceName, control]) => {
+            const nodes = activeNodesRef.current[voiceName];
+            if (nodes && nodes.volumeNode) {
+                nodes.volumeNode.mute = control.muted;
+                nodes.volumeNode.volume.rampTo(control.volume, 0.1);
+            }
+        });
+    }, [voiceControls]);
+
+    const updateVoiceControl = (voiceName, updates) => {
+        setVoiceControls(prev => ({
+            ...prev,
+            [voiceName]: { ...prev[voiceName], ...updates }
+        }));
+    };
+
+    const playMusic = (parsedData, currentControls) => {
+        Tone.getTransport().stop();
+        Tone.getTransport().cancel();
+
+        Object.values(activeNodesRef.current).forEach(({ synth, volumeNode }) => {
+            try { synth.dispose(); volumeNode?.dispose(); } catch (e) { }
+        });
+        activeNodesRef.current = {};
+
+        const bpmRaw = parsedData.directives.tempo || parsedData.directives.bpm || '120';
+        const bpm = parseFloat(bpmRaw) || 120;
+        Tone.getTransport().bpm.value = bpm;
+
+        let maxDuration = 0;
+
+        // Setup Tala (Membrane Synth)
+        if (parsedData.directives.tala) {
+            const talaCtrl = currentControls['__tala'] || { volume: -5, muted: false };
+            const talaVol = new Tone.Volume(talaCtrl.volume).toDestination();
+            talaVol.mute = talaCtrl.muted;
+
+            const membrane = new Tone.MembraneSynth().connect(talaVol);
+            activeNodesRef.current['__tala'] = { synth: membrane, volumeNode: talaVol };
+
+            // Schedule simpler beat for now
+            Tone.getTransport().scheduleRepeat((time) => {
+                membrane.triggerAttackRelease("C2", "8n", time);
+            }, "4n");
+        }
+
+        // Setup Voices
         let SA_FREQ = 261.63;
-        const directives = parsedData.directives || {};
-        const tonicSpec = directives.sa || directives.tonic;
-
+        const tonicSpec = parsedData.directives.sa || parsedData.directives.tonic;
         if (tonicSpec) {
             try {
                 const freq = Tone.Frequency(tonicSpec).toFrequency();
                 if (!isNaN(freq) && freq > 0) SA_FREQ = freq;
-            } catch (e) {
-                console.warn("Invalid tonic:", tonicSpec);
-            }
+            } catch (e) { console.warn("Invalid tonic:", tonicSpec); }
         }
 
         const scales = {
             'S': 0, 'r': 1, 'R': 2, 'g': 3, 'G': 4, 'm': 5, 'M': 6, 'P': 7, 'd': 8, 'D': 9, 'n': 10, 'N': 11
         };
 
-        const bpm = directives.tempo ? parseFloat(directives.tempo) : 120;
-        Tone.getTransport().bpm.value = bpm;
+        Object.entries(parsedData.voices).forEach(([voiceName, voice]) => {
+            const volControl = currentControls[voiceName] || { volume: -5, muted: false };
+            const volumeNode = new Tone.Volume(volControl.volume).toDestination();
+            volumeNode.mute = volControl.muted;
 
-        let maxDuration = 0;
-        if (directives.tala) {
-            Tone.getTransport().scheduleRepeat((time) => {
-                membrane.triggerAttackRelease("C2", "8n", time);
-            }, "4n");
-        }
+            const synth = new Tone.PolySynth(Tone.Synth).connect(volumeNode);
+            activeNodesRef.current[voiceName] = { synth, volumeNode };
 
-        Object.values(parsedData.voices).forEach(voice => {
             let time = 0;
             const beatDur = 60 / bpm;
 
@@ -80,7 +163,19 @@ export function MusicCell({ cell, onChange, theme }) {
                 if (event.duration) {
                     const durSeconds = event.duration * beatDur;
                     if (event.type === 'note' && event.swara) {
-                        let semitones = scales[event.swara] || 0;
+                        let swara = event.swara;
+                        if (swara.length > 1) {
+                            if (swara.toUpperCase() === 'SA') swara = 'S';
+                            else if (swara.toUpperCase() === 'RI') swara = 'R';
+                            else if (swara.toUpperCase() === 'GA') swara = 'G';
+                            else if (swara.toUpperCase() === 'MA') swara = 'M';
+                            else if (swara.toUpperCase() === 'PA') swara = 'P';
+                            else if (swara.toUpperCase() === 'DHA') swara = 'D';
+                            else if (swara.toUpperCase() === 'NI') swara = 'N';
+                            else swara = swara[0];
+                        }
+
+                        let semitones = scales[swara] || 0;
                         if (event.variant === 'k' || event.variant === 'b') semitones -= 1;
                         if (event.variant === 't' || event.variant === '#') semitones += 1;
                         semitones += (event.octave || 0) * 12;
@@ -97,30 +192,107 @@ export function MusicCell({ cell, onChange, theme }) {
         });
 
         Tone.getTransport().start();
-        Tone.getTransport().schedule((time) => {
-            Tone.getTransport().stop();
-            setIsPlaying(false);
+        Tone.getTransport().schedule(() => {
+            stopPlayback();
         }, maxDuration + 0.1);
     };
 
     return (
-        <div className="flex flex-col">
+        <div className="flex flex-col relative">
             <div className="flex items-center justify-between px-4 py-2 bg-muted/10 border-b border-border">
-                <button
-                    onClick={handlePlay}
-                    className={cn(
-                        "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm active:scale-95",
-                        isPlaying
-                            ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            : "bg-primary text-primary-foreground hover:bg-primary/90"
-                    )}
-                >
-                    {isPlaying ? (
-                        <><Square className="w-3 h-3 fill-current" /> Stop</>
-                    ) : (
-                        <><Play className="w-3 h-3 fill-current" /> Play</>
-                    )}
-                </button>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={handlePlay}
+                        className={cn(
+                            "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm active:scale-95",
+                            isPlaying
+                                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                : "bg-primary text-primary-foreground hover:bg-primary/90"
+                        )}
+                    >
+                        {isPlaying ? (
+                            <><Square className="w-3 h-3 fill-current" /> Stop</>
+                        ) : (
+                            <><Play className="w-3 h-3 fill-current" /> Play</>
+                        )}
+                    </button>
+
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowMixer(!showMixer)}
+                            className={cn(
+                                "p-1.5 rounded-full hover:bg-muted transition-colors",
+                                showMixer && "bg-muted text-primary"
+                            )}
+                            title="Instrument Mixer"
+                        >
+                            <Settings2 className="w-4 h-4" />
+                        </button>
+
+                        {showMixer && (
+                            <div className="absolute top-8 left-0 z-50 w-64 bg-popover border border-border rounded-lg shadow-lg p-3 animate-in fade-in zoom-in-95 duration-200 bg-background">
+                                <h4 className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Mixer</h4>
+                                <div className="space-y-3">
+                                    {/* Tala Control */}
+                                    {lastParsedData?.directives?.tala && (
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-medium">Tala (Rhythm)</span>
+                                                <button
+                                                    onClick={() => updateVoiceControl('__tala', { muted: !voiceControls['__tala']?.muted })}
+                                                    className={cn("p-1 rounded-sm hover:bg-muted", voiceControls['__tala']?.muted && "text-destructive")}
+                                                >
+                                                    {voiceControls['__tala']?.muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                                                </button>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="-30"
+                                                max="0"
+                                                step="1"
+                                                value={voiceControls['__tala']?.volume ?? -5}
+                                                onChange={(e) => updateVoiceControl('__tala', { volume: parseFloat(e.target.value) })}
+                                                className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
+                                                disabled={voiceControls['__tala']?.muted}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Voice Controls */}
+                                    {Object.keys(voiceControls).filter(k => k !== '__tala').map(v => (
+                                        <div key={v} className="space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-medium uppercase truncate max-w-[120px]">{v}</span>
+                                                <button
+                                                    onClick={() => updateVoiceControl(v, { muted: !voiceControls[v]?.muted })}
+                                                    className={cn("p-1 rounded-sm hover:bg-muted", voiceControls[v]?.muted && "text-destructive")}
+                                                >
+                                                    {voiceControls[v]?.muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                                                </button>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="-30"
+                                                max="0"
+                                                step="1"
+                                                value={voiceControls[v]?.volume ?? -5}
+                                                onChange={(e) => updateVoiceControl(v, { volume: parseFloat(e.target.value) })}
+                                                className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
+                                                disabled={voiceControls[v]?.muted}
+                                            />
+                                        </div>
+                                    ))}
+
+                                    {Object.keys(voiceControls).length === 0 && (
+                                        <div className="text-xs text-muted-foreground italic text-center py-2">
+                                            No instruments detected
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
             <div className="p-1">
                 <CodeMirror
@@ -132,9 +304,9 @@ export function MusicCell({ cell, onChange, theme }) {
                     className="text-sm font-mono focus-within:ring-0"
                 />
             </div>
-            {isPlaying && parsedData && (
+            {isPlaying && lastParsedData && (
                 <div className="px-4 pb-4">
-                    <MusicVisualizer parsedData={parsedData} isPlaying={isPlaying} />
+                    <MusicVisualizer parsedData={lastParsedData} isPlaying={isPlaying} />
                 </div>
             )}
         </div>

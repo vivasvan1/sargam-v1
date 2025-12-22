@@ -1,0 +1,469 @@
+[
+  {
+    "directives": {
+      "tempo": "120"
+    },
+    "voices": {
+      "default": {
+        "name": "default",
+        "events": [
+          {
+            "type": "note",
+            "swara": "S",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          },
+          {
+            "type": "note",
+            "swara": "R",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          },
+          {
+            "type": "note",
+            "swara": "G",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          },
+          {
+            "type": "note",
+            "swara": "M",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          }
+        ]
+      }
+    }
+  },
+  {
+    "directives": {},
+    "voices": {
+      "default": {
+        "name": "default",
+        "events": [
+          {
+            "type": "note",
+            "swara": "S",
+            "octave": 1,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "R",
+            "octave": -1,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "G",
+            "octave": 2,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "M",
+            "octave": -2,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "directives": {},
+    "voices": {
+      "default": {
+        "name": "default",
+        "events": [
+          {
+            "type": "note",
+            "swara": "R",
+            "octave": 0,
+            "variant": "k",
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "G",
+            "octave": 0,
+            "variant": "t",
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "M",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "directives": {},
+    "voices": {
+      "default": {
+        "name": "default",
+        "events": [
+          {
+            "type": "note",
+            "swara": "S",
+            "octave": 0,
+            "microtone": [
+              25,
+              "c"
+            ],
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "R",
+            "octave": 0,
+            "microtone": [
+              -0.5,
+              "st"
+            ],
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "directives": {},
+    "voices": {
+      "default": {
+        "name": "default",
+        "events": [
+          {
+            "type": "note",
+            "swara": "S",
+            "octave": 0,
+            "duration": 2,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "R",
+            "octave": 0,
+            "duration": 0.5,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "rest",
+            "duration": 0.5,
+            "line_index": 0
+          },
+          {
+            "type": "hold",
+            "duration": 0.5,
+            "line_index": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "directives": {},
+    "voices": {
+      "default": {
+        "name": "default",
+        "events": [
+          {
+            "type": "note",
+            "swara": "R",
+            "octave": 1,
+            "variant": "k",
+            "duration": 0.5,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "S",
+            "octave": 1,
+            "microtone": [
+              25,
+              "c"
+            ],
+            "duration": 1.5,
+            "ornaments": [],
+            "line_index": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "directives": {},
+    "voices": {
+      "default": {
+        "name": "default",
+        "events": [
+          {
+            "type": "note",
+            "swara": "S",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [
+              {
+                "name": "meend",
+                "params": [
+                  "P"
+                ]
+              }
+            ],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "G",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [
+              {
+                "name": "kan",
+                "params": [
+                  "R"
+                ]
+              },
+              {
+                "name": "andolan",
+                "params": []
+              }
+            ],
+            "line_index": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "directives": {},
+    "voices": {
+      "default": {
+        "name": "default",
+        "events": [
+          {
+            "type": "note",
+            "swara": "S",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "lyric": "mo",
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "R",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "lyric": "re",
+            "line_index": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "directives": {},
+    "voices": {
+      "default": {
+        "name": "default",
+        "events": [
+          {
+            "type": "bar",
+            "double": false,
+            "line_index": 0
+          },
+          {
+            "type": "bar",
+            "double": true,
+            "line_index": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "directives": {},
+    "voices": {
+      "melody": {
+        "name": "melody",
+        "events": [
+          {
+            "type": "note",
+            "swara": "S",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          },
+          {
+            "type": "note",
+            "swara": "R",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          },
+          {
+            "type": "note",
+            "swara": "G",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          },
+          {
+            "type": "note",
+            "swara": "M",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          }
+        ]
+      },
+      "tanpura": {
+        "name": "tanpura",
+        "events": [
+          {
+            "type": "note",
+            "swara": "P",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 3
+          },
+          {
+            "type": "hold",
+            "duration": 1,
+            "line_index": 3
+          },
+          {
+            "type": "note",
+            "swara": "P",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 3
+          },
+          {
+            "type": "hold",
+            "duration": 1,
+            "line_index": 3
+          }
+        ]
+      }
+    }
+  },
+  {
+    "directives": {},
+    "voices": {
+      "default": {
+        "name": "default",
+        "events": [
+          {
+            "type": "note",
+            "swara": "S",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "R",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "G",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "M",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 0
+          },
+          {
+            "type": "bar",
+            "double": true,
+            "line_index": 0
+          },
+          {
+            "type": "note",
+            "swara": "P",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          },
+          {
+            "type": "note",
+            "swara": "D",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          },
+          {
+            "type": "note",
+            "swara": "N",
+            "octave": 0,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          },
+          {
+            "type": "note",
+            "swara": "S",
+            "octave": 1,
+            "duration": 1,
+            "ornaments": [],
+            "line_index": 1
+          }
+        ]
+      }
+    }
+  }
+]
