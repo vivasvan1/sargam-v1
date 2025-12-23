@@ -109,7 +109,7 @@ export function MusicVisualizer({ parsedData, isPlaying }) {
             ref={containerRef}
             className="mt-6 p-6 bg-card/60 backdrop-blur-xl border border-border/40 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700"
         >
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between">
                 <div className="space-y-1">
                     <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary/80">
                         Live Score
@@ -129,7 +129,7 @@ export function MusicVisualizer({ parsedData, isPlaying }) {
                 </div>
             </div>
 
-            <div className="overflow-x-auto pb-6 custom-scrollbar">
+            <div className="overflow-x-auto custom-scrollbar px-3">
                 <div className="min-w-max flex flex-col gap-8">
                     {/* Table Header: Beat Numbers */}
                     {voiceData.beatCount > 0 && (
