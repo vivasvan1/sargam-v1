@@ -10,5 +10,3 @@ services:
       - ./frontend:/app
       - /app/node_modules
     command: bun run dev
-    depends_on:
-      - backend
