@@ -23,18 +23,47 @@ import {
   X
 } from "lucide-react";
 
+// Load default notebook
+const loadDefaultNotebook = async () => {
+  try {
+    const response = await fetch('/raag_khamaj_demo.imnb');
+    if (response.ok) {
+      const content = await response.json();
+      return content;
+    }
+  } catch (err) {
+    console.error('Failed to load default notebook', err);
+  }
+  // Fallback to empty notebook
+  return {
+    imnb_version: 1,
+    metadata: { title: 'New Notebook' },
+    cells: []
+  };
+};
+
 function App() {
   const [notebook, setNotebook] = useState({
     imnb_version: 1,
     metadata: { title: 'New Notebook' },
     cells: []
   });
-  const [filePath, setFilePath] = useState('untitled.imnb');
+  const [filePath, setFilePath] = useState('raag_khamaj_demo.imnb');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('sargam-theme') || 'light';
   });
+
+  // Load default notebook on mount
+  useEffect(() => {
+    loadDefaultNotebook().then(defaultNotebook => {
+      setNotebook(defaultNotebook);
+      if (defaultNotebook.metadata?.title) {
+        setFilePath('raag_khamaj_demo.imnb');
+      }
+    });
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
