@@ -249,15 +249,37 @@ def parse_token(token: str, default_duration: float, line_index: int = 0) -> Opt
         except ValueError:
             pass
 
-    # Now we have swara + modifiers
-    # Modifiers are ', , k, t, #, b, n+, n-
-    modifier_match = re.search(r"[',#b]|n[+-]|[kt](?![a-z])", note_part)
-    if modifier_match:
-        swara = note_part[:modifier_match.start()]
-        mods_part = note_part[modifier_match.start():]
+    # Check for lowercase komal swaras (r, g, d, n) - these are equivalent to Rk, Gk, Dk, Nk
+    komal_map = {'r': 'R', 'g': 'G', 'd': 'D', 'n': 'N'}
+    is_lowercase_komal = False
+    if note_part and len(note_part) > 0 and note_part[0] in komal_map:
+        # Check if it's a standalone lowercase komal swara (possibly with modifiers)
+        # Match a single lowercase letter followed by optional modifiers
+        komal_match = re.match(r"^([rgdn])(.*)$", note_part)
+        if komal_match:
+            lowercase_swara = komal_match.group(1)
+            swara = komal_map[lowercase_swara]
+            mods_part = komal_match.group(2)
+            is_lowercase_komal = True
+        else:
+            # Fall through to normal parsing
+            modifier_match = re.search(r"[',#b]|n[+-]|[kt](?![a-z])", note_part)
+            if modifier_match:
+                swara = note_part[:modifier_match.start()]
+                mods_part = note_part[modifier_match.start():]
+            else:
+                swara = note_part
+                mods_part = ""
     else:
-        swara = note_part
-        mods_part = ""
+        # Normal parsing for uppercase swaras
+        # Modifiers are ', , k, t, #, b, n+, n-
+        modifier_match = re.search(r"[',#b]|n[+-]|[kt](?![a-z])", note_part)
+        if modifier_match:
+            swara = note_part[:modifier_match.start()]
+            mods_part = note_part[modifier_match.start():]
+        else:
+            swara = note_part
+            mods_part = ""
 
     # Determine octave offset
     octave = 0
@@ -272,7 +294,24 @@ def parse_token(token: str, default_duration: float, line_index: int = 0) -> Opt
     
     variant = None
     microtone = None
-    if remaining_mods:
+    if is_lowercase_komal:
+        # Lowercase komal swaras always have variant='k'
+        # But check if there are additional modifiers in remaining_mods
+        if remaining_mods:
+            m = _microtone_re.fullmatch(remaining_mods)
+            if m:
+                sign = 1.0 if m.group('sign') == '+' else -1.0
+                value = float(m.group('value'))
+                unit = m.group('unit')
+                microtone = (sign * value, unit)
+                variant = 'k'  # Still komal, but with microtone
+            else:
+                # If there are other modifiers, they should be combined with 'k'
+                # For now, just use 'k' as the variant
+                variant = 'k'
+        else:
+            variant = 'k'
+    elif remaining_mods:
         m = _microtone_re.fullmatch(remaining_mods)
         if m:
             sign = 1.0 if m.group('sign') == '+' else -1.0

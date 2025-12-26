@@ -174,13 +174,37 @@ export function parseToken(token: string, defaultDuration: number): Event | null
   }
 
   // 4. Parse Swara, Octave, and the rest (Variant, Microtone)
-  // Find where swara ends
-  const modifierMatch = notePart.match(/[',#b]|n[+-]|[kt](?![a-z])/);
+  // Check for lowercase komal swaras (r, g, d, n) - these are equivalent to Rk, Gk, Dk, Nk
+  const komalMap: Record<string, string> = { 'r': 'R', 'g': 'G', 'd': 'D', 'n': 'N' };
+  let isLowercaseKomal = false;
+  
   let swara = notePart;
   let modsPart = '';
-  if (modifierMatch && modifierMatch.index !== undefined) {
-    swara = notePart.slice(0, modifierMatch.index);
-    modsPart = notePart.slice(modifierMatch.index);
+  
+  if (notePart && notePart.length > 0 && notePart[0] in komalMap) {
+    // Check if it's a standalone lowercase komal swara (possibly with modifiers)
+    const komalMatch = notePart.match(/^([rgdn])(.*)$/);
+    if (komalMatch) {
+      const lowercaseSwara = komalMatch[1];
+      swara = komalMap[lowercaseSwara];
+      modsPart = komalMatch[2];
+      isLowercaseKomal = true;
+    } else {
+      // Fall through to normal parsing
+      const modifierMatch = notePart.match(/[',#b]|n[+-]|[kt](?![a-z])/);
+      if (modifierMatch && modifierMatch.index !== undefined) {
+        swara = notePart.slice(0, modifierMatch.index);
+        modsPart = notePart.slice(modifierMatch.index);
+      }
+    }
+  } else {
+    // Normal parsing for uppercase swaras
+    // Find where swara ends
+    const modifierMatch = notePart.match(/[',#b]|n[+-]|[kt](?![a-z])/);
+    if (modifierMatch && modifierMatch.index !== undefined) {
+      swara = notePart.slice(0, modifierMatch.index);
+      modsPart = notePart.slice(modifierMatch.index);
+    }
   }
 
   let octave = 0;
@@ -195,7 +219,26 @@ export function parseToken(token: string, defaultDuration: number): Event | null
   // Remove octave marks to find variant/microtone
   const remainingMods = modsPart.replace(/'/g, '').replace(/,/g, '');
 
-  if (remainingMods) {
+  if (isLowercaseKomal) {
+    // Lowercase komal swaras always have variant='k'
+    // But check if there are additional modifiers in remainingMods
+    if (remainingMods) {
+      const m = remainingMods.match(MICROTONE_RE);
+      if (m) {
+        const sign = m[1] === '+' ? 1.0 : -1.0;
+        const value = parseFloat(m[2]);
+        const unit = m[3];
+        microtone = [sign * value, unit];
+        variant = 'k';  // Still komal, but with microtone
+      } else {
+        // If there are other modifiers, they should be combined with 'k'
+        // For now, just use 'k' as the variant
+        variant = 'k';
+      }
+    } else {
+      variant = 'k';
+    }
+  } else if (remainingMods) {
     const m = remainingMods.match(MICROTONE_RE);
     if (m) {
       const sign = m[1] === '+' ? 1.0 : -1.0;

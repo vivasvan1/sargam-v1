@@ -80,6 +80,7 @@ NoteToken ::= Swara Octave? Variant? Duration? Ornaments? Lyric?
 
 Swara     ::= 'S' | 'R' | 'G' | 'M' | 'P' | 'D' | 'N'
             | 'SA' | 'RI' | 'GA' | 'MA' | 'PA' | 'DHA' | 'NI'
+            | 'r' | 'g' | 'd' | 'n'  // lowercase komal variants (equivalent to Rk, Gk, Dk, Nk)
 
 Octave    ::= ("'" | ',')+
               // each `'` raises the pitch by one octave;
@@ -120,10 +121,10 @@ WS        ::= space or tab
 ### Examples
 
 * `S` – shuddha Sa, default octave, default duration.
-* `Rk` – komal Re (flat).  The article on Indian swaras notes that Re, Ga, Dha and Ni can be shuddha or komal, while Ma can be shuddha or tivra【655250085019640†L120-L130】.
+* `Rk` or `r` – komal Re (flat).  The article on Indian swaras notes that Re, Ga, Dha and Ni can be shuddha or komal, while Ma can be shuddha or tivra【655250085019640†L120-L130】.  Komal swaras can be written as either lowercase (`r`, `g`, `d`, `n`) or uppercase with `k` suffix (`Rk`, `Gk`, `Dk`, `Nk`).
 * `M#'` – tivra Ma in the upper octave.
 * `G:2` – Gandhar lasting two beats.
-* `Dk,:0.5` – komal Dha in the lower octave (one comma) lasting half a beat.
+* `Dk,:0.5` or `d,:0.5` – komal Dha in the lower octave (one comma) lasting half a beat.
 * `S+meend(P)` – Sa with a meend ornament sliding to Pa.
 * `G="mo"` – Ga associated with the lyric syllable “mo”.
 * `_0.5` – rest lasting half a beat.
