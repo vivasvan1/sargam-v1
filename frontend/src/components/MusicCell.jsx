@@ -484,42 +484,107 @@ export function MusicCell({ cell, onChange, theme }) {
             </button>
 
             {showMixer && (
-              <div className="relative z-[9999]">
-                <div className="relative md:absolute md:top-10 md:left-0 z-[9999] w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-[288px] md:w-72 bg-popover border border-border rounded-lg shadow-lg p-3 animate-in fade-in zoom-in-95 duration-200 bg-background flex flex-col max-h-[calc(100vh-6rem)] md:max-h-[calc(100vh-8rem)]">
-                  <div className="flex items-center justify-between mb-2 shrink-0">
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Mixer
-                    </h4>
-                    <button
-                      onClick={() => setShowMixer(false)}
-                      className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground shrink-0 min-w-[32px] min-h-[32px] flex items-center justify-center touch-manipulation"
-                      aria-label="Close mixer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="space-y-3 overflow-y-auto flex-1 min-h-0">
-                    {/* Tala Control */}
-                    {lastParsedData?.directives?.tala && (
-                      <div className="space-y-1">
+              <div className="relative z-[9999] w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-[288px] md:w-72 bg-popover border border-border rounded-lg shadow-lg p-3 animate-in fade-in zoom-in-95 duration-200 bg-background flex flex-col max-h-[calc(100vh-6rem)] md:max-h-[calc(100vh-8rem)]">
+                <div className="flex items-center justify-between mb-2 shrink-0">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Mixer
+                  </h4>
+                  <button
+                    onClick={() => setShowMixer(false)}
+                    className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground shrink-0 min-w-[32px] min-h-[32px] flex items-center justify-center touch-manipulation"
+                    aria-label="Close mixer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-3 overflow-y-auto flex-1 min-h-0">
+                  {/* Tala Control */}
+                  {lastParsedData?.directives?.tala && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-0.5 min-w-0 flex-1 mr-2">
+                          <span className="text-xs font-medium">
+                            Tala (Rhythm)
+                          </span>
+                          <select
+                            className="text-[10px] h-6 bg-muted/50 border-none rounded px-1 min-w-0"
+                            value={
+                              voiceControls["__tala"]?.instrument || "tabla"
+                            }
+                            onChange={(e) =>
+                              updateVoiceControl("__tala", {
+                                instrument: e.target.value,
+                              })
+                            }
+                          >
+                            {Object.values(INSTRUMENTS)
+                              .filter((i) => i.category === "rhythm")
+                              .map((inst) => (
+                                <option key={inst.id} value={inst.id}>
+                                  {inst.name}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                        <button
+                          onClick={() =>
+                            updateVoiceControl("__tala", {
+                              muted: !voiceControls["__tala"]?.muted,
+                            })
+                          }
+                          className={cn(
+                            "p-1 rounded-sm hover:bg-muted",
+                            voiceControls["__tala"]?.muted && "text-destructive"
+                          )}
+                        >
+                          {voiceControls["__tala"]?.muted ? (
+                            <VolumeX className="w-3 h-3" />
+                          ) : (
+                            <Volume2 className="w-3 h-3" />
+                          )}
+                        </button>
+                      </div>
+                      <input
+                        type="range"
+                        min="-30"
+                        max="0"
+                        step="1"
+                        value={voiceControls["__tala"]?.volume ?? -5}
+                        onChange={(e) =>
+                          updateVoiceControl("__tala", {
+                            volume: parseFloat(e.target.value),
+                          })
+                        }
+                        className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
+                        disabled={voiceControls["__tala"]?.muted}
+                      />
+                    </div>
+                  )}
+
+                  {/* Voice Controls */}
+                  {Object.keys(voiceControls)
+                    .filter((k) => k !== "__tala")
+                    .map((v) => (
+                      <div
+                        key={v}
+                        className="space-y-1.5 pt-1 border-t border-border/50 first:border-0 first:pt-0"
+                      >
                         <div className="flex items-center justify-between">
                           <div className="flex flex-col gap-0.5 min-w-0 flex-1 mr-2">
-                            <span className="text-xs font-medium">
-                              Tala (Rhythm)
+                            <span className="text-xs font-medium uppercase truncate">
+                              {v}
                             </span>
                             <select
                               className="text-[10px] h-6 bg-muted/50 border-none rounded px-1 min-w-0"
-                              value={
-                                voiceControls["__tala"]?.instrument || "tabla"
-                              }
+                              value={voiceControls[v]?.instrument || "synth"}
                               onChange={(e) =>
-                                updateVoiceControl("__tala", {
+                                updateVoiceControl(v, {
                                   instrument: e.target.value,
                                 })
                               }
                             >
                               {Object.values(INSTRUMENTS)
-                                .filter((i) => i.category === "rhythm")
+                                .filter((i) => i.category === "melody")
                                 .map((inst) => (
                                   <option key={inst.id} value={inst.id}>
                                     {inst.name}
@@ -527,116 +592,48 @@ export function MusicCell({ cell, onChange, theme }) {
                                 ))}
                             </select>
                           </div>
-                          <button
-                            onClick={() =>
-                              updateVoiceControl("__tala", {
-                                muted: !voiceControls["__tala"]?.muted,
-                              })
-                            }
-                            className={cn(
-                              "p-1 rounded-sm hover:bg-muted",
-                              voiceControls["__tala"]?.muted &&
-                                "text-destructive"
-                            )}
-                          >
-                            {voiceControls["__tala"]?.muted ? (
-                              <VolumeX className="w-3 h-3" />
-                            ) : (
-                              <Volume2 className="w-3 h-3" />
-                            )}
-                          </button>
+                          <div className="flex flex-col items-end gap-1">
+                            <button
+                              onClick={() =>
+                                updateVoiceControl(v, {
+                                  muted: !voiceControls[v]?.muted,
+                                })
+                              }
+                              className={cn(
+                                "p-1 rounded-sm hover:bg-muted",
+                                voiceControls[v]?.muted && "text-destructive"
+                              )}
+                            >
+                              {voiceControls[v]?.muted ? (
+                                <VolumeX className="w-3 h-3" />
+                              ) : (
+                                <Volume2 className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
                         </div>
                         <input
                           type="range"
                           min="-30"
                           max="0"
                           step="1"
-                          value={voiceControls["__tala"]?.volume ?? -5}
+                          value={voiceControls[v]?.volume ?? -5}
                           onChange={(e) =>
-                            updateVoiceControl("__tala", {
+                            updateVoiceControl(v, {
                               volume: parseFloat(e.target.value),
                             })
                           }
                           className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
-                          disabled={voiceControls["__tala"]?.muted}
+                          disabled={voiceControls[v]?.muted}
                         />
                       </div>
-                    )}
+                    ))}
 
-                    {/* Voice Controls */}
-                    {Object.keys(voiceControls)
-                      .filter((k) => k !== "__tala")
-                      .map((v) => (
-                        <div
-                          key={v}
-                          className="space-y-1.5 pt-1 border-t border-border/50 first:border-0 first:pt-0"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-col gap-0.5 min-w-0 flex-1 mr-2">
-                              <span className="text-xs font-medium uppercase truncate">
-                                {v}
-                              </span>
-                              <select
-                                className="text-[10px] h-6 bg-muted/50 border-none rounded px-1 min-w-0"
-                                value={voiceControls[v]?.instrument || "synth"}
-                                onChange={(e) =>
-                                  updateVoiceControl(v, {
-                                    instrument: e.target.value,
-                                  })
-                                }
-                              >
-                                {Object.values(INSTRUMENTS)
-                                  .filter((i) => i.category === "melody")
-                                  .map((inst) => (
-                                    <option key={inst.id} value={inst.id}>
-                                      {inst.name}
-                                    </option>
-                                  ))}
-                              </select>
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <button
-                                onClick={() =>
-                                  updateVoiceControl(v, {
-                                    muted: !voiceControls[v]?.muted,
-                                  })
-                                }
-                                className={cn(
-                                  "p-1 rounded-sm hover:bg-muted",
-                                  voiceControls[v]?.muted && "text-destructive"
-                                )}
-                              >
-                                {voiceControls[v]?.muted ? (
-                                  <VolumeX className="w-3 h-3" />
-                                ) : (
-                                  <Volume2 className="w-3 h-3" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                          <input
-                            type="range"
-                            min="-30"
-                            max="0"
-                            step="1"
-                            value={voiceControls[v]?.volume ?? -5}
-                            onChange={(e) =>
-                              updateVoiceControl(v, {
-                                volume: parseFloat(e.target.value),
-                              })
-                            }
-                            className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
-                            disabled={voiceControls[v]?.muted}
-                          />
-                        </div>
-                      ))}
-
-                    {Object.keys(voiceControls).length === 0 && (
-                      <div className="text-xs text-muted-foreground italic text-center py-2">
-                        No instruments detected
-                      </div>
-                    )}
-                  </div>
+                  {Object.keys(voiceControls).length === 0 && (
+                    <div className="text-xs text-muted-foreground italic text-center py-2">
+                      No instruments detected
+                    </div>
+                  )}
                 </div>
               </div>
             )}

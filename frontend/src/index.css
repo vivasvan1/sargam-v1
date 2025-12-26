@@ -83,6 +83,10 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  button {
+    @apply hover:cursor-pointer;
+  }
   
   /* Reset headings, but exclude those inside .prose to allow typography plugin to work */
   h1:not(.prose h1),

@@ -97,7 +97,7 @@ function App() {
   const addCell = (type, index) => {
     if (!notebook) return;
     const newCell = type === 'markdown'
-      ? { cell_type: 'markdown', source: ['# New markdown cell\nDouble click to edit.'] }
+      ? { cell_type: 'markdown', source: ['# New markdown cell\nDouble click or double tap to edit.'] }
       : { cell_type: 'music', metadata: { language: 'sargam-v1' }, source: ['#voice melody', 'S R G M'] };
 
     const newCells = [...notebook.cells];

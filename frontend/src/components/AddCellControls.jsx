@@ -8,7 +8,7 @@ export function AddCellControls({ onAdd }) {
             <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-10">
                 <button
                     onClick={() => onAdd('music')}
-                    className="flex items-center gap-1.5 px-3 py-2 md:px-2.5 md:py-1 bg-card border border-border rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-muted transition-all shadow-sm active:scale-95 min-h-[44px] md:min-h-0 touch-manipulation"
+                    className="flex items-center gap-1.5 px-3 py-2 md:px-2.5 md:py-1 bg-background border border-border rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-muted transition-all shadow-sm active:scale-95 min-h-[44px] md:min-h-0 touch-manipulation"
                     aria-label="Add music cell"
                 >
                     <Plus className="w-3.5 h-3.5 md:w-3 md:h-3" />
@@ -16,7 +16,7 @@ export function AddCellControls({ onAdd }) {
                 </button>
                 <button
                     onClick={() => onAdd('markdown')}
-                    className="flex items-center gap-1.5 px-3 py-2 md:px-2.5 md:py-1 bg-card border border-border rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-muted transition-all shadow-sm active:scale-95 min-h-[44px] md:min-h-0 touch-manipulation"
+                    className="flex items-center gap-1.5 px-3 py-2 md:px-2.5 md:py-1 bg-background border border-border rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-muted transition-all shadow-sm active:scale-95 min-h-[44px] md:min-h-0 touch-manipulation"
                     aria-label="Add markdown cell"
                 >
                     <Plus className="w-3.5 h-3.5 md:w-3 md:h-3" />
