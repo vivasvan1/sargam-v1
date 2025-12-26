@@ -17,9 +17,10 @@ export function Cell({ cell, onChange, onDelete, theme }) {
                 </div>
                 <button
                     onClick={onDelete}
-                    className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-md transition-all shrink-0"
+                    className="opacity-100 md:opacity-0 md:group-hover/cell:opacity-100 p-2 md:p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-md transition-all shrink-0 active:scale-95 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center touch-manipulation"
+                    aria-label="Delete cell"
                 >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4 md:w-3.5 md:h-3.5" />
                 </button>
             </div>
 

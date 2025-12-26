@@ -8,8 +8,8 @@ import { AddCellControls } from './components/AddCellControls';
 
 // Libs
 import { toast, Toaster } from 'sonner';
-import * as ScrollArea from '@radix-ui/react-scroll-area';
 import * as Separator from '@radix-ui/react-separator';
+import * as ScrollArea from '@radix-ui/react-scroll-area';
 import {
   Save,
   Plus,
@@ -18,7 +18,9 @@ import {
   Music2,
   Layout,
   MoreHorizontal,
-  Download
+  Download,
+  Menu,
+  X
 } from "lucide-react";
 
 function App() {
@@ -29,6 +31,7 @@ function App() {
   });
   const [filePath, setFilePath] = useState('untitled.imnb');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('sargam-theme') || 'light';
   });
@@ -112,18 +115,36 @@ function App() {
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden selection:bg-primary/10">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <Sidebar
         onFileUpload={handleFileUpload}
         onNew={handleNew}
         theme={theme}
         setTheme={setTheme}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
       <main className="flex-1 flex flex-col min-w-0 bg-muted/5">
         {/* Header */}
-        <header className="h-16 border-b border-border bg-card flex items-center justify-between px-8 sticky top-0 z-10 shrink-0 shadow-sm">
-          <div className="flex items-center gap-4 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+        <header className="h-14 md:h-16 border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm">
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="md:hidden p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground shrink-0"
+            aria-label="Toggle sidebar"
+          >
+            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
+            <div className="hidden md:flex w-10 h-10 rounded-xl bg-muted items-center justify-center text-muted-foreground shrink-0">
               <FileMusic className="w-5 h-5" />
             </div>
 
@@ -140,13 +161,13 @@ function App() {
                     onBlur={() => setIsEditingTitle(false)}
                     onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingTitle(false); }}
                     autoFocus
-                    className="bg-transparent border-none p-0 font-bold text-xl outline-none focus:ring-0 w-full"
+                    className="bg-transparent border-none p-0 font-bold text-base md:text-xl outline-none focus:ring-0 w-full"
                   />
                 ) : (
                   <>
                     <h3
                       onDoubleClick={() => setIsEditingTitle(true)}
-                      className="font-bold text-xl truncate cursor-text hover:text-primary transition-colors"
+                      className="font-bold text-base md:text-xl truncate cursor-text hover:text-primary transition-colors"
                     >
                       {notebook.metadata?.title || 'Untitled Notebook'}
                     </h3>
@@ -159,20 +180,20 @@ function App() {
                   </>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground font-mono truncate">{filePath}</p>
+              <p className="text-xs text-muted-foreground font-mono truncate hidden md:block">{filePath}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <button
               onClick={handleDownload}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-all shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-primary text-primary-foreground rounded-lg text-xs md:text-sm font-medium hover:opacity-90 transition-all shadow-sm active:scale-95"
             >
               <Download className="w-4 h-4" />
-              Download
+              <span className="hidden sm:inline">Download</span>
             </button>
-            <Separator.Root orientation="vertical" className="h-4 bg-border w-[1px] mx-1" />
-            <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground">
+            <Separator.Root orientation="vertical" className="hidden md:block h-4 bg-border w-px mx-1" />
+            <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hidden md:flex">
               <MoreHorizontal className="w-5 h-5" />
             </button>
           </div>
@@ -181,7 +202,7 @@ function App() {
         {/* Content */}
         <ScrollArea.Root className="flex-1 overflow-hidden h-full">
           <ScrollArea.Viewport className="h-full w-full">
-            <div className="max-w-4xl mx-auto py-12 px-8">
+            <div className="max-w-4xl mx-auto py-6 md:py-12 px-4 md:px-8">
               <div className="">
                 {notebook.cells.map((cell, idx) => (
                   <div key={idx} className="relative">
@@ -200,23 +221,23 @@ function App() {
                 ))}
 
                 {notebook.cells.length === 0 && (
-                  <div className="border-2 border-dashed border-border rounded-xl p-12 flex flex-col items-center justify-center text-muted-foreground gap-4">
-                    <Layout className="w-12 h-12 opacity-20" />
+                  <div className="border-2 border-dashed border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center text-muted-foreground gap-4">
+                    <Layout className="w-10 h-10 md:w-12 md:h-12 opacity-20" />
                     <div className="text-center">
-                      <p className="font-medium">No cells in this notebook</p>
-                      <p className="text-sm">Add a cell to start creating music</p>
+                      <p className="font-medium text-sm md:text-base">No cells in this notebook</p>
+                      <p className="text-xs md:text-sm">Add a cell to start creating music</p>
                     </div>
-                    <div className="flex gap-3 mt-2">
+                    <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full sm:w-auto">
                       <button
                         onClick={() => addCell('music', -1)}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:opacity-90 transition-all shadow-sm"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:opacity-90 transition-all shadow-sm active:scale-95 min-h-[44px]"
                       >
                         <Plus className="w-4 h-4" />
                         Music Cell
                       </button>
                       <button
                         onClick={() => addCell('markdown', -1)}
-                        className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-xs font-bold hover:bg-muted transition-all border border-border"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-secondary text-secondary-foreground rounded-lg text-xs font-bold hover:bg-muted transition-all border border-border active:scale-95 min-h-[44px]"
                       >
                         <Plus className="w-4 h-4" />
                         Markdown Cell
@@ -227,7 +248,7 @@ function App() {
               </div>
             </div>
           </ScrollArea.Viewport>
-          <ScrollArea.Scrollbar className="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[160ms] ease-out hover:bg-muted w-2.5" orientation="vertical">
+          <ScrollArea.Scrollbar className="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-160 ease-out hover:bg-muted w-2.5" orientation="vertical">
             <ScrollArea.Thumb className="flex-1 bg-muted-foreground/30 rounded-[10px] relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]" />
           </ScrollArea.Scrollbar>
         </ScrollArea.Root>
