@@ -106,7 +106,35 @@ export function parseMusicCell(lines: string[]): MusicCell {
       content = line.split('#')[0];
     }
 
-    const tokens = content.trim().split(/\s+/).filter(tok => tok);
+    // Tokenize while respecting parentheses (for ornaments with parameters)
+    const tokens: string[] = [];
+    let current = '';
+    let depth = 0;
+    const trimmed = content.trim();
+    
+    for (let i = 0; i < trimmed.length; i++) {
+      const ch = trimmed[i];
+      if (ch === '(') {
+        depth++;
+        current += ch;
+      } else if (ch === ')') {
+        depth--;
+        current += ch;
+      } else if ((ch === ' ' || ch === '\t') && depth === 0) {
+        // Split on whitespace only when not inside parentheses
+        if (current.trim()) {
+          tokens.push(current.trim());
+        }
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    // Add the last token
+    if (current.trim()) {
+      tokens.push(current.trim());
+    }
+
     for (const token of tokens) {
       const event = parseToken(token, defaultDuration);
       if (event) {
@@ -252,16 +280,70 @@ export function parseToken(token: string, defaultDuration: number): Event | null
 
   const ornaments: Ornament[] = [];
   if (ornamentsPart) {
-    for (let part of ornamentsPart.split(',')) {
-      part = part.trim();
+    // Split ornaments by commas, but only when not inside parentheses
+    const ornamentStrings: string[] = [];
+    let current = '';
+    let depth = 0;
+    
+    for (let i = 0; i < ornamentsPart.length; i++) {
+      const ch = ornamentsPart[i];
+      if (ch === '(') {
+        depth++;
+        current += ch;
+      } else if (ch === ')') {
+        depth--;
+        current += ch;
+      } else if (ch === ',' && depth === 0) {
+        // Split on comma only when not inside parentheses
+        if (current.trim()) {
+          ornamentStrings.push(current.trim());
+        }
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    // Add the last ornament
+    if (current.trim()) {
+      ornamentStrings.push(current.trim());
+    }
+    
+    // Parse each ornament
+    for (const part of ornamentStrings) {
       if (!part) continue;
-      const m = part.match(/^([A-Za-z_]+)(\((.*?)\))?$/);
+      const m = part.match(/^([A-Za-z_]+)(\((.*)\))?$/);
       if (m) {
         const name = m[1];
         const paramsStr = m[3];
         let params: string[] = [];
         if (paramsStr) {
-          params = paramsStr.split(',').map(p => p.trim()).filter(p => p);
+          // Split parameters by commas, but only when not inside nested parentheses
+          const paramStrings: string[] = [];
+          let paramCurrent = '';
+          let paramDepth = 0;
+          
+          for (let i = 0; i < paramsStr.length; i++) {
+            const ch = paramsStr[i];
+            if (ch === '(') {
+              paramDepth++;
+              paramCurrent += ch;
+            } else if (ch === ')') {
+              paramDepth--;
+              paramCurrent += ch;
+            } else if (ch === ',' && paramDepth === 0) {
+              if (paramCurrent.trim()) {
+                paramStrings.push(paramCurrent.trim());
+              }
+              paramCurrent = '';
+            } else {
+              paramCurrent += ch;
+            }
+          }
+          if (paramCurrent.trim()) {
+            paramStrings.push(paramCurrent.trim());
+          }
+          
+          params = paramStrings.filter(p => p);
         }
         ornaments.push({ name, params });
       } else {

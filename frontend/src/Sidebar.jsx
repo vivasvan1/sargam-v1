@@ -14,7 +14,7 @@ export function Sidebar({ onFileUpload, onNew, theme, setTheme, isOpen, onClose 
       {/* Mobile sidebar */}
       <aside className={`
         fixed md:static inset-y-0 left-0 z-50
-        w-64 border-r border-border bg-muted/30 flex flex-col h-screen
+        w-64 border-r border-border bg-muted flex flex-col h-screen
         transform transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0

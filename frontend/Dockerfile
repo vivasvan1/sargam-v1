@@ -10,7 +10,7 @@ WORKDIR /app
 COPY --from=base /app/node_modules ./node_modules
 COPY . .
 EXPOSE 5174
-CMD ["bun", "run", "dev", "--host", "0.0.0.0", "--port", "5174"]
+CMD ["bun", "run", "dev"]
 
 # Build stage (used to build production assets)
 FROM base AS build

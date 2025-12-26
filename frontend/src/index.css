@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --color-border: var(--border);
@@ -81,5 +82,16 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Reset headings, but exclude those inside .prose to allow typography plugin to work */
+  h1:not(.prose h1),
+  h2:not(.prose h2),
+  h3:not(.prose h3),
+  h4:not(.prose h4),
+  h5:not(.prose h5),
+  h6:not(.prose h6) {
+    font-size: inherit;
+    font-weight: inherit;
   }
 }

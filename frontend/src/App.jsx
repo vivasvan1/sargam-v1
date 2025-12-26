@@ -201,9 +201,9 @@ function App() {
 
         {/* Content */}
         <ScrollArea.Root className="flex-1 overflow-hidden h-full">
-          <ScrollArea.Viewport className="h-full w-full">
-            <div className="max-w-4xl mx-auto py-6 md:py-12 px-4 md:px-8">
-              <div className="">
+          <ScrollArea.Viewport className="h-full w-full min-w-0">
+            <div className="max-w-4xl mx-auto py-6 md:py-12 px-4 md:px-8 w-full min-w-0">
+              <div className="w-full min-w-0">
                 {notebook.cells.map((cell, idx) => (
                   <div key={idx} className="relative">
                     <Cell

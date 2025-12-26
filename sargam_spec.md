@@ -125,7 +125,8 @@ WS        ::= space or tab
 * `M#'` – tivra Ma in the upper octave.
 * `G:2` – Gandhar lasting two beats.
 * `Dk,:0.5` or `d,:0.5` – komal Dha in the lower octave (one comma) lasting half a beat.
-* `S+meend(P)` – Sa with a meend ornament sliding to Pa.
+* `S+meend(P)` – Sa with a meend ornament sliding to Pa (slides over the entire note duration).
+* `S+meend(P, 0.2, 0.6, 0.2)` – Sa with a three-phase meend: plays Sa for 0.2 beats, slides to Pa over 0.6 beats, then holds Pa for 0.2 beats.
 * `G="mo"` – Ga associated with the lyric syllable “mo”.
 * `_0.5` – rest lasting half a beat.
 * `|` and `||` – bar and cycle markers.
@@ -140,12 +141,14 @@ Ornaments capture expressive techniques such as slides, shakes and oscillations.
 
 | Name   | Description |
 |--------|-------------|
-| `meend(to)` | A slide from the current swara to the target swara. |
+| `meend(to)` | A slide from the current swara to the target swara over the entire note duration. |
+| `meend(to, startDur, slideDur, endDur)` | A three-phase slide: play the current swara for `startDur` beats`, slide to `to` over `slideDur` beats, then hold `to` for `endDur` beats. The durations should sum to the note's total duration. |
 | `kan(from)`| A grace note (acciaccatura) starting from `from` into the current swara. |
 | `andolan(amount)` | A slow oscillation around the swara. |
 | `kampita(speed)` | A fast oscillation. |
 | `shake` | A repeated rapid alternation (approx. vibrato). |
-| `slide(to)` | Alias for `meend`. |
+| `slide(to)` | Alias for `meend(to)`. |
+| `slide(to, startDur, slideDur, endDur)` | Alias for `meend(to, startDur, slideDur, endDur)`. |
 
 Further ornaments may be added by language versions.
 

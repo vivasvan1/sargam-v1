@@ -13,6 +13,16 @@ html, body, #root {
 /* ScrollArea specific styles */
 [data-radix-scroll-area-viewport] {
   scroll-behavior: smooth;
+  min-width: 0 !important;
+  display: block !important;
+  width: 100% !important;
+}
+
+/* Fix overflow on mobile for ScrollArea content */
+[data-radix-scroll-area-viewport] > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  display: block !important;
 }
 
 /* Prose refinements for Sargam */
@@ -50,3 +60,20 @@ button {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
+
+/* Ensure CodeMirror doesn't overflow on mobile */
+.cm-editor {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.cm-scroller {
+  overflow-x: auto !important;
+}
+
+/* Ensure proper word wrapping in cells */
+.prose {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
