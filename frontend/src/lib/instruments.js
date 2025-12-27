@@ -80,6 +80,33 @@ export const INSTRUMENTS = {
             oscillator: { type: "sine" },
             envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: "exponential" }
         }
+    },
+    'tabla-sampler': {
+        id: 'tabla-sampler',
+        name: 'Tabla (Samples)',
+        type: 'tabla-sampler',
+        category: 'rhythm',
+        samples: {
+            'dha': 'tabla-dha.wav',
+            'dhe': 'tabla-dhe.wav',
+            'dhec': 'tabla-dhec.wav',
+            'dhen': 'tabla-dhen.wav',
+            'dhin': 'tabla-dhin.wav',
+            'dhun': 'tabla-dhun.wav',
+            'ga': 'tabla-ga.wav',
+            'ka': 'tabla-ka.wav',
+            'kat': 'tabla-kat.wav',
+            'na': 'tabla-na.wav',
+            'ne': 'tabla-ne.wav',
+            're': 'tabla-re.wav',
+            'ta': 'tabla-ta.wav',
+            'tak': 'tabla-tak.wav',
+            'te': 'tabla-te.wav',
+            'tin': 'tabla-tin.wav',
+            'tit': 'tabla-tit.wav',
+            'tun': 'tabla-tun.wav',
+        },
+        baseUrl: '/'
     }
 };
 
@@ -97,6 +124,39 @@ export async function createInstrument(instrumentId) {
                 // If loading fails or takes too long, we might want to handle it, 
                 // but Tone.Sampler handles missing files gracefully usually.
             }).toDestination();
+        });
+    } else if (config.type === 'tabla-sampler') {
+        // For tabla sampler, we use a Player for each sample since they're not pitched
+        // We'll return a special object that can play tabla bols
+        return new Promise((resolve) => {
+            const players = {};
+            let loadedCount = 0;
+            const totalSamples = Object.keys(config.samples).length;
+            
+            Object.entries(config.samples).forEach(([bol, url]) => {
+                const player = new Tone.Player({
+                    url: config.baseUrl + url,
+                    onload: () => {
+                        loadedCount++;
+                        if (loadedCount === totalSamples) {
+                            resolve({ type: 'tabla-sampler', players });
+                        }
+                    },
+                    onerror: () => {
+                        console.warn(`Failed to load tabla sample: ${bol}`);
+                        loadedCount++;
+                        if (loadedCount === totalSamples) {
+                            resolve({ type: 'tabla-sampler', players });
+                        }
+                    }
+                }).toDestination();
+                players[bol] = player;
+            });
+            
+            // If no samples, resolve immediately
+            if (totalSamples === 0) {
+                resolve({ type: 'tabla-sampler', players: {} });
+            }
         });
     } else if (config.type === 'synth-custom') {
         const synth = new Tone.PolySynth(Tone.Synth, config.options).toDestination();

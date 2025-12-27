@@ -31,7 +31,7 @@ Within a music cell, lines beginning with `@` are _directives_.  They set contex
 ```
 DirectiveLine  ::= '@' DirectiveKey (WS DirectiveValue)?
 DirectiveKey   ::= 'language' | 'system' | 'raga' | 'thaat'
-                | 'melakarta' | 'tala' | 'laya' | 'tempo'
+                | 'melakarta' | 'tala' | 'tala_pattern' | 'laya' | 'tempo'
                 | 'sa_pitch' | 'default_duration' | 'swing'
                 | 'annot' | 'key'
 DirectiveValue ::= any characters until end‑of‑line
@@ -39,6 +39,22 @@ WS             ::= one or more spaces or tabs
 ```
 
 These keys are extensible.  Unknown keys should be preserved as annotations.  `@sa_pitch` assigns the reference pitch for Sa (e.g. `C4` or `261.63Hz`) and is used to convert swaras to absolute frequency.
+
+The `@tala` directive enables tala (rhythmic cycle) playback.  When combined with `@tala_pattern`, it specifies a sequence of tabla bols (syllables) with optional durations.  The pattern format is:
+
+```
+TalaPattern ::= TalaToken (WS TalaToken)*
+TalaToken   ::= Bol (':' Float)? | '|' | '||'
+Bol         ::= tabla bol name (e.g., 'dha', 'dhin', 'tak', 'tin', etc.)
+```
+
+Each bol can optionally be followed by a duration specifier (e.g., `dha:1` or `dhin:0.5`).  If omitted, the `@default_duration` is used.  Bar markers (`|` and `||`) are ignored for timing but can be used for readability.  The pattern repeats cyclically for the duration of the music cell.
+
+Example:
+```
+@tala Teental(16)
+@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha
+```
 
 ## Voice Declarations
 

@@ -144,6 +144,7 @@
         "",
         "Talas define the rhythmic cycle:",
         "- `@tala Tintal(16)` = 16-beat cycle (4+4+4+4)",
+        "- `@tala_pattern` = Specifies tabla bols (syllables) with timing (e.g., `dha dhin dhin dha`)",
         "- `|` = Vibhag divider (bar marker)",
         "- `||` = End of avartan (complete cycle)",
         "",
@@ -158,6 +159,7 @@
       "source": [
         "@sa D4",
         "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
         "@tempo 100",
         "",
         "# Sthayi in Tintal (16 beats = 4 vibhags)",
@@ -173,6 +175,7 @@
       "source": [
         "@sa D4",
         "@tala Jhaptal(10)",
+        "@tala_pattern dha dhin | dha dhin dhin | dha tin | ta dhin dhin",
         "@tempo 90",
         "",
         "# Composition in Jhaptal (10 beats = 2+3+2+3)",
@@ -378,6 +381,7 @@
       "source": [
         "@sa D4",
         "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
         "@tempo 100",
         "",
         "# Sthayi (First section)",
@@ -469,6 +473,7 @@
       "source": [
         "@sa D4",
         "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
         "@tempo 100",
         "",
         "#voice melody",

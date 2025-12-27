@@ -43,7 +43,11 @@ export function MusicCell({ cell, onChange, theme }) {
 
         // Sync Tala
         if (data.directives.tala && !next["__tala"]) {
-          next["__tala"] = { volume: -5, muted: false, instrument: "tabla" };
+          next["__tala"] = { 
+            volume: -5, 
+            muted: false, 
+            instrument: data.directives.tala_pattern ? "tabla-sampler" : "tabla" 
+          };
           hasChanges = true;
         }
 
@@ -80,8 +84,20 @@ export function MusicCell({ cell, onChange, theme }) {
 
     Object.values(activeNodesRef.current).forEach(({ synth, volumeNode }) => {
       try {
-        synth.releaseAll();
-        synth.dispose();
+        // Handle tabla-sampler type
+        if (synth && synth.type === 'tabla-sampler' && synth.players) {
+          Object.values(synth.players).forEach((player) => {
+            try {
+              player.stop();
+              player.dispose();
+            } catch (e) {
+              /* ignore */
+            }
+          });
+        } else {
+          synth.releaseAll?.();
+          synth.dispose?.();
+        }
         volumeNode?.dispose();
       } catch (e) {
         /* ignore */
@@ -145,9 +161,23 @@ export function MusicCell({ cell, onChange, theme }) {
 
     Object.values(activeNodesRef.current).forEach(({ synth, volumeNode }) => {
       try {
-        synth.dispose();
+        // Handle tabla-sampler type
+        if (synth && synth.type === 'tabla-sampler' && synth.players) {
+          Object.values(synth.players).forEach((player) => {
+            try {
+              player.stop();
+              player.dispose();
+            } catch (e) {
+              /* ignore */
+            }
+          });
+        } else {
+          synth.dispose?.();
+        }
         volumeNode?.dispose();
-      } catch (e) {}
+      } catch (e) {
+        /* ignore */
+      }
     });
     activeNodesRef.current = {};
 
@@ -155,30 +185,108 @@ export function MusicCell({ cell, onChange, theme }) {
       parsedData.directives.tempo || parsedData.directives.bpm || "120";
     const bpm = parseFloat(bpmRaw) || 120;
     Tone.getTransport().bpm.value = bpm;
+    const beatDur = 60 / bpm; // Duration of one beat in seconds
 
     let maxDuration = 0;
 
-    // Setup Tala (Membrane Synth)
+    // Setup Tala
     if (parsedData.directives.tala) {
       const talaCtrl = currentControls["__tala"] || {
         volume: -5,
         muted: false,
-        instrument: "tabla",
+        instrument: parsedData.directives.tala_pattern ? "tabla-sampler" : "tabla",
       };
       const talaVol = new Tone.Volume(talaCtrl.volume).toDestination();
       talaVol.mute = talaCtrl.muted;
 
-      const membrane = await createInstrument(talaCtrl.instrument || "tabla");
-      membrane.connect(talaVol);
-      activeNodesRef.current["__tala"] = {
-        synth: membrane,
-        volumeNode: talaVol,
-      };
+      // Check if we have a tala pattern directive
+      if (parsedData.directives.tala_pattern) {
+        // Parse and play tabla pattern using samples
+        const pattern = parsedData.directives.tala_pattern.trim();
+        const tablaInstrument = await createInstrument("tabla-sampler");
+        
+        if (tablaInstrument && tablaInstrument.type === 'tabla-sampler' && tablaInstrument.players) {
+          tablaInstrument.players = Object.fromEntries(
+            Object.entries(tablaInstrument.players).map(([bol, player]) => [
+              bol,
+              player.connect(talaVol)
+            ])
+          );
+          
+          activeNodesRef.current["__tala"] = {
+            synth: tablaInstrument,
+            volumeNode: talaVol,
+          };
 
-      // Schedule simpler beat for now
-      Tone.getTransport().scheduleRepeat((time) => {
-        membrane.triggerAttackRelease("C2", "8n", time);
-      }, "4n");
+          // Parse the pattern: split by spaces, handle durations and bars
+          const parseTalaPattern = (patternStr, defaultDur, beatDurSeconds) => {
+            const events = [];
+            // Remove comments
+            const cleanPattern = patternStr.split('#')[0].trim();
+            // Split by spaces, but preserve bars
+            const tokens = cleanPattern.split(/\s+/).filter(t => t);
+            
+            let time = 0; // Time in seconds
+            for (const token of tokens) {
+              if (token === '|' || token === '||') {
+                // Bar marker - just continue, timing stays the same
+                continue;
+              }
+              
+              // Parse bol:duration format (e.g., "dha:1" or just "dha")
+              const colonIdx = token.lastIndexOf(':');
+              let bol = token;
+              let duration = defaultDur;
+              
+              if (colonIdx !== -1) {
+                const durStr = token.slice(colonIdx + 1);
+                const parsedDur = parseFloat(durStr);
+                if (!isNaN(parsedDur) && parsedDur > 0) {
+                  duration = parsedDur;
+                  bol = token.slice(0, colonIdx);
+                }
+              }
+              
+              if (bol) {
+                const durationSeconds = duration * beatDurSeconds;
+                events.push({ bol, duration, time });
+                time += durationSeconds;
+              }
+            }
+            
+            return events;
+          };
+
+          const defaultTalaDur = parseFloat(parsedData.directives.default_duration) || 1.0;
+          const talaEvents = parseTalaPattern(pattern, defaultTalaDur, beatDur);
+          const cycleDuration = talaEvents.length > 0 
+            ? talaEvents[talaEvents.length - 1].time + (talaEvents[talaEvents.length - 1].duration * beatDur)
+            : 4 * beatDur; // Default to 4 beats if empty
+
+          // Schedule the pattern to repeat
+          Tone.getTransport().scheduleRepeat((time) => {
+            talaEvents.forEach((event) => {
+              const player = tablaInstrument.players[event.bol];
+              if (player) {
+                player.start(time + event.time);
+              }
+            });
+          }, cycleDuration);
+        }
+      } else {
+        // Fallback to simple membrane synth beat
+        const membrane = await createInstrument(talaCtrl.instrument || "tabla");
+        membrane.connect(talaVol);
+        activeNodesRef.current["__tala"] = {
+          synth: membrane,
+          volumeNode: talaVol,
+        };
+
+        // Schedule simpler beat for now
+        Tone.getTransport().scheduleRepeat((time) => {
+          membrane.triggerAttackRelease("C2", "8n", time);
+        }, "4n");
+      }
     }
 
     // Setup Voices
@@ -222,7 +330,6 @@ export function MusicCell({ cell, onChange, theme }) {
       activeNodesRef.current[voiceName] = { synth, volumeNode };
 
       let time = 0;
-      const beatDur = 60 / bpm;
 
       voice.events.forEach((event) => {
         if (event.duration) {
