@@ -4,14 +4,17 @@ import * as Tone from 'tone';
 // We use a CDN or raw.githubusercontent for demo purposes.
 const BASE_URL = "https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/master/samples/";
 
+export type InstrumentType = 'synth' | 'sampler' | 'synth-custom' | 'synth-membrane' | 'tabla-sampler';
+export type InstrumentCategory = 'melody' | 'rhythm';
+
 export interface InstrumentConfig {
     id: string;
     name: string;
-    type: string;
-    category: string;
+    type: InstrumentType;
+    category: InstrumentCategory;
     samples?: Record<string, string>;
     baseUrl?: string;
-    options?: Tone.MembraneSynthOptions;
+    options?: Tone.MembraneSynthOptions | any;
 }
 
 export const INSTRUMENTS: Record<string, InstrumentConfig> = {
@@ -120,7 +123,24 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
     }
 };
 
-export type Instrument = Tone.Sampler | Tone.PolySynth | Tone.MembraneSynth | { type: 'tabla-sampler', players: Record<string, Tone.Player> };
+// Tonal instruments are those that can play specific frequencies/notes
+export type TonalInstrument = Tone.Sampler | Tone.PolySynth | Tone.MembraneSynth;
+
+// Rhythmic instruments (specifically our Tabla sampler) play pre-defined samples by name
+export interface RhythmicInstrument {
+    type: 'tabla-sampler';
+    players: Record<string, Tone.Player>;
+}
+
+export type Instrument = TonalInstrument | RhythmicInstrument;
+
+export function isRhythmicInstrument(instrument: Instrument): instrument is RhythmicInstrument {
+    return (instrument as any).type === 'tabla-sampler';
+}
+
+export function isTonalInstrument(instrument: Instrument): instrument is TonalInstrument {
+    return !isRhythmicInstrument(instrument);
+}
 
 export async function createInstrument(instrumentId: string): Promise<Instrument> {
     const config = INSTRUMENTS[instrumentId] || INSTRUMENTS.synth;
