@@ -802,8 +802,8 @@ export function MusicCell({ cell, onChange, theme }: MusicCellProps) {
             height="auto"
             extensions={[markdown()]}
             onChange={handleChange}
-            theme={theme}
-            className="text-sm font-mono focus-within:ring-0"
+            theme={theme === 'dark' ? 'dark' : 'light'}
+            className="text-base md:text-sm font-mono focus-within:ring-0"
           />
         </div>
       </div>

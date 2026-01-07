@@ -72,8 +72,8 @@ export function MarkdownCell({ cell, onChange, theme }: MarkdownCellProps) {
                         onChange={handleChange}
                         onBlur={() => setEditing(false)}
                         autoFocus={true}
-                        theme={theme}
-                        className="rounded-lg overflow-hidden border-none text-sm"
+                        theme={theme === 'dark' ? 'dark' : 'light'}
+                        className="rounded-lg overflow-hidden border-none text-base md:text-sm"
                     />
                 </div>
             </div>
