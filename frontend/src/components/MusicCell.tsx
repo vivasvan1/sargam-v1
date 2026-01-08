@@ -23,6 +23,7 @@ interface MusicCellProps {
   };
   onChange: (cell: any) => void;
   theme: string;
+  onFocus?: () => void;
 }
 
 interface ActiveNode {
@@ -30,7 +31,7 @@ interface ActiveNode {
   volumeNode: Tone.Volume;
 }
 
-export function MusicCell({ cell, onChange, theme }: MusicCellProps) {
+export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   const content = Array.isArray(cell.source)
     ? cell.source.join("\n")
     : cell.source;
@@ -51,25 +52,47 @@ export function MusicCell({ cell, onChange, theme }: MusicCellProps) {
       setLastParsedData(data);
 
       setVoiceControls((prev) => {
-        const next = { ...prev };
+        const next: Record<string, VoiceControl> = {};
         let hasChanges = false;
 
         // Sync voices
         Object.keys(data.voices).forEach((v) => {
-          if (!next[v]) {
+          if (prev[v]) {
+            next[v] = prev[v];
+          } else {
             next[v] = { volume: -5, muted: false, instrument: "harmonium" };
             hasChanges = true;
           }
         });
 
         // Sync Tala
-        if (data.directives.tala && !next["__tala"]) {
-          next["__tala"] = { 
-            volume: -5, 
-            muted: false, 
-            instrument: data.directives.tala_pattern ? "tabla-sampler" : "tabla" 
-          };
-          hasChanges = true;
+        if (data.directives.tala) {
+          if (prev["__tala"]) {
+            next["__tala"] = prev["__tala"];
+          } else {
+            next["__tala"] = { 
+              volume: -5, 
+              muted: false, 
+              instrument: data.directives.tala_pattern ? "tabla-sampler" : "tabla" 
+            };
+            hasChanges = true;
+          }
+        }
+
+        // Check if any keys were removed
+        if (!hasChanges) {
+          const prevKeys = Object.keys(prev);
+          const nextKeys = Object.keys(next);
+          if (prevKeys.length !== nextKeys.length) {
+            hasChanges = true;
+          } else {
+            for (const key of prevKeys) {
+              if (!next[key]) {
+                hasChanges = true;
+                break;
+              }
+            }
+          }
         }
 
         return hasChanges ? next : prev;
@@ -505,6 +528,7 @@ export function MusicCell({ cell, onChange, theme }: MusicCellProps) {
             height="auto"
             extensions={[markdown()]}
             onChange={handleChange}
+            onFocus={onFocus}
             theme={theme === 'dark' ? 'dark' : 'light'}
             className="text-base md:text-sm font-mono focus-within:ring-0"
           />

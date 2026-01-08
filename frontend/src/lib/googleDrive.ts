@@ -6,7 +6,7 @@ const ROOT_FOLDER_NAME = "sargamNotes";
 const DISCOVERY_DOCS = [
   "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest",
 ];
-const SCOPES = "https://www.googleapis.com/auth/drive.file";
+const SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
 
 // Type declarations for Google API
 declare global {
@@ -69,29 +69,6 @@ let rootFolderId: string | null = null;
 let accessToken: string | null = null;
 let tokenClient: TokenClient | null = null;
 let clientId: string | null = null;
-
-// Wait for gapi to be available
-function waitForGapi(): Promise<any> {
-  return new Promise((resolve, reject) => {
-    if (typeof window !== "undefined" && window.gapi) {
-      resolve(window.gapi);
-      return;
-    }
-
-    let attempts = 0;
-    const maxAttempts = 50;
-    const interval = setInterval(() => {
-      attempts++;
-      if (typeof window !== "undefined" && window.gapi) {
-        clearInterval(interval);
-        resolve(window.gapi);
-      } else if (attempts >= maxAttempts) {
-        clearInterval(interval);
-        reject(new Error("Google API not loaded after timeout"));
-      }
-    }, 100);
-  });
-}
 
 // Wait for Google Identity Services to load
 function waitForGoogleIdentityServices(): Promise<typeof window.google> {
@@ -198,8 +175,16 @@ export async function initializeGoogleAPI(providedClientId: string): Promise<any
     if (storedToken) {
       accessToken = storedToken;
       gapi.client.setToken({ access_token: accessToken });
-      await getUserInfo();
-      isSignedIn = true;
+      const success = await getUserInfo();
+      if (success) {
+        isSignedIn = true;
+      } else {
+        // Token might be expired
+        accessToken = null;
+        sessionStorage.removeItem("google_drive_token");
+        gapi.client.setToken(null);
+        isSignedIn = false;
+      }
     }
 
     return gapi;
@@ -210,7 +195,9 @@ export async function initializeGoogleAPI(providedClientId: string): Promise<any
 }
 
 // Get user info from token
-async function getUserInfo(): Promise<void> {
+async function getUserInfo(): Promise<boolean> {
+  if (!accessToken) return false;
+  
   try {
     const response = await fetch(
       "https://www.googleapis.com/oauth2/v2/userinfo",
@@ -227,9 +214,15 @@ async function getUserInfo(): Promise<void> {
         email: userInfo.email,
         name: userInfo.name,
       };
+      return true;
+    } else if (response.status === 401) {
+      console.error("Google API token expired or invalid (401)");
+      return false;
     }
+    return false;
   } catch (error) {
     console.error("Error getting user info:", error);
+    return false;
   }
 }
 
@@ -272,11 +265,21 @@ export async function authenticate(): Promise<GoogleUser> {
           gapi.client.setToken({ access_token: accessToken });
 
           // Get user info
-          await getUserInfo();
+          const success = await getUserInfo();
 
           tokenReceived = true;
-          isSignedIn = true;
-          resolve(currentUser!);
+          if (success && currentUser) {
+            isSignedIn = true;
+            resolve(currentUser);
+          } else {
+            // Even if user info fails, we have the token, but for this app's UX
+            // we prefer having the user identity.
+            // If it fails right after auth, it's likely a scope issue.
+            isSignedIn = true;
+            const fallbackUser = { email: "Connected", name: "User" };
+            currentUser = fallbackUser;
+            resolve(fallbackUser);
+          }
         },
       });
 
@@ -345,7 +348,7 @@ export async function ensureRootFolder(): Promise<string | null> {
   // First, try to find existing folder
   try {
     const response = await gapi.client.drive.files.list({
-      q: `name='${ROOT_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      q: `name='${ROOT_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false`,
       fields: "files(id, name)",
       spaces: "drive",
     });
@@ -685,6 +688,22 @@ export async function loadFile(fileId: string): Promise<any> {
   } catch (error: any) {
     console.error("Error loading file:", error);
     throw new Error(error.message || "Failed to load file from Google Drive");
+  }
+}
+
+// Delete file from Google Drive
+export async function deleteFile(fileId: string): Promise<void> {
+  if (!isInitialized || !gapi) {
+    throw new Error("Google API not initialized");
+  }
+
+  try {
+    await gapi.client.drive.files.delete({
+      fileId: fileId,
+    });
+  } catch (error: any) {
+    console.error("Error deleting file:", error);
+    throw new Error(error.result?.error?.message || error.message || "Failed to delete file from Google Drive");
   }
 }
 

@@ -1,4 +1,3 @@
-import React from "react";
 import { Music2, ChevronRight, Trash2 } from "lucide-react";
 import { MusicCell } from "./MusicCell";
 import { MarkdownCell } from "./MarkdownCell";
@@ -7,6 +6,10 @@ import { Button } from "./ui/button";
 interface CellProps {
   cell: {
     cell_type: string;
+    source: string[] | string;
+    metadata?: {
+      [key: string]: any;
+    };
     [key: string]: any;
   };
   onChange: (newCell: any) => void;
@@ -14,7 +17,7 @@ interface CellProps {
   theme: string;
 }
 
-export function Cell({ cell, onChange, onDelete, theme }: CellProps) {
+export function Cell({ cell, onChange, onDelete, theme, onFocus }: CellProps & { onFocus?: () => void }) {
   const isMusic = cell.cell_type === "music";
 
   return (
@@ -43,9 +46,9 @@ export function Cell({ cell, onChange, onDelete, theme }: CellProps) {
 
       <div className="p-0 overflow-x-auto max-w-full">
         {isMusic ? (
-          <MusicCell cell={cell} theme={theme} onChange={onChange} />
+          <MusicCell cell={cell} theme={theme} onChange={onChange} onFocus={onFocus} />
         ) : (
-          <MarkdownCell cell={cell} theme={theme} onChange={onChange} />
+          <MarkdownCell cell={cell} theme={theme} onChange={onChange} onFocus={onFocus} />
         )}
       </div>
     </div>

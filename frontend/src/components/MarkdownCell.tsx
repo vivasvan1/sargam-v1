@@ -13,9 +13,10 @@ interface MarkdownCellProps {
     };
     onChange: (cell: any) => void;
     theme: string;
+    onFocus?: () => void;
 }
 
-export function MarkdownCell({ cell, onChange, theme }: MarkdownCellProps) {
+export function MarkdownCell({ cell, onChange, theme, onFocus }: MarkdownCellProps) {
     const [editing, setEditing] = useState(false);
     const isMobileDevice = useMobileDevice();
     const lastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
@@ -72,6 +73,7 @@ export function MarkdownCell({ cell, onChange, theme }: MarkdownCellProps) {
                         onChange={handleChange}
                         onBlur={() => setEditing(false)}
                         autoFocus={true}
+                        onFocus={onFocus}
                         theme={theme === 'dark' ? 'dark' : 'light'}
                         className="rounded-lg overflow-hidden border-none text-base md:text-sm"
                     />
@@ -83,7 +85,10 @@ export function MarkdownCell({ cell, onChange, theme }: MarkdownCellProps) {
     return (
         <div
             className="p-4 md:p-6 cursor-text min-h-[80px] overflow-x-auto max-w-full touch-manipulation"
-            onClick={handleTap}
+            onClick={(e) => {
+                onFocus?.();
+                handleTap(e);
+            }}
             onDoubleClick={handleDoubleClick}
             role="button"
             tabIndex={0}

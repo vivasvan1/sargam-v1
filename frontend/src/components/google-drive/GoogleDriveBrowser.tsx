@@ -1,21 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Folder, FileMusic, ArrowLeft, Loader2 } from 'lucide-react';
-import { cn } from '../lib/utils';
-import { listFiles, getSubfolders, loadFile } from '../lib/googleDrive';
-import type { GoogleFile, GoogleFolder } from '../lib/googleDrive';
+import { Folder, FileMusic, Loader2, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { listFiles, getSubfolders, loadFile, deleteFile } from '@/lib/googleDrive';
+import type { GoogleFile, GoogleFolder } from '@/lib/googleDrive';
 import { toast } from 'sonner';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface GoogleDriveBrowserProps {
   onLoadFile?: (notebook: any, fileId?: string) => void;
   onClose?: () => void;
+  currentFileId?: string | null;
 }
 
-export function GoogleDriveBrowser({ onLoadFile, onClose }: GoogleDriveBrowserProps) {
+export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: GoogleDriveBrowserProps) {
   const [files, setFiles] = useState<GoogleFile[]>([]);
   const [subfolders, setSubfolders] = useState<GoogleFolder[]>([]);
   const [currentPath, setCurrentPath] = useState<string[]>([]); // Array of folder names representing the path
   const [loading, setLoading] = useState(false);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadCurrentFolder();
@@ -26,7 +39,7 @@ export function GoogleDriveBrowser({ onLoadFile, onClose }: GoogleDriveBrowserPr
     try {
       // Get the current folder name (last in path, or null for root)
       const currentFolder = currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
-      
+
       // Load files
       const fileList = await listFiles(null, currentFolder);
       setFiles(fileList);
@@ -64,6 +77,24 @@ export function GoogleDriveBrowser({ onLoadFile, onClose }: GoogleDriveBrowserPr
     } catch (error: any) {
       console.error('Error loading file:', error);
       toast.error(error.message || 'Failed to load file from Google Drive');
+    }
+  };
+
+  const handleDeleteFile = async () => {
+    if (!deletingFileId) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteFile(deletingFileId);
+      toast.success('File deleted successfully');
+      // Refresh the file list
+      loadCurrentFolder();
+    } catch (error: any) {
+      console.error('Error deleting file:', error);
+      toast.error(error.message || 'Failed to delete file');
+    } finally {
+      setIsDeleting(false);
+      setDeletingFileId(null);
     }
   };
 
@@ -139,23 +170,38 @@ export function GoogleDriveBrowser({ onLoadFile, onClose }: GoogleDriveBrowserPr
                   </div>
                 )}
                 {files.map((file) => (
-                  <Button
-                    key={file.id}
-                    onClick={() => handleFileClick(file.id)}
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start h-auto py-1.5"
-                  >
-                    <FileMusic className="w-3.5 h-3.5 text-primary shrink-0" />
-                    <div className="flex-1 min-w-0 flex flex-col items-start">
-                      <div className="text-xs font-medium truncate">{file.name}</div>
-                      {file.modifiedTime && (
-                        <div className="text-[10px] text-muted-foreground">
-                          {formatDate(file.modifiedTime)}
-                        </div>
+                  <div key={file.id} className="group relative flex w-full items-center">
+                    <Button
+                      onClick={() => handleFileClick(file.id)}
+                      variant={currentFileId === file.id ? "default" : "ghost"}
+                      title={file.name}
+                      size="sm"
+                      className={cn(
+                        "justify-start flex-1  h-auto py-1.5 pr-8"
                       )}
-                    </div>
-                  </Button>
+                    >
+                      <FileMusic className="w-3.5 h-3.5 shrink-0" />
+                      <div className="min-w-0 flex flex-col items-start truncate">
+                        <div className="text-xs font-medium truncate w-full text-left">{file.name}</div>
+                        {file.modifiedTime && (
+                          <div className="text-[10px] text-muted-foreground">
+                            {formatDate(file.modifiedTime)}
+                          </div>
+                        )}
+                      </div>
+                    </Button>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingFileId(file.id);
+                      }}
+                      variant={"ghost"}
+                      className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Delete file"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 ))}
               </div>
             )}
@@ -169,6 +215,30 @@ export function GoogleDriveBrowser({ onLoadFile, onClose }: GoogleDriveBrowserPr
           </>
         )}
       </div>
+
+      <AlertDialog open={!!deletingFileId} onOpenChange={(open) => !open && setDeletingFileId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the notebook from your Google Drive.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteFile();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Cloud, LogOut } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 import { GoogleDriveBrowser } from './GoogleDriveBrowser';
+import { FaGoogleDrive } from "react-icons/fa";
 
 interface GoogleDriveUser {
   email?: string;
@@ -14,8 +15,9 @@ interface GoogleDriveSectionProps {
   onGoogleDriveConnect?: () => void;
   onGoogleDriveDisconnect?: () => void;
   onLoadFromDrive?: () => void;
-  onLoadDriveFile?: (notebook: any) => void;
+  onLoadDriveFile?: (notebook: any, fileId?: string) => void;
   onClose?: () => void;
+  currentFileId?: string | null;
 }
 
 export function GoogleDriveSection({
@@ -25,10 +27,11 @@ export function GoogleDriveSection({
   onGoogleDriveDisconnect,
   onLoadFromDrive,
   onLoadDriveFile,
-  onClose
+  onClose,
+  currentFileId
 }: GoogleDriveSectionProps) {
   return (
-    <div className="pt-2 border-t border-border flex-1 min-h-0 flex flex-col">
+    <div className="flex-1 min-h-0 flex flex-col">
       {/* Connection Status & Actions */}
       <div className="px-3 space-y-2 shrink-0">
         {!googleDriveConnected ? (
@@ -37,12 +40,12 @@ export function GoogleDriveSection({
               onGoogleDriveConnect?.();
               onClose?.();
             }}
-            variant="secondary"
+            variant="default"
             size="sm"
             className="w-full"
           >
-            <Cloud className="w-3.5 h-3.5" />
-            Connect to Drive
+            <FaGoogleDrive className="w-3.5 h-3.5" />
+            Google Drive
           </Button>
         ) : (
           <div className="space-y-1.5">
@@ -86,6 +89,7 @@ export function GoogleDriveSection({
           <GoogleDriveBrowser
             onLoadFile={onLoadDriveFile}
             onClose={onClose}
+            currentFileId={currentFileId}
           />
         </div>
       )}
