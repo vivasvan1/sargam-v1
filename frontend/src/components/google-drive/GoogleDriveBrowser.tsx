@@ -29,6 +29,7 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
   const [loading, setLoading] = useState(false);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isFileIdLoading, setIsFileIdLoading] = useState<string | null>(null);
 
   useEffect(() => {
     loadCurrentFolder();
@@ -71,12 +72,15 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
 
   const handleFileClick = async (fileId: string) => {
     try {
+      setIsFileIdLoading(fileId);
       const notebook = await loadFile(fileId);
       onLoadFile?.(notebook, fileId);
       onClose?.();
     } catch (error: any) {
       console.error('Error loading file:', error);
       toast.error(error.message || 'Failed to load file from Google Drive');
+    } finally {
+      setIsFileIdLoading(null);
     }
   };
 
@@ -172,13 +176,14 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
                 {files.map((file) => (
                   <div key={file.id} className="group relative flex items-center w-full min-w-0">
                     <Button
+                      disabled={isFileIdLoading != null}
                       onClick={() => handleFileClick(file.id)}
                       variant={currentFileId === file.id ? "default" : "ghost"}
                       title={file.name}
                       size="sm"
                       className="flex-1 min-w-0 justify-start h-auto py-1.5 pr-8 gap-2"
                     >
-                      <FileMusic className="w-3.5 h-3.5 shrink-0" />
+                      {(isFileIdLoading && isFileIdLoading === file.id) ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" /> : <FileMusic className="w-3.5 h-3.5 shrink-0" />}
                       <div className="flex-1 min-w-0 flex flex-col items-start pr-8">
                         <div className="text-xs font-medium truncate w-full text-left">
                           {file.name}

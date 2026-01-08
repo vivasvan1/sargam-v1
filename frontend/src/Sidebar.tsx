@@ -71,7 +71,7 @@ export function Sidebar({
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="p-2 gap-4">
+      <SidebarContent className="p-2">
         {/* <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
