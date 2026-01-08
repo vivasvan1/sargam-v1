@@ -21,6 +21,7 @@ import {
   getCurrentUser,
   isAuthenticated,
   updateFileById,
+  publishToRegistry,
 } from "./lib/googleDrive";
 import type { GoogleUser } from "./lib/googleDrive";
 import { MenuBar } from "./components/MenuBar";
@@ -278,6 +279,31 @@ function App() {
     toast.success("Notebook loaded from Google Drive");
   };
 
+  const handlePublish = async () => {
+    if (!driveFileId || !googleDriveConnected) {
+      toast.error("Please save to Google Drive first");
+      return;
+    }
+
+    // Optional: Ask for description? For now, simle confirm.
+    const confirm = window.confirm("This will make your notebook public to the community. Proceed?");
+    if (!confirm) return;
+
+    try {
+      const loadingToast = toast.loading("Publishing to community...");
+      // For now, we use current user name if available, else Anonymous
+      const authorName = googleDriveUser?.name || "Anonymous";
+      const title = notebook.metadata?.title || "Untitled Notebook";
+
+      await publishToRegistry(driveFileId, title, "", authorName);
+      toast.dismiss(loadingToast);
+      toast.success("Successfully published to community!");
+    } catch (error) {
+      console.error("Publishing failed:", error);
+      toast.error("Failed to publish notebook");
+    }
+  };
+
   return (
     <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
       <div className="flex h-screen w-full bg-background text-foreground overflow-hidden selection:bg-primary/10">
@@ -312,6 +338,7 @@ function App() {
               onOpen={() => fileInputRef.current?.click()}
               onSaveDrive={handleSaveToDrive}
               onLoadDrive={handleLoadFromDrive}
+              onPublish={handlePublish}
               onDownload={handleDownload}
               canUndo={canUndo}
               canRedo={canRedo}
@@ -322,6 +349,7 @@ function App() {
               theme={theme}
               setTheme={setTheme}
               googleBacked={!!driveFileId}
+              currentFileId={driveFileId}
             />
           </div>
 

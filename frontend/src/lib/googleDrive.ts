@@ -751,3 +751,79 @@ function sanitizeFolderName(name: string): string {
   );
 }
 
+// --- Public Registry & Sharing Functions ---
+
+// The URL of our deployed Google Apps Script Web App
+// Using the one provided by the user
+const REGISTRY_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4VimJnl_tI5Obo7V7LXbqGRdxCDSyTJTkraxSTO54hUd_kLTib8PPQO69UZeI5vup/exec";
+
+// Make a file public (Anyone with link can view)
+export async function setFilePublic(fileId: string): Promise<void> {
+  if (!isInitialized || !gapi) {
+    throw new Error("Google API not initialized");
+  }
+
+  try {
+    await gapi.client.drive.permissions.create({
+      fileId: fileId,
+      resource: {
+        role: "reader",
+        type: "anyone",
+      },
+    });
+  } catch (error: any) {
+    console.error("Error setting file public:", error);
+    throw new Error("Failed to make file public: " + (error.result?.error?.message || error.message));
+  }
+}
+
+export interface RegistryEntry {
+  id: string;
+  name: string;
+  author: string;
+  description: string;
+  date: string;
+}
+
+// Publish to the registry (Apps Script)
+export async function publishToRegistry(fileId: string, name: string, description: string = "", author: string = "Anonymous"): Promise<void> {
+  // 1. Ensure file is public first
+  await setFilePublic(fileId);
+
+  // 2. Post to registry
+  // We use mode: 'no-cors' which makes the response opaque.
+  try {
+    await fetch(REGISTRY_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8", 
+      },
+      body: JSON.stringify({
+        id: fileId,
+        name: name,
+        description: description,
+        author: author,
+      }),
+    });
+  } catch (error) {
+    console.error("Error publishing to registry:", error);
+    // throw new Error("Failed to publish to registry");
+  }
+}
+
+// Fetch all public files from registry
+export async function fetchPublicRegistry(): Promise<RegistryEntry[]> {
+  try {
+    const response = await fetch(REGISTRY_SCRIPT_URL);
+    if (!response.ok) {
+        throw new Error("Failed to fetch registry");
+    }
+    const data = await response.json();
+    return data as RegistryEntry[];
+  } catch (error) {
+    console.error("Error fetching registry:", error);
+    return [];
+  }
+}
+

@@ -2,6 +2,7 @@ import React from 'react';
 import { Cloud, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GoogleDriveBrowser } from './GoogleDriveBrowser';
+import { PublicBrowser } from './PublicBrowser';
 import { FaGoogleDrive } from "react-icons/fa";
 
 interface GoogleDriveUser {
@@ -25,11 +26,12 @@ export function GoogleDriveSection({
   googleDriveUser,
   onGoogleDriveConnect,
   onGoogleDriveDisconnect,
-  onLoadFromDrive,
   onLoadDriveFile,
   onClose,
   currentFileId
 }: GoogleDriveSectionProps) {
+  const [activeTab, setActiveTab] = React.useState<"personal" | "public">("personal");
+
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       {/* Connection Status & Actions */}
@@ -67,18 +69,23 @@ export function GoogleDriveSection({
                 <LogOut className="w-3 h-3" />
               </Button>
             </div>
-            <Button
-              onClick={() => {
-                onLoadFromDrive?.();
-                onClose?.();
-              }}
-              variant="outline"
-              size="sm"
-              className="w-full"
-            >
-              <Cloud className="w-3 h-3" />
-              Load File
-            </Button>
+
+            <div className="flex w-full gap-1">
+              <Button
+                variant={activeTab === "personal" ? "default" : "ghost"}
+                onClick={() => setActiveTab("personal")}
+                className="flex-1 h-7 text-xs"
+              >
+                My Drive
+              </Button>
+              <Button
+                variant={activeTab === "public" ? "default" : "ghost"}
+                onClick={() => setActiveTab("public")}
+                className="flex-1 h-7 text-xs"
+              >
+                Community
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -86,11 +93,19 @@ export function GoogleDriveSection({
       {/* File Browser */}
       {googleDriveConnected && (
         <div className="flex-1 min-h-0 flex flex-col mt-2">
-          <GoogleDriveBrowser
-            onLoadFile={onLoadDriveFile}
-            onClose={onClose}
-            currentFileId={currentFileId}
-          />
+          {activeTab === "personal" ? (
+            <GoogleDriveBrowser
+              onLoadFile={onLoadDriveFile}
+              onClose={onClose}
+              currentFileId={currentFileId}
+            />
+          ) : (
+            <PublicBrowser
+              onLoadFile={onLoadDriveFile}
+              onClose={onClose}
+              currentFileId={currentFileId}
+            />
+          )}
         </div>
       )}
     </div>

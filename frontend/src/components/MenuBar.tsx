@@ -16,7 +16,9 @@ interface MenuBarProps {
     onOpen: () => void; // This clicks the hidden file input
     onSaveDrive: () => void;
     onLoadDrive: () => void;
+    onPublish: () => void;
     onDownload: () => void;
+    currentFileId?: string | null;
 
     canUndo: boolean;
     canRedo: boolean;
@@ -37,6 +39,7 @@ export function MenuBar({
     onOpen,
     onSaveDrive,
     onLoadDrive,
+    onPublish,
     onDownload,
     canUndo,
     canRedo,
@@ -47,6 +50,7 @@ export function MenuBar({
     theme,
     setTheme,
     googleBacked,
+    currentFileId,
 }: MenuBarProps) {
     const { open, toggleSidebar } = useSidebar();
 
@@ -67,6 +71,9 @@ export function MenuBar({
                     </MenubarItem>
                     <MenubarItem onClick={onLoadDrive}>
                         Load from Drive
+                    </MenubarItem>
+                    <MenubarItem onClick={onPublish} disabled={!googleBacked || !currentFileId}>
+                        Publish to Community
                     </MenubarItem>
                     <MenubarSeparator />
                     <MenubarItem onClick={onDownload}>
