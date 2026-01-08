@@ -164,25 +164,25 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
             {/* Files */}
             {files.length > 0 && (
               <div className="space-y-0.5">
-                {subfolders.length > 0 && (
+                {files.length > 0 && (
                   <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
                     Files
                   </div>
                 )}
                 {files.map((file) => (
-                  <div key={file.id} className="group relative flex w-full items-center">
+                  <div key={file.id} className="group relative flex items-center w-full min-w-0">
                     <Button
                       onClick={() => handleFileClick(file.id)}
                       variant={currentFileId === file.id ? "default" : "ghost"}
                       title={file.name}
                       size="sm"
-                      className={cn(
-                        "justify-start flex-1  h-auto py-1.5 pr-8"
-                      )}
+                      className="flex-1 min-w-0 justify-start h-auto py-1.5 pr-8 gap-2"
                     >
                       <FileMusic className="w-3.5 h-3.5 shrink-0" />
-                      <div className="min-w-0 flex flex-col items-start truncate">
-                        <div className="text-xs font-medium truncate w-full text-left">{file.name}</div>
+                      <div className="flex-1 min-w-0 flex flex-col items-start pr-8">
+                        <div className="text-xs font-medium truncate w-full text-left">
+                          {file.name}
+                        </div>
                         {file.modifiedTime && (
                           <div className="text-[10px] text-muted-foreground">
                             {formatDate(file.modifiedTime)}
@@ -195,8 +195,9 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
                         e.stopPropagation();
                         setDeletingFileId(file.id);
                       }}
-                      variant={"ghost"}
-                      className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      variant="outline"
+                      size="icon"
+                      className="absolute right-1.5 h-7 w-7 hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100 transition-opacity"
                       title="Delete file"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
