@@ -87,7 +87,7 @@ export function PublicBrowser({ onLoadFile, onClose, currentFileId }: PublicBrow
                 </div>
             </div>
 
-            <Separator className='my-2'/>
+            <Separator className='my-2' />
 
             <div className="flex-1 overflow-y-auto min-h-0 px-2 py-1 space-y-0.5">
                 {loading ? (
