@@ -27,6 +27,7 @@ import type { GoogleUser } from "./lib/googleDrive";
 import { MenuBar } from "./components/MenuBar";
 import { useNotebook } from "./hooks/useNotebook";
 import type { Notebook } from "./types/notebook";
+import { NotebookSettingsProvider } from "./context/NotebookSettingsContext";
 
 // Notebook interfaces imported from types/notebook
 
@@ -305,94 +306,96 @@ function App() {
   };
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
-      <div className="flex h-screen w-full bg-background text-foreground overflow-hidden selection:bg-primary/10">
-        <Sidebar
-          onFileUpload={handleFileUpload}
-          onNew={handleNew}
-          theme={theme}
-          setTheme={setTheme}
-          isOpen={sidebarOpen}
-          googleDriveConnected={googleDriveConnected}
-          googleDriveUser={googleDriveUser}
-          onGoogleDriveConnect={handleGoogleDriveConnect}
-          onGoogleDriveDisconnect={handleGoogleDriveDisconnect}
-          onLoadFromDrive={handleLoadFromDrive}
-          onLoadDriveFile={handleDriveLoad}
-          currentFileId={driveFileId}
-        />
-
-        <SidebarInset className="flex-1 flex flex-col min-w-0 bg-muted/5 overflow-hidden">
-          <Header
-            title={notebook.metadata?.title || ""}
-            onTitleUpdate={updateTitle}
-            filePath={filePath}
-            googleDriveConnected={googleDriveConnected}
-            onSaveToDrive={handleSaveToDrive}
-            onDownload={handleDownload}
-          />
-
-          <div className="border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-0.5">
-            <MenuBar
-              onNew={handleNew}
-              onOpen={() => fileInputRef.current?.click()}
-              onSaveDrive={handleSaveToDrive}
-              onLoadDrive={handleLoadFromDrive}
-              onPublish={handlePublish}
-              onDownload={handleDownload}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              onUndo={undo}
-              onRedo={redo}
-              onAddMusic={() => addCell("music", -1)}
-              onAddMarkdown={() => addCell("markdown", -1)}
-              theme={theme}
-              setTheme={setTheme}
-              googleBacked={!!driveFileId}
-              currentFileId={driveFileId}
-            />
-          </div>
-
-          <NotebookEditor
-            notebook={notebook}
-            activeCellId={activeCellId}
-            setActiveCellId={setActiveCellId}
-            updateCell={updateCell}
-            deleteCell={deleteCell}
-            addCell={addCell}
+    <NotebookSettingsProvider>
+      <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <div className="flex h-screen w-full bg-background text-foreground overflow-hidden selection:bg-primary/10">
+          <Sidebar
+            onFileUpload={handleFileUpload}
+            onNew={handleNew}
             theme={theme}
+            setTheme={setTheme}
+            isOpen={sidebarOpen}
+            googleDriveConnected={googleDriveConnected}
+            googleDriveUser={googleDriveUser}
+            onGoogleDriveConnect={handleGoogleDriveConnect}
+            onGoogleDriveDisconnect={handleGoogleDriveDisconnect}
+            onLoadFromDrive={handleLoadFromDrive}
+            onLoadDriveFile={handleDriveLoad}
+            currentFileId={driveFileId}
           />
-        </SidebarInset>
 
-        <GoogleDriveSaveDialog
-          open={saveDialogOpen}
-          onOpenChange={setSaveDialogOpen}
-          notebook={notebook}
-          onSave={(fileId: string | null) => {
-            // Track that this notebook is saved to Drive
-            if (fileId) {
-              setDriveFileId(fileId);
-              setLastSavedContent(JSON.stringify(notebook, null, 2));
-            }
-          }}
-        />
+          <SidebarInset className="flex-1 flex flex-col min-w-0 bg-muted/5 overflow-hidden">
+            <Header
+              title={notebook.metadata?.title || ""}
+              onTitleUpdate={updateTitle}
+              filePath={filePath}
+              googleDriveConnected={googleDriveConnected}
+              onSaveToDrive={handleSaveToDrive}
+              onDownload={handleDownload}
+            />
 
-        <GoogleDriveLoadDialog
-          open={loadDialogOpen}
-          onOpenChange={setLoadDialogOpen}
-          onLoad={handleDriveLoad}
-        />
+            <div className="border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-0.5">
+              <MenuBar
+                onNew={handleNew}
+                onOpen={() => fileInputRef.current?.click()}
+                onSaveDrive={handleSaveToDrive}
+                onLoadDrive={handleLoadFromDrive}
+                onPublish={handlePublish}
+                onDownload={handleDownload}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={undo}
+                onRedo={redo}
+                onAddMusic={() => addCell("music", -1)}
+                onAddMarkdown={() => addCell("markdown", -1)}
+                theme={theme}
+                setTheme={setTheme}
+                googleBacked={!!driveFileId}
+                currentFileId={driveFileId}
+              />
+            </div>
 
-        <Toaster position="bottom-right" theme={theme} closeButton />
-        <input
-          type="file"
-          accept=".imnb,.json"
-          className="hidden"
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-        />
-      </div>
-    </SidebarProvider>
+            <NotebookEditor
+              notebook={notebook}
+              activeCellId={activeCellId}
+              setActiveCellId={setActiveCellId}
+              updateCell={updateCell}
+              deleteCell={deleteCell}
+              addCell={addCell}
+              theme={theme}
+            />
+          </SidebarInset>
+
+          <GoogleDriveSaveDialog
+            open={saveDialogOpen}
+            onOpenChange={setSaveDialogOpen}
+            notebook={notebook}
+            onSave={(fileId: string | null) => {
+              // Track that this notebook is saved to Drive
+              if (fileId) {
+                setDriveFileId(fileId);
+                setLastSavedContent(JSON.stringify(notebook, null, 2));
+              }
+            }}
+          />
+
+          <GoogleDriveLoadDialog
+            open={loadDialogOpen}
+            onOpenChange={setLoadDialogOpen}
+            onLoad={handleDriveLoad}
+          />
+
+          <Toaster position="bottom-right" theme={theme} closeButton />
+          <input
+            type="file"
+            accept=".imnb,.json"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+          />
+        </div>
+      </SidebarProvider>
+    </NotebookSettingsProvider >
   );
 }
 

@@ -34,6 +34,8 @@ interface MenuBarProps {
     googleBacked: boolean;
 }
 
+import { useNotebookSettings } from "../context/NotebookSettingsContext";
+
 export function MenuBar({
     onNew,
     onOpen,
@@ -53,6 +55,7 @@ export function MenuBar({
     currentFileId,
 }: MenuBarProps) {
     const { open, toggleSidebar } = useSidebar();
+    const { showVisualizer, toggleVisualizer } = useNotebookSettings();
 
     return (
         <Menubar className="border-none bg-transparent h-auto p-0 shadow-none">
@@ -102,6 +105,9 @@ export function MenuBar({
                 <MenubarContent>
                     <MenubarItem onClick={toggleSidebar}>
                         {open ? "Hide" : "Show"} Sidebar <MenubarShortcut>⌘B</MenubarShortcut>
+                    </MenubarItem>
+                    <MenubarItem onClick={toggleVisualizer}>
+                        {showVisualizer ? "Hide" : "Show"} All Visualizers
                     </MenubarItem>
                     <MenubarSeparator />
                     <MenubarItem onClick={() => setTheme("dark")}>Dark Mode</MenubarItem>

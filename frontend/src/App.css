@@ -1,5 +1,7 @@
 /* Clean slate for main App layout */
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
@@ -77,3 +79,16 @@ button {
   overflow-wrap: break-word;
 }
 
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(var(--primary), 0.1);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--primary), 0.2);
+}

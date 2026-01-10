@@ -10,6 +10,7 @@ import { createInstrument, isRhythmicInstrument, isTonalInstrument } from "../li
 import type { Instrument } from "../lib/instruments";
 import { Mixer, type VoiceControl } from "./music-cell/Mixer";
 import { Controls } from "./music-cell/Controls";
+import { useNotebookSettings } from "../context/NotebookSettingsContext";
 
 interface MusicCellProps {
   cell: {
@@ -40,6 +41,13 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   const [voiceControls, setVoiceControls] = useState<Record<string, VoiceControl>>({});
   const [showMixer, setShowMixer] = useState(false);
   const activeNodesRef = useRef<Record<string, ActiveNode>>({});
+  const { defaultInstruments, updateDefaultInstrument, showVisualizer } = useNotebookSettings();
+  const [localShowVisualizer, setLocalShowVisualizer] = useState(true);
+
+  // Sync with global setting when it changes
+  useEffect(() => {
+    setLocalShowVisualizer(showVisualizer);
+  }, [showVisualizer]);
 
   const handleChange = (val: string) => {
     onChange({ ...cell, source: val.split("\n") });
@@ -60,7 +68,12 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           if (prev[v]) {
             next[v] = prev[v];
           } else {
-            next[v] = { volume: -5, muted: false, instrument: "harmonium" };
+            // Use global default if available for "default" voice
+            const instrument = v === "default" && defaultInstruments["default"]
+              ? defaultInstruments["default"]
+              : "harmonium";
+
+            next[v] = { volume: -5, muted: false, instrument };
             hasChanges = true;
           }
         });
@@ -70,10 +83,10 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           if (prev["__tala"]) {
             next["__tala"] = prev["__tala"];
           } else {
-            next["__tala"] = { 
-              volume: -5, 
-              muted: false, 
-              instrument: data.directives.tala_pattern ? "tabla-sampler" : "tabla" 
+            next["__tala"] = {
+              volume: -5,
+              muted: false,
+              instrument: data.directives.tala_pattern ? "tabla-sampler" : "tabla"
             };
             hasChanges = true;
           }
@@ -100,7 +113,26 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     } catch (e) {
       // silent fail on type; waiting for valid input
     }
-  }, [content]);
+  }, [content, defaultInstruments]); // Add defaultInstruments to dependency to likely trigger re-init if needed? 
+  // Actually, we want a separate effect for reactive updates to avoid re-parsing content.
+
+  // Effect to sync local state with global default changes
+  useEffect(() => {
+    if (defaultInstruments["default"]) {
+      setVoiceControls(prev => {
+        if (prev["default"] && prev["default"].instrument !== defaultInstruments["default"]) {
+          return {
+            ...prev,
+            default: {
+              ...prev["default"],
+              instrument: defaultInstruments["default"]
+            }
+          };
+        }
+        return prev;
+      });
+    }
+  }, [defaultInstruments]);
 
   const handlePlay = async () => {
     if (isPlaying) {
@@ -137,7 +169,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           });
         } else if (isTonalInstrument(synth)) {
           if (synth instanceof Tone.PolySynth || synth instanceof Tone.Sampler) {
-             (synth as any).releaseAll?.();
+            (synth as any).releaseAll?.();
           }
           synth.dispose();
         }
@@ -166,6 +198,11 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       ...prev,
       [voiceName]: { ...prev[voiceName], ...updates },
     }));
+
+    // If updating instrument for default voice, propagate globally
+    if (voiceName === "default" && updates.instrument) {
+      updateDefaultInstrument("default", updates.instrument);
+    }
   };
 
   // Helper function to convert swara notation to frequency
@@ -204,16 +241,16 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
 
     // Clean up previous
     Object.values(activeNodesRef.current).forEach(({ synth, volumeNode }) => {
-        try {
-            if (isRhythmicInstrument(synth)) {
-                Object.values(synth.players).forEach((player) => {
-                    try { player.stop(); player.dispose(); } catch (e) {}
-                });
-            } else if (isTonalInstrument(synth)) {
-                synth.dispose();
-            }
-            volumeNode?.dispose();
-        } catch (e) {}
+      try {
+        if (isRhythmicInstrument(synth)) {
+          Object.values(synth.players).forEach((player) => {
+            try { player.stop(); player.dispose(); } catch (e) { }
+          });
+        } else if (isTonalInstrument(synth)) {
+          synth.dispose();
+        }
+        volumeNode?.dispose();
+      } catch (e) { }
     });
     activeNodesRef.current = {};
 
@@ -239,77 +276,77 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       if (parsedData.directives.tala_pattern) {
         const pattern = parsedData.directives.tala_pattern.trim();
         const tablaInstrument = await createInstrument("tabla-sampler");
-        
+
         if (isRhythmicInstrument(tablaInstrument)) {
-            // Connect all players to volume node
-            Object.values(tablaInstrument.players).forEach(player => player.connect(talaVol));
-          
-            activeNodesRef.current["__tala"] = {
-                synth: tablaInstrument,
-                volumeNode: talaVol,
-            };
+          // Connect all players to volume node
+          Object.values(tablaInstrument.players).forEach(player => player.connect(talaVol));
 
-            // Parse pattern
-            const parseTalaPattern = (patternStr: string, defaultDur: number, beatDurSeconds: number) => {
-                const events: { bol: string, duration: number, time: number }[] = [];
-                const cleanPattern = patternStr.split('#')[0].trim();
-                const tokens = cleanPattern.split(/\s+/).filter(t => t);
-                
-                let time = 0;
-                for (const token of tokens) {
-                    if (token === '|' || token === '||') continue;
-                    
-                    const colonIdx = token.lastIndexOf(':');
-                    let bol = token;
-                    let duration = defaultDur;
-                    
-                    if (colonIdx !== -1) {
-                        const durStr = token.slice(colonIdx + 1);
-                        const parsedDur = parseFloat(durStr);
-                        if (!isNaN(parsedDur) && parsedDur > 0) {
-                            duration = parsedDur;
-                            bol = token.slice(0, colonIdx);
-                        }
-                    }
-                    
-                    if (bol) {
-                        const durationSeconds = duration * beatDurSeconds;
-                        events.push({ bol, duration, time });
-                        time += durationSeconds;
-                    }
+          activeNodesRef.current["__tala"] = {
+            synth: tablaInstrument,
+            volumeNode: talaVol,
+          };
+
+          // Parse pattern
+          const parseTalaPattern = (patternStr: string, defaultDur: number, beatDurSeconds: number) => {
+            const events: { bol: string, duration: number, time: number }[] = [];
+            const cleanPattern = patternStr.split('#')[0].trim();
+            const tokens = cleanPattern.split(/\s+/).filter(t => t);
+
+            let time = 0;
+            for (const token of tokens) {
+              if (token === '|' || token === '||') continue;
+
+              const colonIdx = token.lastIndexOf(':');
+              let bol = token;
+              let duration = defaultDur;
+
+              if (colonIdx !== -1) {
+                const durStr = token.slice(colonIdx + 1);
+                const parsedDur = parseFloat(durStr);
+                if (!isNaN(parsedDur) && parsedDur > 0) {
+                  duration = parsedDur;
+                  bol = token.slice(0, colonIdx);
                 }
-                return events;
-            };
+              }
 
-            const defaultTalaDur = parseFloat(parsedData.directives.default_duration || "1.0");
-            const talaEvents = parseTalaPattern(pattern, defaultTalaDur, beatDur);
-            const cycleDuration = talaEvents.length > 0 
-                ? talaEvents[talaEvents.length - 1].time + (talaEvents[talaEvents.length - 1].duration * beatDur)
-                : 4 * beatDur;
+              if (bol) {
+                const durationSeconds = duration * beatDurSeconds;
+                events.push({ bol, duration, time });
+                time += durationSeconds;
+              }
+            }
+            return events;
+          };
 
-            Tone.getTransport().scheduleRepeat((time) => {
-                talaEvents.forEach((event) => {
-                    const player = tablaInstrument.players[event.bol];
-                    if (player) {
-                        player.start(time + event.time);
-                    }
-                });
-            }, cycleDuration);
+          const defaultTalaDur = parseFloat(parsedData.directives.default_duration || "1.0");
+          const talaEvents = parseTalaPattern(pattern, defaultTalaDur, beatDur);
+          const cycleDuration = talaEvents.length > 0
+            ? talaEvents[talaEvents.length - 1].time + (talaEvents[talaEvents.length - 1].duration * beatDur)
+            : 4 * beatDur;
+
+          Tone.getTransport().scheduleRepeat((time) => {
+            talaEvents.forEach((event) => {
+              const player = tablaInstrument.players[event.bol];
+              if (player) {
+                player.start(time + event.time);
+              }
+            });
+          }, cycleDuration);
         }
       } else {
         // Fallback or explicit simple tabla
         const membrane = await createInstrument(talaCtrl.instrument || "tabla");
         if (isTonalInstrument(membrane)) {
-            membrane.connect(talaVol);
-            activeNodesRef.current["__tala"] = {
-                synth: membrane,
-                volumeNode: talaVol,
-            };
+          membrane.connect(talaVol);
+          activeNodesRef.current["__tala"] = {
+            synth: membrane,
+            volumeNode: talaVol,
+          };
 
-            Tone.getTransport().scheduleRepeat((time) => {
-                 // We can cast here safely as we checked isTonalInstrument
-                (membrane as Tone.MembraneSynth).triggerAttackRelease("C2", "8n", time);
-            }, "4n");
+          Tone.getTransport().scheduleRepeat((time) => {
+            // We can cast here safely as we checked isTonalInstrument
+            (membrane as Tone.MembraneSynth).triggerAttackRelease("C2", "8n", time);
+          }, "4n");
         }
       }
     }
@@ -347,9 +384,9 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       activeNodesRef.current[voiceName] = { synth, volumeNode };
 
       if (!isTonalInstrument(synth)) {
-          // Skip scheduling for non-tonal instruments on melody tracks for now
-          // or handle differently
-          continue; 
+        // Skip scheduling for non-tonal instruments on melody tracks for now
+        // or handle differently
+        continue;
       }
 
       let time = 0;
@@ -386,9 +423,9 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               else if (upper.startsWith("DHA")) targetSwara = "D";
               else if (upper.startsWith("NI")) targetSwara = "N";
               else {
-                  const firstChar = targetSwara[0]?.toUpperCase();
-                  if (firstChar && ["S", "R", "G", "M", "P", "D", "N"].includes(firstChar)) targetSwara = firstChar;
-                  else targetSwara = "S";
+                const firstChar = targetSwara[0]?.toUpperCase();
+                if (firstChar && ["S", "R", "G", "M", "P", "D", "N"].includes(firstChar)) targetSwara = firstChar;
+                else targetSwara = "S";
               }
 
               if (targetSwaraStr.includes("k") || targetSwaraStr.includes("b")) targetVariant = "k";
@@ -416,29 +453,29 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               let isThreePhase = false;
 
               if (meendOrnament.params.length === 4) {
-                 const parsedStart = parseFloat(meendOrnament.params[1]);
-                 const parsedSlide = parseFloat(meendOrnament.params[2]);
-                 const parsedEnd = parseFloat(meendOrnament.params[3]);
-                 if (!isNaN(parsedStart) && !isNaN(parsedSlide) && !isNaN(parsedEnd)) {
-                     const totalSpecified = parsedStart + parsedSlide + parsedEnd;
-                     if (totalSpecified > 0) {
-                         const scale = event.duration / totalSpecified;
-                         startDur = parsedStart * scale * beatDur;
-                         slideDur = parsedSlide * scale * beatDur;
-                         endDur = parsedEnd * scale * beatDur;
-                         isThreePhase = true;
-                     }
-                 }
+                const parsedStart = parseFloat(meendOrnament.params[1]);
+                const parsedSlide = parseFloat(meendOrnament.params[2]);
+                const parsedEnd = parseFloat(meendOrnament.params[3]);
+                if (!isNaN(parsedStart) && !isNaN(parsedSlide) && !isNaN(parsedEnd)) {
+                  const totalSpecified = parsedStart + parsedSlide + parsedEnd;
+                  if (totalSpecified > 0) {
+                    const scale = event.duration / totalSpecified;
+                    startDur = parsedStart * scale * beatDur;
+                    slideDur = parsedSlide * scale * beatDur;
+                    endDur = parsedEnd * scale * beatDur;
+                    isThreePhase = true;
+                  }
+                }
               }
 
               Tone.getTransport().schedule((t) => {
                 // If it needs a temp synth, create one. It will be a standard Synth (monophonic, tonal)
                 const meendSynth = needsTempSynth
                   ? new Tone.Synth().connect(volumeNode)
-                  : synth; 
-                
+                  : synth;
+
                 // Let's coerce for the complex logic
-                const mSynth = meendSynth as any; 
+                const mSynth = meendSynth as any;
 
                 if (isThreePhase) {
                   mSynth.triggerAttack(startFreq, t);
@@ -480,16 +517,16 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
                 }
               }, time);
             } else {
-               // Normal Note Playback
-               const instrument = synth; // is TonalInstrument
-               Tone.getTransport().schedule((t) => {
-                  if (instrument instanceof Tone.PolySynth || instrument instanceof Tone.Sampler || instrument instanceof Tone.MembraneSynth) {
-                      instrument.triggerAttackRelease(startFreq, durSeconds, t);
-                  } else {
-                      // Fallback for other tonal instruments if any
-                      (instrument as any).triggerAttackRelease?.(startFreq, durSeconds, t);
-                  }
-               }, time);
+              // Normal Note Playback
+              const instrument = synth; // is TonalInstrument
+              Tone.getTransport().schedule((t) => {
+                if (instrument instanceof Tone.PolySynth || instrument instanceof Tone.Sampler || instrument instanceof Tone.MembraneSynth) {
+                  instrument.triggerAttackRelease(startFreq, durSeconds, t);
+                } else {
+                  // Fallback for other tonal instruments if any
+                  (instrument as any).triggerAttackRelease?.(startFreq, durSeconds, t);
+                }
+              }, time);
             }
           }
           time += durSeconds;
@@ -506,19 +543,22 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
 
   return (
     <div className="flex flex-col relative max-w-full overflow-hidden">
-      <Controls 
-        isPlaying={isPlaying} 
-        onPlay={handlePlay} 
-        mixerOpen={showMixer} 
+      {localShowVisualizer ? "true" : "false"}
+      <Controls
+        isPlaying={isPlaying}
+        onPlay={handlePlay}
+        mixerOpen={showMixer}
         onToggleMixer={() => setShowMixer(!showMixer)}
+        showVisualizer={localShowVisualizer}
+        onToggleVisualizer={() => setLocalShowVisualizer(!localShowVisualizer)}
         mixerContent={
-            <Mixer 
-                show={showMixer} 
-                onClose={() => setShowMixer(false)} 
-                voiceControls={voiceControls} 
-                updateVoiceControl={updateVoiceControl} 
-                parsedData={lastParsedData} 
-            />
+          <Mixer
+            show={showMixer}
+            onClose={() => setShowMixer(false)}
+            voiceControls={voiceControls}
+            updateVoiceControl={updateVoiceControl}
+            parsedData={lastParsedData}
+          />
         }
       />
       <div className="p-1 overflow-x-auto max-w-full">
@@ -534,7 +574,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           />
         </div>
       </div>
-      {isPlaying && lastParsedData && (
+      {(localShowVisualizer || (isPlaying && lastParsedData)) && (
         <div className="px-3 md:px-4 pb-4 overflow-x-auto max-w-full">
           <div className="min-w-0">
             <MusicVisualizer

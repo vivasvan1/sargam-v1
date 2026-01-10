@@ -37,7 +37,13 @@ export interface BarEvent {
   line_index?: number;
 }
 
-export type Event = NoteEvent | RestEvent | HoldEvent | BarEvent;
+export interface CommentEvent {
+  type: 'comment';
+  text: string;
+  line_index?: number;
+}
+
+export type Event = NoteEvent | RestEvent | HoldEvent | BarEvent | CommentEvent;
 
 export interface Voice {
   name: string;
@@ -94,6 +100,31 @@ export function parseMusicCell(lines: string[]): MusicCell {
       continue;
     }
 
+    // Handle comments/markdown (lines starting with #, but not #voice)
+    {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('#') || trimmed.startsWith('//')) {
+        // It's a comment. We add it to the current voice (or default if none).
+        // If no voice started, we start default.
+        if (!currentVoice) {
+          if (!voices['default']) {
+            voices['default'] = { name: 'default', events: [] };
+          }
+          currentVoice = voices['default'];
+        }
+
+        currentVoice.events.push({
+          type: 'comment',
+          text: trimmed,
+          line_index: currentLineIndex
+        });
+
+        // Comments take up a line, so we increment line index logic
+        // (Actually line index is handled by the loop, so just pushing it is enough)
+        continue;
+      }
+    }
+
     if (!currentVoice) {
       if (!voices['default']) {
         voices['default'] = { name: 'default', events: [] };
@@ -111,7 +142,7 @@ export function parseMusicCell(lines: string[]): MusicCell {
     let current = '';
     let depth = 0;
     const trimmed = content.trim();
-    
+
     for (let i = 0; i < trimmed.length; i++) {
       const ch = trimmed[i];
       if (ch === '(') {
@@ -181,7 +212,7 @@ export function parseToken(token: string, defaultDuration: number): Event | null
   // 2. Split Ornaments (+)
   // Ornaments start with +, but + can also be inside a microtone (e.g., n+25c)
   let ornamentsPart: string | undefined;
-  
+
   // Find the + that is not part of a microtone (preceded by 'n')
   const ornMatch = notePart.match(/(?<!n)\+/);
   if (ornMatch && ornMatch.index !== undefined) {
@@ -205,10 +236,10 @@ export function parseToken(token: string, defaultDuration: number): Event | null
   // Check for lowercase komal swaras (r, g, d, n) - these are equivalent to Rk, Gk, Dk, Nk
   const komalMap: Record<string, string> = { 'r': 'R', 'g': 'G', 'd': 'D', 'n': 'N' };
   let isLowercaseKomal = false;
-  
+
   let swara = notePart;
   let modsPart = '';
-  
+
   if (notePart && notePart.length > 0 && notePart[0] in komalMap) {
     // Check if it's a standalone lowercase komal swara (possibly with modifiers)
     const komalMatch = notePart.match(/^([rgdn])(.*)$/);
@@ -284,7 +315,7 @@ export function parseToken(token: string, defaultDuration: number): Event | null
     const ornamentStrings: string[] = [];
     let current = '';
     let depth = 0;
-    
+
     for (let i = 0; i < ornamentsPart.length; i++) {
       const ch = ornamentsPart[i];
       if (ch === '(') {
@@ -307,7 +338,7 @@ export function parseToken(token: string, defaultDuration: number): Event | null
     if (current.trim()) {
       ornamentStrings.push(current.trim());
     }
-    
+
     // Parse each ornament
     for (const part of ornamentStrings) {
       if (!part) continue;
@@ -321,7 +352,7 @@ export function parseToken(token: string, defaultDuration: number): Event | null
           const paramStrings: string[] = [];
           let paramCurrent = '';
           let paramDepth = 0;
-          
+
           for (let i = 0; i < paramsStr.length; i++) {
             const ch = paramsStr[i];
             if (ch === '(') {
@@ -342,7 +373,7 @@ export function parseToken(token: string, defaultDuration: number): Event | null
           if (paramCurrent.trim()) {
             paramStrings.push(paramCurrent.trim());
           }
-          
+
           params = paramStrings.filter(p => p);
         }
         ornaments.push({ name, params });

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import * as Tone from "tone";
 import { cn } from "../lib/utils";
-import type { MusicCell as ParsedMusicCell } from "../utils/sargam_parser";
+import type { MusicCell as ParsedMusicCell, BarEvent } from "../utils/sargam_parser";
 
 interface MusicVisualizerProps {
   parsedData: ParsedMusicCell | null;
@@ -30,7 +30,7 @@ export function MusicVisualizer({ parsedData, isPlaying }: MusicVisualizerProps)
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number>(null);
 
   // Group events by line_index for the first voice (primary visual)
   const voiceData = useMemo<VoiceData | null>(() => {
@@ -46,20 +46,35 @@ export function MusicVisualizer({ parsedData, isPlaying }: MusicVisualizerProps)
     const beatDur = 60 / bpm;
 
     mainVoice.events.forEach((event) => {
-      if (event.duration === undefined) return;
+      // Include duration-based events and comments
+      // @ts-expect-error
+      if (event.duration === undefined && event.type !== 'comment') return;
 
       const lineIdx = event.line_index || 0;
       if (!lines[lineIdx])
         lines[lineIdx] = { events: [], duration: 0, startTime: absTime };
 
-      const durationSeconds = event.duration * beatDur;
+      // @ts-expect-error
+      const durationSeconds = (event.type === 'comment') ? 0.05 : (event.duration || 0) * beatDur;
+      // We attribute 0 or small duration to comment? 
+      // Actually comments shouldn't advance music time usually if they are blocks associated with a line. 
+      // But here we're grouping strictly by line_index from parser.
+      // Parser increments line index for new lines.
+      // So a comment line is its own line_index.
+
       lines[lineIdx].events.push({
         ...event,
         startTime: absTime,
         durationSeconds,
       });
       lines[lineIdx].duration += durationSeconds;
-      absTime += durationSeconds;
+
+      // If it's a music event, it advances time. If comment, it might not?
+      // For now, let's treat comments as having 0 duration in playback time, 
+      // but they exist in the sequence.
+      if (event.type !== 'comment') {
+        absTime += durationSeconds;
+      }
     });
 
     // Parse beat count from tala if available (e.g., "Tintal(16)")
@@ -219,16 +234,14 @@ export function MusicVisualizer({ parsedData, isPlaying }: MusicVisualizerProps)
   if (!voiceData || !isPlaying) return null;
 
   // Dynamic BEAT_WIDTH calculation:
-  // Try to fit the beat count in the container width, but stay between 40px and 80px.
-  // If no beatCount, default to 60px.
-  const PADDING = 48; // total horizontal padding
+  const PADDING = 48;
   const rawBeatWidth =
     voiceData.beatCount > 0
       ? (containerWidth - PADDING) / voiceData.beatCount
       : 60;
   const BEAT_WIDTH = Math.max(40, Math.min(80, rawBeatWidth));
 
-  const bpm = parsedData.directives.tempo
+  const bpm = parsedData?.directives.tempo
     ? parseFloat(parsedData.directives.tempo)
     : 120;
   const PIXELS_PER_SECOND = (BEAT_WIDTH * bpm) / 60;
@@ -244,10 +257,10 @@ export function MusicVisualizer({ parsedData, isPlaying }: MusicVisualizerProps)
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary/80">
-            Live Score
+            {isPlaying ? "Live " : ""}Score
           </h3>
           <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">
-            {parsedData.directives.tala || "Free Rhythm"} • {bpm} BPM
+            {parsedData?.directives.tala || "Free Rhythm"} • {bpm} BPM
           </p>
         </div>
         <div className="flex items-center gap-3 bg-muted/20 px-3 py-1.5 rounded-full border border-border/50">
@@ -270,7 +283,6 @@ export function MusicVisualizer({ parsedData, isPlaying }: MusicVisualizerProps)
         className="overflow-x-auto custom-scrollbar px-2 md:px-3 -mx-4 md:-mx-6 max-w-full"
       >
         <div className="min-w-max flex flex-col gap-6 md:gap-8">
-          {/* Table Header: Beat Numbers */}
           {voiceData.beatCount > 0 && (
             <div
               className="grid border-b border-border/10 pb-2 -mb-6"
@@ -289,12 +301,32 @@ export function MusicVisualizer({ parsedData, isPlaying }: MusicVisualizerProps)
               ))}
             </div>
           )}
-
-          {/* Table Rows */}
+          {JSON.stringify(voiceData)}
           <div className="space-y-6 pt-6">
             {voiceData.lines.map((line, idx) => {
+              // Check for comment line
+              const isCommentLine = line.events.some(e => e.type === 'comment');
+
+              if (isCommentLine) {
+                const commentText = line.events
+                  .filter(e => e.type === 'comment')
+                  .map(e => (e as any).text)
+                  .join(' ')
+                  .replace(/^[#\/]+\s*/, '');
+
+                return (
+                  <div key={idx} className="flex items-center px-2 py-2 text-sm text-foreground/80 font-medium italic">
+                    {commentText}
+                  </div>
+                );
+              }
+
               const isActive = idx === activeLineIndex;
               const lineProgress = isActive ? currentTime - line.startTime : 0;
+
+              // Generate beat markers for grid
+              const totalBeatsInLine = Math.ceil(line.duration / voiceData.beatDur);
+              const beatMarkers = Array.from({ length: totalBeatsInLine }, (_, i) => i);
 
               return (
                 <div
@@ -307,30 +339,48 @@ export function MusicVisualizer({ parsedData, isPlaying }: MusicVisualizerProps)
                   )}
                   style={{
                     height: "4rem",
-                    width: `${
-                      (voiceData.beatCount || Math.ceil(line.duration)) *
+                    width: `${(voiceData.beatCount || Math.ceil(line.duration / voiceData.beatDur) || 4) *
                       BEAT_WIDTH
-                    }px`,
+                      }px`,
                   }}
                 >
+                  {/* Grid Overlay */}
+                  <div className="absolute inset-0 z-0 pointer-events-none">
+                    {beatMarkers.map(beatIndex => (
+                      <div
+                        key={beatIndex}
+                        className={cn(
+                          "absolute top-0 bottom-0 border-l border-border/10",
+                          (beatIndex % (voiceData.beatCount || 4) === 0) ? "border-border/30 border-l-2" : ""
+                        )}
+                        style={{ left: `${beatIndex * BEAT_WIDTH}px` }}
+                      />
+                    ))}
+                  </div>
+
                   {/* Note Overlay */}
                   <div className="absolute inset-0 z-10 pointer-events-none">
                     {line.events.map((event, eIdx) => {
-                      if (!event.swara && !event.duration) return null;
+                      if (event.type === 'bar' || event.type === 'comment') return null;
+
+                      // Type narrowing
+                      const duration = (event as any).duration;
+                      if (!('swara' in event) && !duration) return null;
+
+                      const noteEvent = event as any;
 
                       // Check for meend ornament
-                      const meendOrnament = event.ornaments?.find(
-                        (o) => o.name === "meend" || o.name === "slide"
+                      const meendOrnament = noteEvent.ornaments?.find(
+                        (o: any) => o.name === "meend" || o.name === "slide"
                       );
                       const hasMeend =
                         meendOrnament && meendOrnament.params.length > 0;
 
-                      // Parse target swara from meend params
+                      // Parse target swara from meend
                       let targetSwara = null;
                       if (hasMeend) {
                         const targetStr = meendOrnament.params[0]?.trim();
                         if (targetStr) {
-                          // Extract swara name (first letter or multi-char like SA, RI, etc.)
                           const upper = targetStr.toUpperCase();
                           if (upper.startsWith("SA")) targetSwara = "S";
                           else if (upper.startsWith("RI")) targetSwara = "R";
@@ -353,73 +403,45 @@ export function MusicVisualizer({ parsedData, isPlaying }: MusicVisualizerProps)
                       }
 
                       if (hasMeend && targetSwara) {
-                        // Render meend with special styling
                         return (
                           <div
                             key={eIdx}
                             className="absolute top-[15%] bottom-[15%] rounded-md overflow-hidden transition-all duration-500 shadow-lg bg-linear-to-r from-primary/30 via-primary/15 to-primary/30 border-[1.5px] border-primary/40"
                             style={{
-                              left: `${
-                                (event.startTime - line.startTime) *
-                                  PIXELS_PER_SECOND +
+                              left: `${(event.startTime - line.startTime) *
+                                PIXELS_PER_SECOND +
                                 2
-                              }px`,
+                                }px`,
                               width: `${Math.max(
                                 0,
                                 event.durationSeconds * PIXELS_PER_SECOND - 4
                               )}px`,
                             }}
                           >
-                            {/* Start swara */}
                             <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                               <span className="text-[10px] font-black text-primary drop-shadow-sm">
-                                {event.swara}
-                                {event.variant || ""}
+                                {noteEvent.swara}
+                                {noteEvent.variant || ""}
                               </span>
-                              {event.octave !== 0 && (
-                                <span className="text-[7px] opacity-60">
-                                  {event.octave > 0
-                                    ? "'".repeat(event.octave)
-                                    : ",".repeat(Math.abs(event.octave))}
+                              {noteEvent.octave !== 0 && (
+                                <span className="text-[7px] opacity-60 ml-0.5">
+                                  {noteEvent.octave > 0
+                                    ? "'".repeat(noteEvent.octave)
+                                    : ",".repeat(Math.abs(noteEvent.octave))}
                                 </span>
                               )}
                             </div>
-
-                            {/* Arrow/connector - curved line with arrow */}
                             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center">
-                              <svg
-                                width="32"
-                                height="12"
-                                viewBox="0 0 32 12"
-                                fill="none"
-                                className="text-primary/70"
-                              >
-                                {/* Curved path from left to right */}
-                                <path
-                                  d="M2 6 Q16 2, 28 6"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  fill="none"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                                {/* Arrowhead - filled triangle for better visibility */}
-                                <path
-                                  d="M28 6 L24 3.5 L24 8.5 Z"
-                                  fill="currentColor"
-                                  stroke="none"
-                                />
+                              <svg width="32" height="12" viewBox="0 0 32 12" fill="none" className="text-primary/70">
+                                <path d="M2 6 Q16 2, 28 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M28 6 L24 3.5 L24 8.5 Z" fill="currentColor" stroke="none" />
                               </svg>
                             </div>
-
-                            {/* Target swara */}
                             <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                               <span className="text-[10px] font-black text-primary drop-shadow-sm">
                                 {targetSwara}
                               </span>
                             </div>
-
-                            {/* Meend indicator badge */}
                             <div className="absolute -top-1.5 left-1/2 -translate-x-1/2">
                               <span className="text-[6px] font-bold uppercase tracking-wider text-primary/70 bg-primary/10 px-1 py-0.5 rounded">
                                 meend
@@ -429,45 +451,42 @@ export function MusicVisualizer({ parsedData, isPlaying }: MusicVisualizerProps)
                         );
                       }
 
-                      // Regular note rendering
                       return (
                         <div
                           key={eIdx}
                           className={cn(
                             "absolute top-[15%] bottom-[15%] rounded-md flex items-center justify-center text-[10px] font-black tracking-tight transition-all duration-500 shadow-sm",
-                            event.swara
+                            noteEvent.swara
                               ? "bg-linear-to-br from-primary/25 to-primary/5 text-primary border border-primary/20"
                               : "bg-muted/10 opacity-20"
                           )}
                           style={{
-                            left: `${
-                              (event.startTime - line.startTime) *
-                                PIXELS_PER_SECOND +
+                            left: `${(event.startTime - line.startTime) *
+                              PIXELS_PER_SECOND +
                               2
-                            }px`,
+                              }px`,
                             width: `${Math.max(
                               0,
                               event.durationSeconds * PIXELS_PER_SECOND - 4
                             )}px`,
                           }}
                         >
-                          <span className="drop-shadow-sm">
-                            {event.swara}
-                            {event.variant || ""}
+                          <span className="drop-shadow-sm flex items-center">
+                            {noteEvent.swara}
+                            {noteEvent.variant || ""}
+                            {noteEvent.octave !== 0 && (
+                              <span className="opacity-60 ml-0.5">
+                                {noteEvent.octave > 0
+                                  ? "'".repeat(noteEvent.octave)
+                                  : ",".repeat(Math.abs(noteEvent.octave))}
+                              </span>
+                            )}
                           </span>
-                          {event.octave !== 0 && (
-                            <span className="absolute top-0.5 right-1 text-[7px] opacity-60">
-                              {event.octave > 0
-                                ? "'".repeat(event.octave)
-                                : ",".repeat(Math.abs(event.octave))}
-                            </span>
-                          )}
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* Playhead */}
                   {isActive && (
                     <div
                       ref={playheadRef}
@@ -487,22 +506,6 @@ export function MusicVisualizer({ parsedData, isPlaying }: MusicVisualizerProps)
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          height: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(var(--primary), 0.1);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(var(--primary), 0.2);
-        }
-      `}</style>
     </div>
   );
 }
