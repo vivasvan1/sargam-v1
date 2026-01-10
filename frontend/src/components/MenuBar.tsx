@@ -55,7 +55,7 @@ export function MenuBar({
     currentFileId,
 }: MenuBarProps) {
     const { open, toggleSidebar } = useSidebar();
-    const { showVisualizer, toggleVisualizer } = useNotebookSettings();
+    const { showVisualizer, toggleVisualizer, showCode, toggleCode } = useNotebookSettings();
 
     return (
         <Menubar className="border-none bg-transparent h-auto p-0 shadow-none">
@@ -108,6 +108,9 @@ export function MenuBar({
                     </MenubarItem>
                     <MenubarItem onClick={toggleVisualizer}>
                         {showVisualizer ? "Hide" : "Show"} All Visualizers
+                    </MenubarItem>
+                    <MenubarItem onClick={toggleCode}>
+                        {showCode ? "Hide" : "Show"} All Code
                     </MenubarItem>
                     <MenubarSeparator />
                     <MenubarItem onClick={() => setTheme("dark")}>Dark Mode</MenubarItem>

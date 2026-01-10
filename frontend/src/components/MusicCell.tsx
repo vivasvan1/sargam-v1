@@ -41,13 +41,18 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   const [voiceControls, setVoiceControls] = useState<Record<string, VoiceControl>>({});
   const [showMixer, setShowMixer] = useState(false);
   const activeNodesRef = useRef<Record<string, ActiveNode>>({});
-  const { defaultInstruments, updateDefaultInstrument, showVisualizer } = useNotebookSettings();
+  const { defaultInstruments, updateDefaultInstrument, showVisualizer, showCode } = useNotebookSettings();
   const [localShowVisualizer, setLocalShowVisualizer] = useState(true);
+  const [localShowCode, setLocalShowCode] = useState(true);
 
   // Sync with global setting when it changes
   useEffect(() => {
     setLocalShowVisualizer(showVisualizer);
   }, [showVisualizer]);
+
+  useEffect(() => {
+    setLocalShowCode(showCode);
+  }, [showCode]);
 
   const handleChange = (val: string) => {
     onChange({ ...cell, source: val.split("\n") });
@@ -543,7 +548,6 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
 
   return (
     <div className="flex flex-col relative max-w-full overflow-hidden">
-      {localShowVisualizer ? "true" : "false"}
       <Controls
         isPlaying={isPlaying}
         onPlay={handlePlay}
@@ -551,6 +555,8 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
         onToggleMixer={() => setShowMixer(!showMixer)}
         showVisualizer={localShowVisualizer}
         onToggleVisualizer={() => setLocalShowVisualizer(!localShowVisualizer)}
+        showCode={localShowCode}
+        onToggleCode={() => setLocalShowCode(!localShowCode)}
         mixerContent={
           <Mixer
             show={showMixer}
@@ -563,15 +569,28 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       />
       <div className="p-1 overflow-x-auto max-w-full">
         <div className="min-w-0">
-          <CodeMirror
-            value={content}
-            height="auto"
-            extensions={[markdown()]}
-            onChange={handleChange}
-            onFocus={onFocus}
-            theme={theme === 'dark' ? 'dark' : 'light'}
-            className="text-base md:text-sm font-mono focus-within:ring-0"
-          />
+          <div className={localShowCode ? "" : "relative h-[50px] overflow-hidden select-none"}>
+            <CodeMirror
+              value={content}
+              height="auto"
+              extensions={[markdown()]}
+              onChange={handleChange}
+              onFocus={onFocus}
+              theme={theme === 'dark' ? 'dark' : 'light'}
+              className="text-base md:text-sm font-mono focus-within:ring-0"
+              readOnly={!localShowCode}
+            />
+            {!localShowCode && (
+              <div className="absolute inset-0 z-10 bg-background/50 backdrop-blur-md flex items-center justify-center border-b border-border/50">
+                <button
+                  onClick={() => setLocalShowCode(true)}
+                  className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md shadow-lg hover:bg-primary/90 transition-colors cursor-pointer z-50 pointer-events-auto"
+                >
+                  Show Music Code
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       {(localShowVisualizer || (isPlaying && lastParsedData)) && (
@@ -580,6 +599,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
             <MusicVisualizer
               parsedData={lastParsedData}
               isPlaying={isPlaying}
+              onPlay={handlePlay}
             />
           </div>
         </div>

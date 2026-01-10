@@ -179,7 +179,7 @@
         "@tempo 90",
         "",
         "# Composition in Jhaptal (10 beats = 2+3+2+3)",
-        "G M P | D N S' . | n D | P M G R ||"
+        "G M:0.5 P:0.5 | D N:0.5 S':0.5 . | n D | P M G:0.5 R:0.5 ||"
       ]
     },
     {
