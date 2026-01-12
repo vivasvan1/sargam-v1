@@ -184,6 +184,12 @@ export function parseMusicCell(lines: string[]): MusicCell {
 export function parseToken(token: string, defaultDuration: number): Event | null {
   if (token === '|') return { type: 'bar', double: false };
   if (token === '||') return { type: 'bar', double: true };
+  if (token.startsWith('^')) {
+    let durStr = token.slice(1);
+    if (durStr.startsWith(':')) durStr = durStr.slice(1);
+    const duration = durStr ? parseFloat(durStr) : defaultDuration;
+    return { type: 'note', swara: '^', octave: 0, duration, ornaments: [] };
+  }
 
   if (token.startsWith('_')) {
     let durStr = token.slice(1);

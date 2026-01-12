@@ -13,7 +13,7 @@ const NotebookSettingsContext = createContext<NotebookSettingsContextType | unde
 
 export function NotebookSettingsProvider({ children }: { children: ReactNode }) {
     const [defaultInstruments, setDefaultInstruments] = useState<Record<string, string>>({
-        default: "harmonium",
+        default: "sitar-sampler",
     });
     const [showVisualizer, setShowVisualizer] = useState(true);
     const [showCode, setShowCode] = useState(false);

@@ -1,7 +1,7 @@
 {
   "imnb_version": 1,
   "metadata": {
-    "title": "Raag Khamaj Masterclass - Complete Sargam Language Guide"
+    "title": "Raag Khamaj Tutorial + Sitar Composition - Saptak Music School"
   },
   "cells": [
     {
@@ -12,52 +12,33 @@
         "**Thaat**: Khamaj  ",
         "**Vadi**: Ga  ",
         "**Samvadi**: Ni  ",
-        "**Time**: Late Evening (2nd Prahar of Night)",
+        "**Time**: 2nd Prahar of Night (roughly 9:00 PM – 12:00 AM)",
         "",
         "Khamaj is a popular raga known for its romantic and light classical nature (Thumri style). It uses **Shuddha Ni** in Aroha (Ascent) and **Komal Ni** in Avroha (Descent). All other notes are Shuddha.",
         "",
         "This notebook demonstrates all features of the **sargam-v1** language while teaching Raag Khamaj."
-      ]
+      ],
+      "id": "68ffc214-7a28-4a6e-aefa-70ed9777d5d3"
     },
     {
       "cell_type": "markdown",
       "source": [
         "## 1. Basic Scale: Aroha & Avroha",
         "",
-        "The fundamental structure of Raag Khamaj. Notice the use of `N` (Shuddha Ni) in ascent and `n` or `Nk` (Komal Ni) in descent."
-      ]
-    },
-    {
-      "cell_type": "music",
-      "metadata": {
-        "language": "sargam-v1"
-      },
-      "source": [
-        "@sa C4",
-        "@raga Khamaj",
-        "@default_duration 1",
+        "**Aroha**: ",
+        "  - Uses Shuddha Ni (N).",
+        "  - Banned note: Re",
         "",
-        "# Aroha (Ascent)",
-        "S R G M P D N S' ||",
+        "**Descent**: ",
+        "  - Uses Komal Ni (n).",
         "",
-        "# Avroha (Descent)",
-        "S' n D P M G R S ||"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "source": [
-        "## 2. Note Variants & Octaves",
+        "### Scale Structure:",
         "",
-        "Sargam supports multiple ways to write komal (flat) notes:",
-        "- Lowercase: `r`, `g`, `d`, `n` (komal Re, Ga, Dha, Ni)",
-        "- Uppercase with `k`: `Rk`, `Gk`, `Dk`, `Nk`",
-        "- Tivra (sharp) Ma: `Mt` or `M#`",
+        "**Aroha**: Sa - Ga - Ma - Pa - Dha - Ni - Sa'",
         "",
-        "Octaves are indicated with:",
-        "- `'` (apostrophe) for higher octaves: `S'` = Sa in upper octave",
-        "- `,` (comma) for lower octaves: `S,,` = Sa two octaves below"
-      ]
+        "**Avroha**: Sa' - Ni (komal) - Dha - Pa - Ma - Ga - Re - Sa"
+      ],
+      "id": "5242f2f8-6763-4dd4-8241-86fb38843246"
     },
     {
       "cell_type": "music",
@@ -66,14 +47,49 @@
       },
       "source": [
         "@sa D4",
-        "@tempo 80",
+        "@raga Khamaj",
         "",
-        "# Demonstrating octaves and variants",
-        "S,, R,, G,, M,, P,, D,, N,, S, ||",
-        "S, R, G, M, P, D, N, S ||",
-        "S R G M P D N S' ||",
-        "S' R' G' M' P' D' N' S'' ||"
-      ]
+        "# Aroha (Ascent)",
+        "S G M P D N S' ||",
+        "",
+        "# Avroha (Descent)",
+        "S' n D P M G R S ||"
+      ],
+      "id": "14cab560-c67c-47a5-bfd7-c44d3aec130e"
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## 2. Composition",
+        "",
+        "This section presents a Vilambit (slow tempo) composition set to the 16-beat rhythmic cycle known as Teentaal. ",
+        "",
+        "The melody allows for a detailed exploration of the raga's romantic temperament. "
+      ],
+      "id": "3f689a5b-9978-4e7c-b710-b3fcda638e1b"
+    },
+    {
+      "cell_type": "music",
+      "metadata": {
+        "language": "sargam-v1"
+      },
+      "source": [
+        "@sa D4",
+        "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
+        "@tempo 50",
+        "",
+        "## Gat / Sthayi / Line 1",
+        "",
+        ".:4 | .:4 | .3  S:0.5 S:0.5 | G:0.5 ^:0.5 m:0.5 m:0.5 P:0.5 D:0.25 D:0.25 N:0.5 S':0.5 |",
+        "N:0.5 ^:0.5 N:0.5 ^:0.5 S':0.5 ^:0.5 n:0.5 n:0.5 | D:0.5 ^:0.5 m:0.5 m:0.5 P:0.5 ^:0.5 D:0.5 ^:0.5 | G:0.5 ^:0.5 m:0.5 ^:0.5 G:0.5 ^:0.5",
+        "",
+        "# Line 2",
+        ".:11 S:0.5 S:0.5 n,:0.5 ^:0.5 S:0.5 S:0.5 m:0.5 ^:0.5 G:0.5 ^:0.5 |",
+        "S:0.5 ^:0.5 n,:0.5 ^:0.5 D,:0.5 ^:0.5 P,:0.5 D,:0.5 | N,:0.5 ^:0.5 S:0.5 S:0.5 G:0.5 m:0.25 m:0.25 P:0.5 D:0.5 | G:0.5 ^:0.5 m:0.5 ^:0.5 G:0.5 ^:0.5 |",
+        ""
+      ],
+      "id": "7ce070fa-31a8-441a-b462-498403ae6453"
     },
     {
       "cell_type": "markdown",
@@ -85,7 +101,8 @@
         "- `G:0.5` = Ga lasting half a beat (double speed)",
         "- `M:0.25` = Ma lasting quarter beat (quadruple speed)",
         "- `@default_duration 1` sets the default duration for notes without explicit duration"
-      ]
+      ],
+      "id": "8077bb71-d8ce-43e9-a247-bd59f2da12a2"
     },
     {
       "cell_type": "music",
@@ -105,7 +122,8 @@
         "",
         "# Very fast (Chhota Khayal style)",
         "S:0.25 R:0.25 G:0.25 M:0.25 | P:0.25 D:0.25 N:0.25 S':0.25 ||"
-      ]
+      ],
+      "id": "1c784478-22ba-4bcc-a6de-71de4d6f1702"
     },
     {
       "cell_type": "markdown",
@@ -116,7 +134,8 @@
         "- `.` = Hold (extends previous note) - can have duration: `.2`",
         "",
         "These are essential for creating rhythmic patterns and pauses."
-      ]
+      ],
+      "id": "f2316366-0d98-41b9-bae5-556ddc8f67b3"
     },
     {
       "cell_type": "music",
@@ -135,7 +154,8 @@
         "",
         "# Holds extending notes",
         "S . . . | R . G . | M . P . | D . N . ||"
-      ]
+      ],
+      "id": "51e51985-5a6e-4f02-9c86-dec3c7c8d24a"
     },
     {
       "cell_type": "markdown",
@@ -149,7 +169,8 @@
         "- `||` = End of avartan (complete cycle)",
         "",
         "Common talas: Tintal (16), Teental (16), Jhaptal (10), Ektaal (12), Rupak (7)"
-      ]
+      ],
+      "id": "00f61a18-c673-4709-a97a-07aeffc99ab6"
     },
     {
       "cell_type": "music",
@@ -165,7 +186,8 @@
         "# Sthayi in Tintal (16 beats = 4 vibhags)",
         "G M P D | N S' S' . | n D P M | G R S . ||",
         "G M P D | N S' R' S' | n D P M | G R S . ||"
-      ]
+      ],
+      "id": "2e12a52b-c952-4b81-8202-17fa81a4b9b5"
     },
     {
       "cell_type": "music",
@@ -180,7 +202,8 @@
         "",
         "# Composition in Jhaptal (10 beats = 2+3+2+3)",
         "G M:0.5 P:0.5 | D N:0.5 S':0.5 . | n D | P M G:0.5 R:0.5 ||"
-      ]
+      ],
+      "id": "f3ddb106-5c6a-41cf-8ca9-b75217268ea0"
     },
     {
       "cell_type": "markdown",
@@ -190,7 +213,8 @@
         "Meend creates smooth glides between notes:",
         "- `S+meend(P)` = Slide from Sa to Pa over the note's duration",
         "- `G+meend(M, 0.2, 0.6, 0.2)` = Three-phase meend: play G for 0.2 beats, slide to M over 0.6 beats, hold M for 0.2 beats"
-      ]
+      ],
+      "id": "59ee5152-c7e2-4bbf-a0f1-c42806e93b8b"
     },
     {
       "cell_type": "music",
@@ -208,7 +232,8 @@
         "# Three-phase meend (more expressive)",
         "S+meend(P, 0.3, 0.4, 0.3) . . ||",
         "G+meend(M, 0.2, 0.6, 0.2) . . ||"
-      ]
+      ],
+      "id": "ed495aea-4790-48b1-85a3-4e358e8e8af3"
     },
     {
       "cell_type": "markdown",
@@ -218,7 +243,8 @@
         "Kan adds a quick grace note before the main note:",
         "- `G+kan(R)` = Quick grace note from R into G",
         "- Creates a subtle ornamentation typical in Khamaj"
-      ]
+      ],
+      "id": "006826d7-081f-4e56-a418-1491769a3d1e"
     },
     {
       "cell_type": "music",
@@ -234,7 +260,8 @@
         "",
         "# Kan with longer notes",
         "S+kan(N) . . . | G+kan(S) . . . ||"
-      ]
+      ],
+      "id": "0d6b0b54-8a5b-43b3-9470-0fce73590e76"
     },
     {
       "cell_type": "markdown",
@@ -244,7 +271,8 @@
         "- `+andolan(amount)` = Slow oscillation around the swara",
         "- `+kampita(speed)` = Fast oscillation (vibrato-like)",
         "- `+shake` = Rapid repeated alternation"
-      ]
+      ],
+      "id": "89de0d49-06ba-49c8-9837-7649c7b7af50"
     },
     {
       "cell_type": "music",
@@ -263,7 +291,8 @@
         "",
         "# Shake (rapid alternation)",
         "N+shake . . . | S'+shake . . . ||"
-      ]
+      ],
+      "id": "fe0b1e4e-d7f3-4027-99a7-e644d06cecb9"
     },
     {
       "cell_type": "markdown",
@@ -274,7 +303,8 @@
         "- `Gn+25c` = Ga with +25 cents (slightly higher)",
         "- `Mn-15c` = Ma with -15 cents (slightly lower)",
         "- `n+0.25st` = +0.25 semitone offset"
-      ]
+      ],
+      "id": "a3937e89-8d44-46af-b7c8-14803d2469d0"
     },
     {
       "cell_type": "music",
@@ -291,7 +321,8 @@
         "",
         "# Subtle shruti adjustments",
         "Gn+12c Mn+8c | Pn+18c Dn+22c ||"
-      ]
+      ],
+      "id": "4ac1956d-fc7d-48ad-a5b3-f19a9049b0b8"
     },
     {
       "cell_type": "markdown",
@@ -301,7 +332,8 @@
         "Associate lyrics with notes using `=\"lyric\"` syntax:",
         "- `G=\"mo\"` = Ga with lyric \"mo\"",
         "- Useful for bandish, thumri, and vocal compositions"
-      ]
+      ],
+      "id": "11bf418e-a6e1-4fa2-bff4-452e53add840"
     },
     {
       "cell_type": "music",
@@ -317,7 +349,8 @@
         "",
         "# Longer phrase",
         "S=\"ra\" G=\"ga\" M=\"kha\" | P=\"ma\" D=\"ja\" N=\"me\" S'=\"in\" ||"
-      ]
+      ],
+      "id": "da24f778-f9f9-48ab-a446-f41b40cbbde9"
     },
     {
       "cell_type": "markdown",
@@ -328,7 +361,8 @@
         "- Each voice plays independently",
         "- Common use: melody + tanpura drone",
         "- Can have any number of voices"
-      ]
+      ],
+      "id": "6b423385-509f-47ae-8982-64077dd8fe26"
     },
     {
       "cell_type": "music",
@@ -344,7 +378,8 @@
         "",
         "#voice tanpura",
         "S,, . . . | P,, . . . | S,, . . . | P,, . . . ||"
-      ]
+      ],
+      "id": "e6f683d3-1c73-41b7-9cae-22eaad9417e4"
     },
     {
       "cell_type": "music",
@@ -363,7 +398,8 @@
         "",
         "#voice drone",
         "S,, . . . | . . . . | P,, . . . | . . . . ||"
-      ]
+      ],
+      "id": "5141e785-3bbc-4065-86b8-e4458358a3ce"
     },
     {
       "cell_type": "markdown",
@@ -371,7 +407,8 @@
         "## 12. Advanced Composition - Sthayi & Antara",
         "",
         "A complete composition structure with multiple sections, combining all techniques."
-      ]
+      ],
+      "id": "014fa0c4-8166-4f3b-ae63-880ec0ed5bfa"
     },
     {
       "cell_type": "music",
@@ -390,7 +427,8 @@
         "",
         "# Antara (Second section)",
         "S' R' G' M' | P' D' N' S'' | n' D' P' M' | G' R' S' . ||"
-      ]
+      ],
+      "id": "4c2a17d2-c980-4a4c-87c2-3f34a8408205"
     },
     {
       "cell_type": "markdown",
@@ -398,7 +436,8 @@
         "## 13. Complex Taans with Ornaments",
         "",
         "Fast passages (taans) combined with ornamentation for expressive performance."
-      ]
+      ],
+      "id": "890d7294-6037-4511-bb64-33955cb7670f"
     },
     {
       "cell_type": "music",
@@ -417,7 +456,8 @@
         "",
         "# Mixed ornamentation",
         "G+meend(P)+kan(M):1 | D+meend(N)+kampita(8):1 | S'+shake:1 . . . ||"
-      ]
+      ],
+      "id": "d3dba197-537e-41dc-b71b-2eeda4b2d544"
     },
     {
       "cell_type": "markdown",
@@ -428,7 +468,8 @@
         "- Lower tempo (60-80) = Vilambit (slow)",
         "- Medium tempo (100-120) = Madhya (medium)",
         "- Higher tempo (140+) = Drut (fast)"
-      ]
+      ],
+      "id": "a538d337-8f38-4dcf-a0b1-e89e1175cbdb"
     },
     {
       "cell_type": "music",
@@ -441,7 +482,8 @@
         "",
         "# Vilambit (slow) - Alap style",
         "S . . . . . . . | R . . . . . . . | G . . . . . . . | M . . . . . . . ||"
-      ]
+      ],
+      "id": "5dc2f9e4-9d8d-4ad0-893a-838051209e9a"
     },
     {
       "cell_type": "music",
@@ -455,7 +497,8 @@
         "# Drut (fast) - Fast taan",
         "S:0.25 R:0.25 G:0.25 M:0.25 | P:0.25 D:0.25 N:0.25 S':0.25 |",
         "S':0.25 N:0.25 D:0.25 P:0.25 | M:0.25 G:0.25 R:0.25 S:0.25 ||"
-      ]
+      ],
+      "id": "b4fc9e79-cc94-4df8-8e6b-e91a0c7b0370"
     },
     {
       "cell_type": "markdown",
@@ -463,7 +506,8 @@
         "## 15. Complete Raag Khamaj Performance",
         "",
         "A comprehensive example combining all elements: multiple voices, ornamentation, different sections, and expressive techniques."
-      ]
+      ],
+      "id": "3a4b5f64-6562-4a35-b1d1-08baccc3d832"
     },
     {
       "cell_type": "music",
@@ -482,7 +526,8 @@
         "",
         "#voice tanpura",
         "S,, . . . | P,, . . . | S,, . . . | P,, . . . ||"
-      ]
+      ],
+      "id": "9b85a377-b071-4baa-b27c-c5af080c9c5b"
     },
     {
       "cell_type": "markdown",
@@ -502,7 +547,8 @@
         "✅ **Complex Compositions**: Sthayi, Antara, Taans  ",
         "",
         "All while exploring the beautiful Raag Khamaj! 🎵"
-      ]
+      ],
+      "id": "479c4ddf-f14a-4cb0-b872-e5676142a3a1"
     }
   ]
 }

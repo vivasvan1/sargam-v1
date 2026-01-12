@@ -30,6 +30,8 @@ interface MusicCellProps {
 interface ActiveNode {
   synth: Instrument;
   volumeNode: Tone.Volume;
+  part?: Tone.Part | Tone.Loop | Tone.ToneEvent;
+  chikariSynth?: Instrument;
 }
 
 export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
@@ -44,6 +46,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   const { defaultInstruments, updateDefaultInstrument, showVisualizer, showCode } = useNotebookSettings();
   const [localShowVisualizer, setLocalShowVisualizer] = useState(true);
   const [localShowCode, setLocalShowCode] = useState(true);
+  const [initialStartTime, setInitialStartTime] = useState(0);
 
   // Sync with global setting when it changes
   useEffect(() => {
@@ -139,6 +142,14 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     }
   }, [defaultInstruments]);
 
+  const handleSeek = (time: number) => {
+    setInitialStartTime(time);
+    if (isPlaying) {
+      // If already playing, we need to jump
+      Tone.getTransport().seconds = time;
+    }
+  };
+
   const handlePlay = async () => {
     if (isPlaying) {
       stopPlayback();
@@ -151,7 +162,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       // Re-parse to get the latest exact structure for playback
       const data = parseMusicCell(content.split("\n"));
       setLastParsedData(data);
-      await playMusic(data, voiceControls);
+      await playMusic(data, voiceControls, initialStartTime);
       setIsPlaying(true);
     } catch (e) {
       console.error(e);
@@ -163,8 +174,9 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     Tone.getTransport().stop();
     Tone.getTransport().cancel();
 
-    Object.values(activeNodesRef.current).forEach(({ synth, volumeNode }) => {
+    Object.values(activeNodesRef.current).forEach(({ synth, volumeNode, part, chikariSynth }) => {
       try {
+        if (part) part.dispose();
         if (isRhythmicInstrument(synth)) {
           Object.values(synth.players).forEach((player) => {
             try {
@@ -178,6 +190,16 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           }
           synth.dispose();
         }
+
+        if (chikariSynth) {
+          if (isTonalInstrument(chikariSynth)) {
+            if (chikariSynth instanceof Tone.PolySynth || chikariSynth instanceof Tone.Sampler) {
+              (chikariSynth as any).releaseAll?.();
+            }
+            chikariSynth.dispose();
+          }
+        }
+
         volumeNode?.dispose();
       } catch (e) {
         /* ignore */
@@ -240,19 +262,23 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     return SA_FREQ * Math.pow(2, semitones / 12);
   };
 
-  const playMusic = async (parsedData: ParsedMusicCell, currentControls: Record<string, VoiceControl>) => {
+  const playMusic = async (parsedData: ParsedMusicCell, currentControls: Record<string, VoiceControl>, startOffset: number = 0) => {
     Tone.getTransport().stop();
     Tone.getTransport().cancel();
 
     // Clean up previous
-    Object.values(activeNodesRef.current).forEach(({ synth, volumeNode }) => {
+    Object.values(activeNodesRef.current).forEach(({ synth, volumeNode, part, chikariSynth }) => {
       try {
+        if (part) part.dispose();
         if (isRhythmicInstrument(synth)) {
           Object.values(synth.players).forEach((player) => {
             try { player.stop(); player.dispose(); } catch (e) { }
           });
         } else if (isTonalInstrument(synth)) {
           synth.dispose();
+        }
+        if (chikariSynth && isTonalInstrument(chikariSynth)) {
+          chikariSynth.dispose();
         }
         volumeNode?.dispose();
       } catch (e) { }
@@ -286,11 +312,6 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           // Connect all players to volume node
           Object.values(tablaInstrument.players).forEach(player => player.connect(talaVol));
 
-          activeNodesRef.current["__tala"] = {
-            synth: tablaInstrument,
-            volumeNode: talaVol,
-          };
-
           // Parse pattern
           const parseTalaPattern = (patternStr: string, defaultDur: number, beatDurSeconds: number) => {
             const events: { bol: string, duration: number, time: number }[] = [];
@@ -315,9 +336,9 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               }
 
               if (bol) {
-                const durationSeconds = duration * beatDurSeconds;
-                events.push({ bol, duration, time });
-                time += durationSeconds;
+                const eventTime = time;
+                events.push({ bol, duration, time: eventTime });
+                time += duration * beatDurSeconds;
               }
             }
             return events;
@@ -329,29 +350,39 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
             ? talaEvents[talaEvents.length - 1].time + (talaEvents[talaEvents.length - 1].duration * beatDur)
             : 4 * beatDur;
 
-          Tone.getTransport().scheduleRepeat((time) => {
-            talaEvents.forEach((event) => {
-              const player = tablaInstrument.players[event.bol];
-              if (player) {
-                player.start(time + event.time);
-              }
-            });
-          }, cycleDuration);
+          const talaPart = new Tone.Part((time, event) => {
+            const player = tablaInstrument.players[event.bol];
+            if (player && player.buffer.loaded) {
+              player.start(time);
+            }
+          }, talaEvents.map(e => ({ time: e.time, bol: e.bol })));
+
+          talaPart.loop = true;
+          talaPart.loopEnd = cycleDuration;
+          talaPart.start(0);
+
+          activeNodesRef.current["__tala"] = {
+            synth: tablaInstrument,
+            volumeNode: talaVol,
+            part: talaPart,
+          };
         }
       } else {
         // Fallback or explicit simple tabla
         const membrane = await createInstrument(talaCtrl.instrument || "tabla");
         if (isTonalInstrument(membrane)) {
           membrane.connect(talaVol);
+
+          const talaLoop = new Tone.Loop((time) => {
+            (membrane as Tone.MembraneSynth).triggerAttackRelease("C2", "8n", time);
+          }, "4n");
+          talaLoop.start(0);
+
           activeNodesRef.current["__tala"] = {
             synth: membrane,
             volumeNode: talaVol,
+            part: talaLoop,
           };
-
-          Tone.getTransport().scheduleRepeat((time) => {
-            // We can cast here safely as we checked isTonalInstrument
-            (membrane as Tone.MembraneSynth).triggerAttackRelease("C2", "8n", time);
-          }, "4n");
         }
       }
     }
@@ -386,7 +417,18 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       if (isTonalInstrument(synth)) {
         synth.connect(volumeNode);
       }
-      activeNodesRef.current[voiceName] = { synth, volumeNode };
+
+      // Check for chikari (^) in this voice
+      let chikariSynth: Instrument | undefined;
+      const hasChikari = voice.events.some(e => e.type === 'note' && (e as any).swara === '^');
+      if (hasChikari) {
+        chikariSynth = await createInstrument("sitar-sampler");
+        if (isTonalInstrument(chikariSynth)) {
+          chikariSynth.connect(volumeNode);
+        }
+      }
+
+      activeNodesRef.current[voiceName] = { synth, volumeNode, chikariSynth };
 
       if (!isTonalInstrument(synth)) {
         // Skip scheduling for non-tonal instruments on melody tracks for now
@@ -400,19 +442,30 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
         if ('duration' in event && event.duration) {
           const durSeconds = event.duration * beatDur;
           if (event.type === "note" && 'swara' in event && event.swara) {
-            const startFreq = swaraToFrequency(
-              event.swara,
-              event.variant,
-              event.octave,
-              SA_FREQ,
-              scales
-            );
+            const isChingari = event.swara === '^';
 
-            const meendOrnament = event.ornaments?.find(
+            const frequencies = isChingari
+              ? [
+                swaraToFrequency("P", undefined, 1, SA_FREQ, scales), // p'
+                swaraToFrequency("S", undefined, 1, SA_FREQ, scales), // s'
+                swaraToFrequency("S", undefined, 2, SA_FREQ, scales), // s''
+              ]
+              : [
+                swaraToFrequency(
+                  event.swara,
+                  event.variant,
+                  event.octave,
+                  SA_FREQ,
+                  scales
+                ),
+              ];
+
+            const meendOrnament = !isChingari && event.ornaments?.find(
               (o) => o.name === "meend" || o.name === "slide"
             );
 
             if (meendOrnament && meendOrnament.params.length > 0) {
+              const startFreq = frequencies[0];
               const targetSwaraStr = meendOrnament.params[0];
               // ... parsing logic for target swara ...
               let targetSwara = targetSwaraStr.trim();
@@ -523,13 +576,20 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               }, time);
             } else {
               // Normal Note Playback
-              const instrument = synth; // is TonalInstrument
+              const instrument = isChingari && chikariSynth && isTonalInstrument(chikariSynth)
+                ? chikariSynth
+                : synth;
+
               Tone.getTransport().schedule((t) => {
                 if (instrument instanceof Tone.PolySynth || instrument instanceof Tone.Sampler || instrument instanceof Tone.MembraneSynth) {
-                  instrument.triggerAttackRelease(startFreq, durSeconds, t);
+                  frequencies.forEach(f => {
+                    instrument.triggerAttackRelease(f, durSeconds, t);
+                  });
                 } else {
                   // Fallback for other tonal instruments if any
-                  (instrument as any).triggerAttackRelease?.(startFreq, durSeconds, t);
+                  frequencies.forEach(f => {
+                    (instrument as any).triggerAttackRelease?.(f, durSeconds, t);
+                  });
                 }
               }, time);
             }
@@ -540,7 +600,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       if (time > maxDuration) maxDuration = time;
     }
 
-    Tone.getTransport().start();
+    Tone.getTransport().start(undefined, startOffset);
     Tone.getTransport().schedule(() => {
       stopPlayback();
     }, maxDuration + 0.1);
@@ -600,6 +660,8 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               parsedData={lastParsedData}
               isPlaying={isPlaying}
               onPlay={handlePlay}
+              initialTime={initialStartTime}
+              onSeek={handleSeek}
             />
           </div>
         </div>
