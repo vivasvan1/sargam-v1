@@ -280,6 +280,7 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
               return (
                 <VisualizerLine
                   key={idx + (line.events[0]?.startTime || 0)}
+                  previousLine={idx !== 0 ? voiceData.lines.at(idx - 1) : null}
                   line={line}
                   isActive={isActive}
                   currentTime={currentTime}

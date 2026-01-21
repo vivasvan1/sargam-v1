@@ -10,6 +10,11 @@ interface VisualizerLineProps {
         duration: number;
         startTime: number;
     };
+    previousLine?: {
+        events: any[];
+        duration: number;
+        startTime: number;
+    } | null;
     isActive: boolean;
     currentTime: number;
     beatDur: number;
@@ -22,6 +27,7 @@ interface VisualizerLineProps {
 
 export function VisualizerLine({
     line,
+    previousLine,
     isActive,
     currentTime,
     beatDur,
@@ -32,7 +38,7 @@ export function VisualizerLine({
     playheadRef
 }: VisualizerLineProps) {
     const isCommentLine = line.events.some(e => e.type === 'comment');
-
+    const isPreviousCommentLine = previousLine?.events.some(e => e.type === 'comment');
     if (isCommentLine) {
         const commentText = line.events
             .filter(e => e.type === 'comment')
@@ -42,13 +48,13 @@ export function VisualizerLine({
 
         return (
             <div className="flex flex-col">
-                <div className="flex text-sm text-foreground/80 font-extrabold italic py-5">
+                <div className={cn("flex text-sm text-foreground/80 font-extrabold italic", isPreviousCommentLine ? "pb-5" : "py-5")}>
                     {commentText}
                 </div>
-                <VisualizerBeatNumbers
+                {isPreviousCommentLine && <VisualizerBeatNumbers
                     beatCount={beatCount}
                     beatWidth={beatWidth}
-                />
+                />}
             </div>
         );
     }
