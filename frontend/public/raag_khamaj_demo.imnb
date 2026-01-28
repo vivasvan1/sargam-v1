@@ -265,6 +265,13 @@
       ]
     },
     {
+      "id": "bf0128df-1139-4afb-9ced-634e1bdd4f9b",
+      "cell_type": "markdown",
+      "source": [
+        "### 4.1 Drut Tans"
+      ]
+    },
+    {
       "id": "aa3220a6-6d3d-47f6-891c-e5d8310a2c68",
       "cell_type": "music",
       "metadata": {
@@ -380,6 +387,33 @@
         "# Back to Line 1",
         "",
         "N S':0.5 S':0.5 N"
+      ]
+    },
+    {
+      "id": "caaec54f-08ec-4dbd-9bb5-b97c945af1e1",
+      "cell_type": "markdown",
+      "source": [
+        "## 5. Jhalla",
+        "",
+        "This concluding section is performed in a brisk tempo, marked by rhythmic intensity and dynamic energy.",
+        "",
+        "It features rapid melodic patterns and strong rhythmic accents, bringing the performance to a vibrant close."
+      ]
+    },
+    {
+      "id": "a4ba787d-1967-4b50-840f-5f0b6b286ca4",
+      "cell_type": "music",
+      "metadata": {
+        "language": "sargam-v1"
+      },
+      "source": [
+        "@sa D4",
+        "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
+        "@tempo 120",
+        "",
+        "N,:0.5 ^:0.5 ^:0.5 ^:0.5 | R:0.5 ^:0.5 ^:0.5 ^:0.5 | S:0.5 ^:0.5 ^:0.5 ^:0.5 | S:0.5 ^:0.5 ^:0.5 ^:0.5 | N,:0.5 ^:0.5 ^:0.5 ^:0.5 | R:0.5 ^:0.5 ^:0.5 ^:0.5 | S:0.5 ^:0.5 ^:0.5 ^:0.5 | S:0.5 ^:0.5 ^:0.5 ^:0.5 | ",
+        "D,:0.5 ^:0.5 ^:0.5 ^:0.5 | n,:0.5 ^:0.5 ^:0.5 ^:0.5 | D,:0.5 ^:0.5 ^:0.5 ^:0.5 | D,:0.5 ^:0.5 ^:0.5 ^:0.5 | n,:0.5 ^:0.5 ^:0.5 ^:0.5 | D,:0.5 ^:0.5 ^:0.5 ^:0.5 | P,:0.5 ^:0.5 ^:0.5 ^:0.5 | P,:0.5 ^:0.5 ^:0.5 ^:0.5 |"
       ]
     }
   ]
