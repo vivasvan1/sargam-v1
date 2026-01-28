@@ -147,7 +147,7 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-2 py-1 space-y-0.5">
+      <div className="flex-1 overflow-y-auto min-h-0 py-1 space-y-0.5">
         {loading ? (
           <div className="flex items-center justify-center py-6">
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -174,7 +174,7 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
 
             {/* Files */}
             {files.length > 0 && (
-              <div className="space-y-0.5">
+              <div className="space-y-1.5">
                 {files.length > 0 && (
                   <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
                     Files
@@ -188,7 +188,7 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
                       variant={currentFileId === file.id ? "default" : "ghost"}
                       title={file.name}
                       size="sm"
-                      className="flex-1 min-w-0 justify-start h-auto py-1.5 pr-8 gap-2"
+                      className="flex-1 min-w-0 justify-start h-auto py-1.5 pr-8 gap-2 border"
                     >
                       {(isFileIdLoading && isFileIdLoading === file.id) ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" /> : <FileMusic className="w-3.5 h-3.5 shrink-0" />}
                       <div className="flex-1 min-w-0 flex flex-col items-start pr-8">

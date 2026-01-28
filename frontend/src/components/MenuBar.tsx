@@ -31,7 +31,7 @@ interface MenuBarProps {
     theme: "light" | "dark" | "system";
     setTheme: (theme: "light" | "dark" | "system") => void;
 
-    googleBacked: boolean;
+    googleDriveConnected: boolean;
 }
 
 import { useNotebookSettings } from "../context/NotebookSettingsContext";
@@ -51,7 +51,7 @@ export function MenuBar({
     onAddMarkdown,
     theme,
     setTheme,
-    googleBacked,
+    googleDriveConnected,
     currentFileId,
 }: MenuBarProps) {
     const { open, toggleSidebar } = useSidebar();
@@ -69,13 +69,13 @@ export function MenuBar({
                         Open Local... <MenubarShortcut>⌘O</MenubarShortcut>
                     </MenubarItem>
                     <MenubarSeparator />
-                    <MenubarItem onClick={onSaveDrive} disabled={!googleBacked}>
+                    <MenubarItem onClick={onSaveDrive} disabled={!googleDriveConnected}>
                         Save to Drive <MenubarShortcut>⌘S</MenubarShortcut>
                     </MenubarItem>
                     <MenubarItem onClick={onLoadDrive}>
                         Load from Drive
                     </MenubarItem>
-                    <MenubarItem onClick={onPublish} disabled={!googleBacked || !currentFileId}>
+                    <MenubarItem onClick={onPublish} disabled={!googleDriveConnected || !currentFileId}>
                         Publish to Community
                     </MenubarItem>
                     <MenubarSeparator />

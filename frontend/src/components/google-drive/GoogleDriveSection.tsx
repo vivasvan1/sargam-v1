@@ -56,7 +56,7 @@ export function GoogleDriveSection({
 
           <TabsContent value="personal" className="h-full m-0 data-[state=inactive]:hidden flex flex-col">
             {/* Connection Status & Actions */}
-            <div className="px-3 pb-2 shrink-0">
+            <div className="px-2 pb-2 shrink-0">
               {!googleDriveConnected ? (
                 <div className="flex flex-col items-center justify-center text-center p-4">
                   <Button

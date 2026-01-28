@@ -454,7 +454,7 @@ function App() {
                 onAddMarkdown={() => addCell("markdown", -1)}
                 theme={theme}
                 setTheme={setTheme}
-                googleBacked={!!driveFileId}
+                googleDriveConnected={googleDriveConnected}
                 currentFileId={driveFileId}
               />
             </div>

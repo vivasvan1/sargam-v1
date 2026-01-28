@@ -108,7 +108,7 @@ export function Sidebar({
           </SidebarMenuItem>
         </SidebarMenu> */}
 
-        <div className="px-1">
+        <div className="">
           <GoogleDriveSection
             googleDriveConnected={googleDriveConnected}
             googleDriveUser={googleDriveUser}
