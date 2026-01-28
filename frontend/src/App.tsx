@@ -22,6 +22,9 @@ import {
   isAuthenticated,
   updateFileById,
   publishToRegistry,
+  loadFile,
+  checkIfEditable,
+  getFileMetadata,
 } from "./lib/googleDrive";
 import type { GoogleUser } from "./lib/googleDrive";
 import { MenuBar } from "./components/MenuBar";
@@ -89,6 +92,7 @@ function App() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [driveFileId, setDriveFileId] = useState<string | null>(null); // Track if notebook was saved to Drive
+  const [isReadOnly, setIsReadOnly] = useState(false); // Track if current file is read-only
   const [lastSavedContent, setLastSavedContent] = useState<string | null>(null); // Track last saved content for change detection
 
   // Initialize Google API on mount
@@ -110,12 +114,52 @@ function App() {
 
   // Load default notebook on mount
   useEffect(() => {
-    loadDefaultNotebook().then((defaultNotebook) => {
-      setNotebook(defaultNotebook);
-      if (defaultNotebook.metadata?.title) {
-        setFilePath("raag_khamaj_demo.imnb");
-      }
-    });
+    // Check for fileId in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const fileId = urlParams.get("fileId");
+
+    if (fileId) {
+      // If fileId is present, try to load it (public file)
+      toast.info("Loading shared notebook...");
+      loadFile(fileId)
+        .then((fileContent) => {
+          setNotebook(fileContent);
+          const title = fileContent.metadata?.title || "Shared Notebook";
+          setFilePath(`${title}.imnb`);
+          setDriveFileId(fileId);
+          setLastSavedContent(JSON.stringify(fileContent, null, 2));
+
+          // Check if file is editable
+          getFileMetadata(fileId).then(metadata => {
+            const editable = checkIfEditable(metadata);
+            setIsReadOnly(!editable);
+            if (!editable) {
+              toast.info("This notebook is read-only. Save a copy to edit.");
+            }
+          }).catch(console.error);
+
+          toast.success("Loaded shared notebook");
+        })
+        .catch((error) => {
+          console.error("Failed to load shared notebook:", error);
+          toast.error("Failed to load shared notebook. It might not be public.");
+          // Fallback to default if loading fails
+          loadDefaultNotebook().then((defaultNotebook) => {
+            setNotebook(defaultNotebook);
+            if (defaultNotebook.metadata?.title) {
+              setFilePath("raag_khamaj_demo.imnb");
+            }
+          });
+        });
+    } else {
+      // Load default notebook on mount if no fileId
+      loadDefaultNotebook().then((defaultNotebook) => {
+        setNotebook(defaultNotebook);
+        if (defaultNotebook.metadata?.title) {
+          setFilePath("raag_khamaj_demo.imnb");
+        }
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -128,13 +172,25 @@ function App() {
     localStorage.setItem("sargam-theme", theme);
   }, [theme]);
 
+  // Sync URL with driveFileId
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (driveFileId) {
+      url.searchParams.set("fileId", driveFileId);
+    } else {
+      url.searchParams.delete("fileId");
+    }
+    window.history.replaceState({}, "", url.toString());
+  }, [driveFileId]);
+
   // Auto-save to Google Drive
   useEffect(() => {
     // Only auto-save if:
     // 1. Connected to Google Drive
     // 2. Notebook was previously saved to Drive (has file ID)
     // 3. Content has changed since last save
-    if (!googleDriveConnected || !driveFileId) {
+    // 4. File is not read-only
+    if (!googleDriveConnected || !driveFileId || isReadOnly) {
       return;
     }
 
@@ -161,7 +217,7 @@ function App() {
     return () => {
       clearTimeout(autoSaveTimer);
     };
-  }, [notebook, googleDriveConnected, driveFileId, lastSavedContent]);
+  }, [notebook, googleDriveConnected, driveFileId, lastSavedContent, isReadOnly]);
 
   const handleNew = () => {
     if (window.confirm("Start a new notebook? Unsaved changes will be lost.")) {
@@ -172,6 +228,7 @@ function App() {
       });
       setFilePath("untitled.imnb");
       setDriveFileId(null);
+      setIsReadOnly(false);
       setLastSavedContent(null);
       setActiveCellId(null);
     }
@@ -188,6 +245,7 @@ function App() {
         setNotebook(content);
         setFilePath(file.name);
         setDriveFileId(null); // Clear Drive file ID for local file
+        setIsReadOnly(false);
         setLastSavedContent(null);
         toast.success(`Loaded ${file.name}`);
       } catch (err) {
@@ -251,12 +309,31 @@ function App() {
     }
   };
 
-  const handleSaveToDrive = () => {
+  const handleSaveToDrive = async () => {
     if (!googleDriveConnected) {
-      toast.error("Please connect to Google Drive first");
+      handleGoogleDriveConnect();
       return;
     }
-    setSaveDialogOpen(true);
+
+    // Smart Save:
+    // If we have a driveFileId AND it is writeable (not read-only), overwrite it directly.
+    // Otherwise (new file or read-only), open the save dialog (Save As).
+    if (driveFileId && !isReadOnly) {
+      const loadingToast = toast.loading("Saving changes...");
+      try {
+        const content = JSON.stringify(notebook, null, 2);
+        await updateFileById(driveFileId, content);
+        setLastSavedContent(content);
+        toast.dismiss(loadingToast);
+        toast.success("Notebook saved");
+      } catch (error: any) {
+        console.error("Save failed:", error);
+        toast.dismiss(loadingToast);
+        toast.error(error.message || "Failed to save changes");
+      }
+    } else {
+      setSaveDialogOpen(true);
+    }
   };
 
   const handleLoadFromDrive = () => {
@@ -276,6 +353,20 @@ function App() {
     if (fileId) {
       setDriveFileId(fileId);
       setLastSavedContent(JSON.stringify(loadedNotebook, null, 2));
+
+      // Check capabilities
+      getFileMetadata(fileId).then(metadata => {
+        const editable = checkIfEditable(metadata);
+        setIsReadOnly(!editable);
+        if (!editable) {
+          toast.info("This notebook is read-only. Save a copy to edit.");
+        } else {
+          setIsReadOnly(false);
+        }
+      }).catch(console.error);
+    } else {
+      setDriveFileId(null);
+      setIsReadOnly(false);
     }
     toast.success("Notebook loaded from Google Drive");
   };
@@ -332,6 +423,7 @@ function App() {
               googleDriveConnected={googleDriveConnected}
               onSaveToDrive={handleSaveToDrive}
               onDownload={handleDownload}
+              currentFileId={driveFileId}
             />
 
             <div className="border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-0.5">
@@ -374,6 +466,7 @@ function App() {
               // Track that this notebook is saved to Drive
               if (fileId) {
                 setDriveFileId(fileId);
+                setIsReadOnly(false); // Just saved, so we own it
                 setLastSavedContent(JSON.stringify(notebook, null, 2));
               }
             }}

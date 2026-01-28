@@ -51,10 +51,6 @@ export function VisualizerLine({
                 <div className={cn("flex text-sm text-foreground/80 font-extrabold italic", isPreviousCommentLine ? "pb-5" : "py-5")}>
                     {commentText}
                 </div>
-                {isPreviousCommentLine && <VisualizerBeatNumbers
-                    beatCount={beatCount}
-                    beatWidth={beatWidth}
-                />}
             </div>
         );
     }
@@ -64,62 +60,69 @@ export function VisualizerLine({
     const lineWidth = (beatCount || totalBeatsInLine || 4) * beatWidth;
 
     return (
-        <div
-            className={cn(
-                "relative group transition-all duration-500",
-                isActive
-                    ? "opacity-100"
-                    : "opacity-70 blur-[0.3px] hover:opacity-100"
-            )}
-            style={{
-                height: "4rem",
-                width: `${lineWidth}px`,
-            }}
-        >
-            <VisualizerGrid
+        <>
+            {isPreviousCommentLine && <VisualizerBeatNumbers
                 beatCount={beatCount}
                 beatWidth={beatWidth}
-                totalBeatsInLine={totalBeatsInLine}
-            />
+            />}
+            <div
+                className={cn(
+                    "relative group transition-all duration-500",
+                    isActive
+                        ? "opacity-100"
+                        : "opacity-70 blur-[0.3px] hover:opacity-100"
+                )}
+                style={{
+                    height: "4rem",
+                    width: `${lineWidth}px`,
+                }}
+            >
 
-            <div className="absolute inset-0 z-10 pointer-events-none">
-                {line.events.map((event, eIdx) => {
-                    if (event.type === 'comment') return null;
+                <VisualizerGrid
+                    beatCount={beatCount}
+                    beatWidth={beatWidth}
+                    totalBeatsInLine={totalBeatsInLine}
+                />
 
-                    if (event.type === 'bar') {
+                <div className="absolute inset-0 z-10 pointer-events-none">
+                    {line.events.map((event, eIdx) => {
+                        if (event.type === 'comment') return null;
+
+                        if (event.type === 'bar') {
+                            return (
+                                <VisualizerBar
+                                    key={`bar-${eIdx}`}
+                                    event={event}
+                                    lineStartTime={line.startTime}
+                                    pixelsPerSecond={pixelsPerSecond}
+                                    onSeek={onSeek}
+                                />
+                            );
+                        }
+
+                        const duration = (event as any).duration;
+                        if (!('swara' in event) && !duration) return null;
+
                         return (
-                            <VisualizerBar
-                                key={`bar-${eIdx}`}
+                            <VisualizerNote
+                                key={eIdx}
                                 event={event}
                                 lineStartTime={line.startTime}
                                 pixelsPerSecond={pixelsPerSecond}
                                 onSeek={onSeek}
                             />
                         );
-                    }
+                    })}
+                </div>
 
-                    const duration = (event as any).duration;
-                    if (!('swara' in event) && !duration) return null;
-
-                    return (
-                        <VisualizerNote
-                            key={eIdx}
-                            event={event}
-                            lineStartTime={line.startTime}
-                            pixelsPerSecond={pixelsPerSecond}
-                            onSeek={onSeek}
-                        />
-                    );
-                })}
+                {isActive && (
+                    <VisualizerPlayhead
+                        ref={playheadRef}
+                        lineProgress={lineProgress}
+                        pixelsPerSecond={pixelsPerSecond}
+                    />
+                )}
             </div>
-
-            {isActive && (
-                <VisualizerPlayhead
-                    ref={playheadRef}
-                    lineProgress={lineProgress}
-                    pixelsPerSecond={pixelsPerSecond}
-                />
-            )}
-        </div>
+        </>
     );
 }

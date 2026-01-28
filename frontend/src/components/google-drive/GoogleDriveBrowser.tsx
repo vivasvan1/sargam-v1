@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Folder, FileMusic, Loader2, Trash2 } from 'lucide-react';
+import { Folder, FileMusic, Loader2, Trash2, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { listFiles, getSubfolders, loadFile, deleteFile } from '@/lib/googleDrive';
+import { listFiles, getSubfolders, loadFile, deleteFile, checkIfPublic, getShareableLink } from '@/lib/googleDrive';
 import type { GoogleFile, GoogleFolder } from '@/lib/googleDrive';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -102,6 +102,13 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
     }
   };
 
+  const handleShareFile = (file: GoogleFile, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const link = getShareableLink(file.id);
+    navigator.clipboard.writeText(link);
+    toast.success('Shareable link copied to clipboard');
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -195,18 +202,20 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
                         )}
                       </div>
                     </Button>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeletingFileId(file.id);
-                      }}
-                      variant="outline"
-                      size="icon"
-                      className="absolute right-1.5 h-7 w-7 hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100 transition-opacity"
-                      title="Delete file"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    <div className="absolute right-1.5 flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingFileId(file.id);
+                        }}
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 hover:bg-destructive hover:text-destructive-foreground"
+                        title="Delete file"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -7,7 +7,7 @@
     {
       "cell_type": "markdown",
       "source": [
-        "# Raag Khamaj Masterclass",
+        "# Raag Khamaj",
         "",
         "**Thaat**: Khamaj  ",
         "**Vadi**: Ga  ",
@@ -78,7 +78,8 @@
         "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
         "@tempo 50",
         "",
-        "## Gat / Sthayi / Line 1",
+        "",
+        "# Gat / Sthayi / Line 1",
         "",
         ".:4 | .:4 | .3  S:0.5 S:0.5 | G:0.5 ^:0.5 m:0.5 m:0.5 P:0.5 D:0.25 D:0.25 N:0.5 S':0.5 |",
         "N:0.5 ^:0.5 N:0.5 ^:0.5 S':0.5 ^:0.5 n:0.5 n:0.5 | D:0.5 ^:0.5 m:0.5 m:0.5 P:0.5 ^:0.5 D:0.5 ^:0.5 | G:0.5 ^:0.5 m:0.5 ^:0.5 G:0.5 ^:0.5",
@@ -238,6 +239,147 @@
         "This section features a fast-tempo passage in Teentaal, bringing heightened energy and rhythmic drive.",
         "",
         "It emphasizes brisk melodic movements and precise rhythmic alignment while retaining the raga’s essence."
+      ]
+    },
+    {
+      "id": "e2dd80cf-8aa3-48c0-aafc-6d8bbb0b5375",
+      "cell_type": "music",
+      "metadata": {
+        "language": "sargam-v1"
+      },
+      "source": [
+        "@sa D4",
+        "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
+        "@tempo 120",
+        "",
+        "# Line 1",
+        "# Starts at beat 1",
+        "",
+        "N S':0.5 S':0.5 N S' ^ n D P G m:0.5 m:0.5 P:0.5 P:0.5 D:0.5 D:0.5 m m:0.5 G R:0.5 G",
+        "",
+        "# Line 2",
+        "",
+        "S R:0.5 R:0.5 S G ^ m:0.5 m:0.5 P D N S':0.5 S':0.5 N:0.5 N:0.5 S':0.5 S':0.5 m m:0.5 G R:0.5 G",
+        ""
+      ]
+    },
+    {
+      "id": "aa3220a6-6d3d-47f6-891c-e5d8310a2c68",
+      "cell_type": "music",
+      "metadata": {
+        "language": "sargam-v1"
+      },
+      "source": [
+        "@sa D4",
+        "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
+        "@tempo 120",
+        "",
+        "",
+        "# Tan 1",
+        "# Starts at beat 8",
+        "",
+        "N S':0.5 S':0.5 N S' | ^ n D P | G:0.5 m:0.5 G m:0.5 P:0.5 m P:0.5 D:0.5 P m:0.5 G:0.5 R:0.5 S:0.5"
+      ]
+    },
+    {
+      "id": "0cf5a9e1-f36c-4160-bd12-91ef9374e6c5",
+      "cell_type": "music",
+      "metadata": {
+        "language": "sargam-v1"
+      },
+      "source": [
+        "@sa D4",
+        "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
+        "@tempo 120",
+        "",
+        "",
+        "# Tan 2",
+        "# Starts at beat 8",
+        "",
+        "N S':0.5 S':0.5 N S' | ^ n D P | N,:0.5 S:0.5 G:0.5 M:0.5 P:0.5 D:0.5 N:0.5 S':0.5 | S':0.5 n:0.5 D:0.5 P:0.5 m:0.5 G:0.5 R:0.5 S:0.5"
+      ]
+    },
+    {
+      "id": "424516fb-b7e6-4574-963f-4507cc3aac3a",
+      "cell_type": "music",
+      "metadata": {
+        "language": "sargam-v1"
+      },
+      "source": [
+        "@sa D4",
+        "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
+        "@tempo 120",
+        "",
+        "",
+        "# Tan 3",
+        "# Starts at beat 8",
+        "",
+        "N S':0.5 S':0.5 N S' | ^ n D P | S:0.5 G:0.5 m:0.5 P:0.5 D:0.5 n:0.5 D:0.5 P:0.5 D:0.5 P:0.5 m:0.5 G:0.5 R:0.5 S:0.5 N,:0.5 S:0.5 "
+      ]
+    },
+    {
+      "id": "d11c7ec3-c1f9-438e-8116-91568cd60834",
+      "cell_type": "music",
+      "metadata": {
+        "language": "sargam-v1"
+      },
+      "source": [
+        "@sa D4",
+        "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
+        "@tempo 120",
+        "",
+        "N S':0.5 S':0.5 N S' ^ n D P G m:0.5 m:0.5 P:0.5 P:0.5 D:0.5 D:0.5 m m:0.5 G R:0.5 G",
+        "",
+        "",
+        "# Tan 4",
+        "# Starts at beat 1",
+        "",
+        "P:0.5 P:0.5 P:0.5 D:0.5 D:0.5 D:0.5 N:0.5 N:0.5 | N:0.5 N:0.5 N:0.5 N:0.5 S':0.5 S':0.5 S':0.5 S':0.5 | G:0.5 m:0.5 P:0.5 D:0.5 ..:0.5 P:0.5 D:0.5 N:0.5 S':0.5 | D:0.5 n:0.5 D m:0.5 D:0.5 P |",
+        "",
+        "# Thihai",
+        "",
+        "P:0.5 n:0.5 D:0.5 P:0.5 m:0.5 G:0.5 R:0.5 S:0.5 G:0.5 G:0.5 G:0.5 m:0.5 m:0.5 m:0.5 P:0.5 P:0.5 P:0.5 D:0.5 D:0.5 D:0.5 N | P:0.5 n:0.5 D:0.5 P:0.5 m:0.5 G:0.5 R:0.5 S:0.5 G:0.5 G:0.5 ",
+        "G:0.5 m:0.5 m:0.5 m:0.5 P:0.5 P:0.5 P:0.5 D:0.5 D:0.5 D:0.5 N | P:0.5 n:0.5 D:0.5 P:0.5 m:0.5 G:0.5 R:0.5 S:0.5 G:0.5 G:0.5 G:0.5 m:0.5 m:0.5 m:0.5 P:0.5 P:0.5 P:0.5 D:0.5 D:0.5 D:0.5 ||",
+        "",
+        "# Back to Line 1",
+        "",
+        "N S':0.5 S':0.5 N"
+      ]
+    },
+    {
+      "id": "0c926df1-f293-46e4-8487-6e4f9e2a49ee",
+      "cell_type": "music",
+      "metadata": {
+        "language": "sargam-v1"
+      },
+      "source": [
+        "@sa D4",
+        "@tala Tintal(16)",
+        "@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha",
+        "@tempo 120",
+        "",
+        "N S':0.5 S':0.5 N S' ^ n D P G m:0.5 m:0.5 P:0.5 P:0.5 D:0.5 D:0.5 m m:0.5 G R:0.5 G",
+        "",
+        "",
+        "# Tan 5",
+        "# Starts at beat 1",
+        "",
+        "",
+        "S':0.5 n:0.5 D:0.5 n:0.5 P:0.5 D:0.5 N:0.5 S':0.5 P:0.5 D:0.5 n:0.5 D:0.5 P:0.5 m:0.5 G | G:0.5 G:0.5 G:0.5 m:0.5 m:0.5 m:0.5 S:0.5 S:0.5 S:0.5 G:0.5 G:0.5 G:0.5 R:0.5 S:0.5 N,:0.5 S:0.5 ",
+        "",
+        "# Thihai",
+        "",
+        "R':0.5 S':0.5 N':0.5 S':0.5 S':0.5 n:0.5 D:0.5 P:0.5 m:0.5 G:0.5 R:0.5 S:0.5 S:0.5 G:0.5 m:0.5 P:0.5 G:0.5 m:0.5 P:0.5 D:0.5 N | R':0.5 S':0.5 N':0.5 S':0.5 S':0.5 n:0.5 D:0.5 P:0.5 m:0.5 G:0.5 ",
+        "R:0.5 S:0.5 S:0.5 G:0.5 m:0.5 P:0.5 G:0.5 m:0.5 P:0.5 D:0.5 N | R':0.5 S':0.5 N':0.5 S':0.5 S':0.5 n:0.5 D:0.5 P:0.5 m:0.5 G:0.5 R:0.5 S:0.5 S:0.5 G:0.5 m:0.5 P:0.5 G:0.5 m:0.5 P:0.5 D:0.5 |",
+        "",
+        "# Back to Line 1",
+        "",
+        "N S':0.5 S':0.5 N"
       ]
     }
   ]

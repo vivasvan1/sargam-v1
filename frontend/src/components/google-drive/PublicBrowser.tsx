@@ -49,7 +49,7 @@ export function PublicBrowser({ onLoadFile, onClose, currentFileId }: PublicBrow
             const notebook = await loadFile(fileId);
             onLoadFile?.(notebook, fileId);
             onClose?.();
-            toast.success("Public notebook loaded");
+            console.debug("Public notebook loaded");
         } catch (error: any) {
             console.error('Error loading file:', error);
             toast.error(error.message || 'Failed to open file. You might need to sign in to Google Drive first.');

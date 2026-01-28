@@ -245,7 +245,9 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       else if (upper === "PA") normalizedSwara = "P";
       else if (upper === "DHA") normalizedSwara = "D";
       else if (upper === "NI") normalizedSwara = "N";
-      else normalizedSwara = swara[0];
+      else normalizedSwara = swara[0].toUpperCase();
+    } else if (swara === 'm') {
+      normalizedSwara = "M";
     }
 
     // Calculate semitones from scale
@@ -400,7 +402,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     }
 
     const scales: Record<string, number> = {
-      S: 0, r: 1, R: 2, g: 3, G: 4, m: 5, M: 6, P: 7, d: 8, D: 9, n: 10, N: 11,
+      S: 0, r: 1, R: 2, g: 3, G: 4, M: 5, P: 7, d: 8, D: 9, n: 10, N: 11,
     };
 
     for (const [voiceName, voice] of Object.entries(parsedData.voices)) {

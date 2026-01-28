@@ -272,6 +272,21 @@ export function parseToken(token: string, defaultDuration: number): Event | null
     }
   }
 
+  // Normalize swara names (e.g., 'm' -> 'M', 'SA' -> 'S')
+  const normalizationMap: Record<string, string> = {
+    'SA': 'S', 'sa': 'S', 'Sa': 'S',
+    'RI': 'R', 'ri': 'R', 'Ri': 'R',
+    'GA': 'G', 'ga': 'G', 'Ga': 'G',
+    'MA': 'M', 'ma': 'M', 'Ma': 'M', 'm': 'M',
+    'PA': 'P', 'pa': 'P', 'Pa': 'P',
+    'DHA': 'D', 'dha': 'D', 'Dha': 'D',
+    'NI': 'N', 'ni': 'N', 'Ni': 'N'
+  };
+
+  if (normalizationMap[swara]) {
+    swara = normalizationMap[swara];
+  }
+
   let octave = 0;
   let variant: string | undefined;
   let microtone: [number, string] | undefined;

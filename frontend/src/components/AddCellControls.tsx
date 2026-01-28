@@ -8,9 +8,9 @@ interface AddCellControlsProps {
 
 export function AddCellControls({ onAdd }: AddCellControlsProps) {
     return (
-        <div className="flex justify-center items-center min-h-[44px] relative group my-2 md:my-1">
-            <div className="absolute inset-x-0 h-px bg-border/20 opacity-0 md:group-hover:opacity-100 transition-opacity" />
-            <div className="flex gap-5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-10">
+        <div className="flex justify-center items-center min-h-[44px] relative my-2 md:my-1">
+            <div className="absolute inset-x-0 h-px bg-border" />
+            <div className="flex gap-5 opacity-100 transition-all z-10">
                 <Button
                     onClick={() => onAdd('music')}
                     variant="outline"

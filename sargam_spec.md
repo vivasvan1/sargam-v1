@@ -96,6 +96,7 @@ NoteToken ::= Swara Octave? Variant? Duration? Ornaments? Lyric?
 
 Swara     ::= 'S' | 'R' | 'G' | 'M' | 'P' | 'D' | 'N'
             | 'SA' | 'RI' | 'GA' | 'MA' | 'PA' | 'DHA' | 'NI'
+            | 'm' | 'ma' | 'Ma'  // shuddha Ma (equivalent to M)
             | 'r' | 'g' | 'd' | 'n'  // lowercase komal variants (equivalent to Rk, Gk, Dk, Nk)
 
 Octave    ::= ("'" | ',')+
@@ -138,6 +139,7 @@ WS        ::= space or tab
 
 * `S` – shuddha Sa, default octave, default duration.
 * `Rk` or `r` – komal Re (flat).  The article on Indian swaras notes that Re, Ga, Dha and Ni can be shuddha or komal, while Ma can be shuddha or tivra【655250085019640†L120-L130】.  Komal swaras can be written as either lowercase (`r`, `g`, `d`, `n`) or uppercase with `k` suffix (`Rk`, `Gk`, `Dk`, `Nk`).
+* `Mt` or `M#` – tivra Ma. Shuddha Ma can be written as `m`, `M`, `ma` or `MA`.
 * `M#'` – tivra Ma in the upper octave.
 * `G:2` – Gandhar lasting two beats.
 * `Dk,:0.5` or `d,:0.5` – komal Dha in the lower octave (one comma) lasting half a beat.

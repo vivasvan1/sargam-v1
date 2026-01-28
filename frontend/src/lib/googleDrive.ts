@@ -53,12 +53,32 @@ export interface GoogleFile {
   modifiedTime?: string;
   mimeType?: string;
   parents?: string[];
+  permissions?: { type: string; role: string; emailAddress?: string }[];
+  capabilities?: { canEdit: boolean };
 }
 
 interface SaveFileResult {
   id: string;
   name: string;
   webViewLink?: string;
+}
+
+// Helper to check if a file is public
+export function checkIfPublic(file: GoogleFile): boolean {
+  console.log(file, file.permissions);
+  if (!file.permissions) return false;
+  return file.permissions.some(p => p.type === 'anyone' || p.type === 'domain');
+}
+
+// Helper to check if a file is editable
+export function checkIfEditable(file: GoogleFile): boolean {
+  return file.capabilities?.canEdit ?? true; // Default to true if unknown, to be safe, or false? authenticating usually gives capabilities.
+}
+
+// Helper to generate shareable link
+export function getShareableLink(fileId: string): string {
+  const origin = window.location.origin;
+  return `${origin}?fileId=${fileId}`;
 }
 
 let gapi: any = null;
@@ -197,7 +217,7 @@ export async function initializeGoogleAPI(providedClientId: string): Promise<any
 // Get user info from token
 async function getUserInfo(): Promise<boolean> {
   if (!accessToken) return false;
-  
+
   try {
     const response = await fetch(
       "https://www.googleapis.com/oauth2/v2/userinfo",
@@ -465,7 +485,7 @@ export async function listFiles(folderId: string | null = null, subfolderName: s
   try {
     const response = await gapi.client.drive.files.list({
       q: `'${parentId}' in parents and name contains '.imnb' and trashed=false`,
-      fields: "files(id, name, modifiedTime, mimeType)",
+      fields: "files(id, name, modifiedTime, mimeType, permissions)",
       spaces: "drive",
       orderBy: "modifiedTime desc",
     });
@@ -656,67 +676,67 @@ export async function updateFileById(fileId: string, content: string): Promise<S
 // Load file from Google Drive
 // Load file from Google Drive
 export async function loadFile(fileId: string): Promise<any> {
-    // Try to get an authenticated token first
-    const token = accessToken || (isInitialized && gapi?.client?.getToken()?.access_token);
-    
-    // If we have a token, use the standard authenticated request
-    if (token) {
-        try {
-            const response = await fetch(
-              `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            );
+  // Try to get an authenticated token first
+  const token = accessToken || (isInitialized && gapi?.client?.getToken()?.access_token);
 
-            if (!response.ok) {
-              const error = await response
-                .json()
-                .catch(() => ({ error: { message: "Failed to load file" } }));
-              throw new Error(error.error?.message || "Failed to load file");
-            }
-
-            const content = await response.text();
-            return JSON.parse(content);
-        } catch (error: any) {
-            console.error("Error loading file with auth:", error);
-            // If auth fails for a potentially public file, we might want to fall back 
-            // but usually if you have a token it should work or the file is private.
-            throw new Error(error.message || "Failed to load file from Google Drive");
+  // If we have a token, use the standard authenticated request
+  if (token) {
+    try {
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-    } else {
-        // No token available. Try to load using API Key (for public files)
-        // CHECKME: User must provide this key
-        const API_KEY = "REDACTED_GOOGLE_API_KEY"; // TODO: Put your Google API Key here
-        
-        if (!API_KEY) {
-             throw new Error("Sign in to Google Drive or provide an API Key to load this file.");
-        }
+      );
 
-        try {
-             // Access public file via API Key
-             const response = await fetch(
-               `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`
-             );
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ error: { message: "Failed to load file" } }));
+        throw new Error(error.error?.message || "Failed to load file");
+      }
 
-             if (!response.ok) {
-                 const error = await response.json().catch(() => ({}));
-                 // 403 usually means the file is not public or key is invalid
-                 if (response.status === 403 || response.status === 401) {
-                     throw new Error("File is not public or invalid API Key. Please sign in.");
-                 }
-                 throw new Error(error.error?.message || "Failed to load public file");
-             }
-
-             const content = await response.text();
-             return JSON.parse(content);
-        } catch (error: any) {
-             console.error("Error loading public file:", error);
-             throw new Error(error.message || "Failed to load public file");
-        }
+      const content = await response.text();
+      return JSON.parse(content);
+    } catch (error: any) {
+      console.error("Error loading file with auth:", error);
+      // If auth fails for a potentially public file, we might want to fall back 
+      // but usually if you have a token it should work or the file is private.
+      throw new Error(error.message || "Failed to load file from Google Drive");
     }
+  } else {
+    // No token available. Try to load using API Key (for public files)
+    // CHECKME: User must provide this key
+    const API_KEY = "REDACTED_GOOGLE_API_KEY"; // TODO: Put your Google API Key here
+
+    if (!API_KEY) {
+      throw new Error("Sign in to Google Drive or provide an API Key to load this file.");
+    }
+
+    try {
+      // Access public file via API Key
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        // 403 usually means the file is not public or key is invalid
+        if (response.status === 403 || response.status === 401) {
+          throw new Error("File is not public or invalid API Key. Please sign in.");
+        }
+        throw new Error(error.error?.message || "Failed to load public file");
+      }
+
+      const content = await response.text();
+      return JSON.parse(content);
+    } catch (error: any) {
+      console.error("Error loading public file:", error);
+      throw new Error(error.message || "Failed to load public file");
+    }
+  }
 }
 
 // Delete file from Google Drive
@@ -744,7 +764,7 @@ export async function getFileMetadata(fileId: string): Promise<GoogleFile> {
   try {
     const response = await gapi.client.drive.files.get({
       fileId: fileId,
-      fields: "id, name, modifiedTime, mimeType, parents",
+      fields: "id, name, modifiedTime, mimeType, parents, permissions, capabilities",
     });
 
     return response.result;
@@ -825,7 +845,7 @@ export async function publishToRegistry(fileId: string, name: string, descriptio
       method: "POST",
       mode: "no-cors",
       headers: {
-        "Content-Type": "text/plain;charset=utf-8", 
+        "Content-Type": "text/plain;charset=utf-8",
       },
       body: JSON.stringify({
         id: fileId,
@@ -845,7 +865,7 @@ export async function fetchPublicRegistry(): Promise<RegistryEntry[]> {
   try {
     const response = await fetch(REGISTRY_SCRIPT_URL);
     if (!response.ok) {
-        throw new Error("Failed to fetch registry");
+      throw new Error("Failed to fetch registry");
     }
     const data = await response.json();
     return data as RegistryEntry[];

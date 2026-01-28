@@ -6,6 +6,7 @@ import {
     MoreHorizontal,
     Download,
     X,
+    Share2,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { SidebarTrigger } from "./ui/sidebar";
@@ -17,6 +18,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { getFileMetadata, checkIfPublic, getShareableLink } from "@/lib/googleDrive";
+import { toast } from "sonner";
 
 interface HeaderProps {
     title: string;
@@ -25,6 +28,7 @@ interface HeaderProps {
     googleDriveConnected: boolean;
     onSaveToDrive: () => void;
     onDownload: () => void;
+    currentFileId?: string | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,8 +38,37 @@ export const Header: React.FC<HeaderProps> = ({
     googleDriveConnected,
     onSaveToDrive,
     onDownload,
+    currentFileId,
 }) => {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [isPublic, setIsPublic] = useState(false);
+
+    React.useEffect(() => {
+        if (!currentFileId) {
+            setIsPublic(false);
+            return;
+        }
+
+        const checkPublicStatus = async () => {
+            try {
+                const metadata = await getFileMetadata(currentFileId);
+                setIsPublic(checkIfPublic(metadata));
+            } catch (error) {
+                console.error("Failed to check public status", error);
+                setIsPublic(false);
+            }
+        };
+
+        checkPublicStatus();
+    }, [currentFileId, googleDriveConnected]);
+
+    const handleShare = () => {
+        if (currentFileId) {
+            const link = getShareableLink(currentFileId);
+            navigator.clipboard.writeText(link);
+            toast.success("Shareable link copied to clipboard");
+        }
+    };
 
     return (
         <header className="h-14 md:h-16 border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-2">
@@ -85,13 +118,18 @@ export const Header: React.FC<HeaderProps> = ({
                     <>
                         <Button onClick={onSaveToDrive} variant="default" size="sm">
                             <Cloud className="w-4 h-4" />
-                            <span className="hidden sm:inline">Save to Drive</span>
+                            <span className="hidden sm:inline">Save</span>
                         </Button>
                         <Separator
                             orientation="vertical"
                             className="hidden md:block h-4 mx-1"
                         />
                     </>
+                )}
+                {isPublic && (
+                    <Button onClick={handleShare} variant="ghost" size="icon-sm" title="Copy shareable link">
+                        <Share2 className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                    </Button>
                 )}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
