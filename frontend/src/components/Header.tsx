@@ -28,7 +28,9 @@ interface HeaderProps {
     googleDriveConnected: boolean;
     onSaveToDrive: () => void;
     onDownload: () => void;
+
     currentFileId?: string | null;
+    saveStatus?: "saved" | "unsaved" | "saving";
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -39,6 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
     onSaveToDrive,
     onDownload,
     currentFileId,
+    saveStatus = "saved",
 }) => {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [isPublic, setIsPublic] = useState(false);
@@ -107,28 +110,27 @@ export const Header: React.FC<HeaderProps> = ({
                             </>
                         )}
                     </div>
-                    <p className="text-xs text-muted-foreground font-mono truncate hidden md:block">
-                        {filePath}
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground font-mono truncate hidden md:block">
+                            {filePath}
+                        </p>
+                    </div>
                 </div>
             </div>
 
             <div className="flex items-center gap-2 md:gap-3">
-                {googleDriveConnected && (
-                    <>
-                        <Button onClick={onSaveToDrive} variant="default" size="sm">
-                            <Cloud className="w-4 h-4" />
-                            <span className="hidden sm:inline">Save</span>
-                        </Button>
-                        <Separator
-                            orientation="vertical"
-                            className="hidden md:block h-4 mx-1"
-                        />
-                    </>
+                {googleDriveConnected && currentFileId && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className={`w-1 h-1 rounded-full ${saveStatus === "saving" ? "bg-blue-500 animate-pulse" : saveStatus === "unsaved" ? "bg-amber-500" : "bg-green-500"}`} />
+                        {saveStatus === "saving" && <span className="text-blue-500 animate-pulse">Saving...</span>}
+                        {saveStatus === "unsaved" && <span className="text-amber-500">Unsaved</span>}
+                        {saveStatus === "saved" && <span className="text-green-500">Saved</span>}
+                    </span>
                 )}
                 {isPublic && (
-                    <Button onClick={handleShare} variant="ghost" size="icon-sm" title="Copy shareable link">
-                        <Share2 className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                    <Button onClick={handleShare} variant="default" size="default" title="Copy shareable link">
+                        <Share2 className="w-5 h-5" />
+                        Share
                     </Button>
                 )}
                 <DropdownMenu>
@@ -142,6 +144,15 @@ export const Header: React.FC<HeaderProps> = ({
                         sideOffset={5}
                         align="end"
                     >
+                        {googleDriveConnected && (
+                            <DropdownMenuItem
+                                onClick={onSaveToDrive}
+                                className="flex items-center gap-2 cursor-pointer"
+                            >
+                                <Cloud className="w-4 h-4" />
+                                Save to Drive
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                             onClick={onDownload}
                             className="flex items-center gap-2 cursor-pointer"

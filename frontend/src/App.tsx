@@ -94,6 +94,7 @@ function App() {
   const [driveFileId, setDriveFileId] = useState<string | null>(null); // Track if notebook was saved to Drive
   const [isReadOnly, setIsReadOnly] = useState(false); // Track if current file is read-only
   const [lastSavedContent, setLastSavedContent] = useState<string | null>(null); // Track last saved content for change detection
+  const [saveStatus, setSaveStatus] = useState<"saved" | "unsaved" | "saving">("saved");
 
   // Initialize Google API on mount
   useEffect(() => {
@@ -128,6 +129,7 @@ function App() {
           setFilePath(`${title}.imnb`);
           setDriveFileId(fileId);
           setLastSavedContent(JSON.stringify(fileContent, null, 2));
+          setSaveStatus("saved");
 
           // Check if file is editable
           getFileMetadata(fileId).then(metadata => {
@@ -185,6 +187,11 @@ function App() {
 
   // Auto-save to Google Drive
   useEffect(() => {
+    // If content has changed, mark as unsaved
+    if (lastSavedContent && JSON.stringify(notebook, null, 2) !== lastSavedContent) {
+      setSaveStatus("unsaved");
+    }
+
     // Only auto-save if:
     // 1. Connected to Google Drive
     // 2. Notebook was previously saved to Drive (has file ID)
@@ -198,17 +205,21 @@ function App() {
 
     // Skip if content hasn't changed
     if (currentContent === lastSavedContent) {
+      setSaveStatus("saved");
       return;
     }
 
     // Debounce: wait 2 seconds after last change before auto-saving
     const autoSaveTimer = setTimeout(async () => {
       try {
+        setSaveStatus("saving");
         await updateFileById(driveFileId, currentContent);
         setLastSavedContent(currentContent);
+        setSaveStatus("saved");
         // Silently save - don't show toast to avoid spam
       } catch (error) {
         console.error("Auto-save failed:", error);
+        setSaveStatus("unsaved"); // Revert to unsaved on failure
         // Don't show error toast for auto-save failures to avoid spam
         // User can manually save if needed
       }
@@ -424,6 +435,7 @@ function App() {
               onSaveToDrive={handleSaveToDrive}
               onDownload={handleDownload}
               currentFileId={driveFileId}
+              saveStatus={saveStatus}
             />
 
             <div className="border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-0.5">
