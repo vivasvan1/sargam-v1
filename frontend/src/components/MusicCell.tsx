@@ -32,6 +32,7 @@ interface ActiveNode {
   volumeNode: Tone.Volume;
   part?: Tone.Part | Tone.Loop | Tone.ToneEvent;
   chikariSynth?: Instrument;
+  chikariVolumeNode?: Tone.Volume;
 }
 
 export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
@@ -99,6 +100,18 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
             hasChanges = true;
           }
         }
+
+        // Initialize Chikari settings for sitar
+        Object.keys(next).forEach(v => {
+          if (next[v].instrument === "sitar-sampler" && next[v].chikariVolume === undefined) {
+            next[v] = {
+              ...next[v],
+              chikariVolume: -5,
+              chikariMuted: false
+            };
+            hasChanges = true;
+          }
+        });
 
         // Check if any keys were removed
         if (!hasChanges) {
@@ -174,7 +187,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     Tone.getTransport().stop();
     Tone.getTransport().cancel();
 
-    Object.values(activeNodesRef.current).forEach(({ synth, volumeNode, part, chikariSynth }) => {
+    Object.values(activeNodesRef.current).forEach(({ synth, volumeNode, part, chikariSynth, chikariVolumeNode }) => {
       try {
         if (part) part.dispose();
         if (isRhythmicInstrument(synth)) {
@@ -201,6 +214,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
         }
 
         volumeNode?.dispose();
+        chikariVolumeNode?.dispose();
       } catch (e) {
         /* ignore */
       }
@@ -213,9 +227,15 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     // Apply real-time volume/mute changes
     Object.entries(voiceControls).forEach(([voiceName, control]) => {
       const nodes = activeNodesRef.current[voiceName];
-      if (nodes && nodes.volumeNode) {
-        nodes.volumeNode.mute = control.muted;
-        nodes.volumeNode.volume.rampTo(control.volume, 0.1);
+      if (nodes) {
+        if (nodes.volumeNode) {
+          nodes.volumeNode.mute = control.muted;
+          nodes.volumeNode.volume.rampTo(control.volume, 0.1);
+        }
+        if (nodes.chikariVolumeNode && control.chikariVolume !== undefined) {
+          nodes.chikariVolumeNode.mute = control.chikariMuted ?? false;
+          nodes.chikariVolumeNode.volume.rampTo(control.chikariVolume, 0.1);
+        }
       }
     });
   }, [voiceControls]);
@@ -269,7 +289,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     Tone.getTransport().cancel();
 
     // Clean up previous
-    Object.values(activeNodesRef.current).forEach(({ synth, volumeNode, part, chikariSynth }) => {
+    Object.entries(activeNodesRef.current).forEach(([vName, { synth, volumeNode, part, chikariSynth, chikariVolumeNode }]) => {
       try {
         if (part) part.dispose();
         if (isRhythmicInstrument(synth)) {
@@ -283,6 +303,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           chikariSynth.dispose();
         }
         volumeNode?.dispose();
+        chikariVolumeNode?.dispose();
       } catch (e) { }
     });
     activeNodesRef.current = {};
@@ -422,15 +443,18 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
 
       // Check for chikari (^) in this voice
       let chikariSynth: Instrument | undefined;
+      let chikariVolumeNode: Tone.Volume | undefined;
       const hasChikari = voice.events.some(e => e.type === 'note' && (e as any).swara === '^');
       if (hasChikari) {
         chikariSynth = await createInstrument("sitar-sampler");
         if (isTonalInstrument(chikariSynth)) {
-          chikariSynth.connect(volumeNode);
+          chikariVolumeNode = new Tone.Volume(volControl.chikariVolume ?? -5).toDestination();
+          chikariVolumeNode.mute = volControl.chikariMuted ?? false;
+          chikariSynth.connect(chikariVolumeNode);
         }
       }
 
-      activeNodesRef.current[voiceName] = { synth, volumeNode, chikariSynth };
+      activeNodesRef.current[voiceName] = { synth, volumeNode, chikariSynth, chikariVolumeNode };
 
       if (!isTonalInstrument(synth)) {
         // Skip scheduling for non-tonal instruments on melody tracks for now

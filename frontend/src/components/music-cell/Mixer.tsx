@@ -8,6 +8,8 @@ export interface VoiceControl {
     volume: number;
     muted: boolean;
     instrument: string;
+    chikariVolume?: number;
+    chikariMuted?: boolean;
 }
 
 interface MixerProps {
@@ -174,6 +176,50 @@ export function Mixer({
                                 className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
                                 disabled={voiceControls[v]?.muted}
                             />
+
+                            {/* Chikari Control - Only for Sitar */}
+                            {voiceControls[v]?.instrument === "sitar-sampler" && (
+                                <div className="mt-2 pl-4 border-l-2 border-primary/20 space-y-1">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-medium text-muted-foreground uppercase">
+                                            Chikari
+                                        </span>
+                                        <Button
+                                            onClick={() =>
+                                                updateVoiceControl(v, {
+                                                    chikariMuted: !voiceControls[v]?.chikariMuted,
+                                                })
+                                            }
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            className={cn(
+                                                "h-5 w-5",
+                                                voiceControls[v]?.chikariMuted && "text-destructive"
+                                            )}
+                                        >
+                                            {voiceControls[v]?.chikariMuted ? (
+                                                <VolumeX className="w-2.5 h-2.5" />
+                                            ) : (
+                                                <Volume2 className="w-2.5 h-2.5" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="-30"
+                                        max="0"
+                                        step="1"
+                                        value={voiceControls[v]?.chikariVolume ?? -5}
+                                        onChange={(e) =>
+                                            updateVoiceControl(v, {
+                                                chikariVolume: parseFloat(e.target.value),
+                                            })
+                                        }
+                                        className="w-full h-1 bg-muted rounded-full appearance-none cursor-pointer accent-primary/70"
+                                        disabled={voiceControls[v]?.chikariMuted}
+                                    />
+                                </div>
+                            )}
                         </div>
                     ))}
 
