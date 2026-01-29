@@ -803,7 +803,7 @@ function sanitizeFolderName(name: string): string {
 
 // The URL of our deployed Google Apps Script Web App
 // Using the one provided by the user
-const REGISTRY_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4VimJnl_tI5Obo7V7LXbqGRdxCDSyTJTkraxSTO54hUd_kLTib8PPQO69UZeI5vup/exec";
+const REGISTRY_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxibtOQpGm010P_TMv98bfdprHBXqniqyC6MiFRy8Qe3VNwStwafrO6yYVmZlaSsR5E/exec";
 
 // Make a file public (Anyone with link can view)
 export async function setFilePublic(fileId: string): Promise<void> {
@@ -860,18 +860,27 @@ export async function publishToRegistry(fileId: string, name: string, descriptio
   }
 }
 
-// Fetch all public files from registry
-export async function fetchPublicRegistry(): Promise<RegistryEntry[]> {
+// Fetch public files from registry with search and pagination
+export async function fetchPublicRegistry(
+  search: string = "",
+  page: number = 1,
+  pageSize: number = 10
+): Promise<{ total: number; files: RegistryEntry[] }> {
   try {
-    const response = await fetch(REGISTRY_SCRIPT_URL);
+    const url = new URL(REGISTRY_SCRIPT_URL);
+    if (search) url.searchParams.append("q", search);
+    if (page) url.searchParams.append("page", page.toString());
+    if (pageSize) url.searchParams.append("pageSize", pageSize.toString());
+
+    const response = await fetch(url.toString());
     if (!response.ok) {
       throw new Error("Failed to fetch registry");
     }
     const data = await response.json();
-    return data as RegistryEntry[];
+    return data as { total: number; files: RegistryEntry[] };
   } catch (error) {
     console.error("Error fetching registry:", error);
-    return [];
+    return { total: 0, files: [] };
   }
 }
 

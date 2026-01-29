@@ -12,10 +12,24 @@ function doGet(e) {
   var data = sheet.getDataRange().getValues();
 
   // Assuming headers are in row 1: ID, Name, Author, Description, Date
-  var headers = data[0];
   var rows = data.slice(1);
 
-  var result = rows.map(function (row) {
+  var query = e.parameter.q ? e.parameter.q.toLowerCase() : "";
+  var page = parseInt(e.parameter.page || "1");
+  var pageSize = parseInt(e.parameter.pageSize || "10");
+
+  var filteredRows = rows.filter(function (row) {
+    if (!query) return true;
+    var name = (row[1] || "").toString().toLowerCase();
+    var author = (row[2] || "").toString().toLowerCase();
+    return name.indexOf(query) !== -1 || author.indexOf(query) !== -1;
+  });
+
+  var total = filteredRows.length;
+  var start = (page - 1) * pageSize;
+  var paginatedRows = filteredRows.slice(start, start + pageSize);
+
+  var files = paginatedRows.map(function (row) {
     return {
       id: row[0],
       name: row[1],
@@ -24,6 +38,11 @@ function doGet(e) {
       date: row[4],
     };
   });
+
+  var result = {
+    total: total,
+    files: files,
+  };
 
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(
     ContentService.MimeType.JSON,

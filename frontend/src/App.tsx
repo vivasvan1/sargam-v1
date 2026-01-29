@@ -37,7 +37,7 @@ import { NotebookSettingsProvider } from "./context/NotebookSettingsContext";
 // Load default notebook
 const loadDefaultNotebook = async (): Promise<Notebook> => {
   try {
-    const response = await fetch("/raag_khamaj_demo.imnb");
+    const response = await fetch("/Raag Brindavani Sarang Composition - Saptak Music School - Ahmedabad.imnb");
     if (response.ok) {
       const content = await response.json();
       return content;

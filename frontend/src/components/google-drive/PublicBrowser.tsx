@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Globe, Loader2, Search } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Globe, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchPublicRegistry, loadFile } from '@/lib/googleDrive';
 import type { RegistryEntry } from '@/lib/googleDrive';
 import { toast } from 'sonner';
@@ -13,39 +13,47 @@ interface PublicBrowserProps {
     currentFileId?: string | null;
 }
 
+const PAGE_SIZE = 10;
+
 export function PublicBrowser({ onLoadFile, onClose, currentFileId }: PublicBrowserProps) {
     const [files, setFiles] = useState<RegistryEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [openingId, setOpeningId] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalFiles, setTotalFiles] = useState(0);
 
+    // Debounce search term
     useEffect(() => {
-        loadRegistry();
-    }, []);
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1); // Reset to page 1 on new search
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
-    const loadRegistry = async () => {
+    const loadRegistry = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await fetchPublicRegistry();
-            setFiles(data);
+            const result = await fetchPublicRegistry(debouncedSearch, currentPage, PAGE_SIZE);
+            setFiles(result.files);
+            setTotalFiles(result.total);
         } catch (error) {
             console.error('Error loading public registry:', error);
             toast.error('Failed to load public community files');
         } finally {
             setLoading(false);
         }
-    };
+    }, [debouncedSearch, currentPage]);
+
+    useEffect(() => {
+        loadRegistry();
+    }, [loadRegistry]);
 
     const handleFileClick = async (fileId: string) => {
         setOpeningId(fileId);
         try {
-            // NOTE: loadFile uses gapi.client.drive which requires auth.
-            // If the user is NOT authenticated, this might fail or we might need a non-auth fallback 
-            // (using API key only, or just `fetch` on the public link if CORS allows).
-            // For now, we assume the user is logged in significantly simplifies things, 
-            // but strictly speaking "public" files should be viewable without auth if we used a simple fetch.
-            // However, `loadFile` in googleDrive.ts is built around `gapi.client`.
-
             const notebook = await loadFile(fileId);
             onLoadFile?.(notebook, fileId);
             onClose?.();
@@ -68,10 +76,7 @@ export function PublicBrowser({ onLoadFile, onClose, currentFileId }: PublicBrow
         }
     };
 
-    const filteredFiles = files.filter(file =>
-        file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        file.author.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const totalPages = Math.ceil(totalFiles / PAGE_SIZE);
 
     return (
         <div className="flex flex-col h-full min-h-0">
@@ -96,9 +101,9 @@ export function PublicBrowser({ onLoadFile, onClose, currentFileId }: PublicBrow
                     </div>
                 ) : (
                     <>
-                        {filteredFiles.length > 0 ? (
+                        {files.length > 0 ? (
                             <div className="space-y-0.5">
-                                {filteredFiles.map((file) => (
+                                {files.map((file) => (
                                     <Button
                                         key={file.id}
                                         onClick={() => handleFileClick(file.id)}
@@ -127,6 +132,32 @@ export function PublicBrowser({ onLoadFile, onClose, currentFileId }: PublicBrow
                     </>
                 )}
             </div>
+
+            {totalPages > 1 && (
+                <div className="px-2 py-2 shrink-0 flex items-center justify-between border-t mt-auto">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={currentPage === 1 || loading}
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        className="h-7 px-2"
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-[10px] text-muted-foreground">
+                        Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={currentPage === totalPages || loading}
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        className="h-7 px-2"
+                    >
+                        <ChevronRight className="w-4 h-4" />
+                    </Button>
+                </div>
+            )}
         </div>
     );
 }
