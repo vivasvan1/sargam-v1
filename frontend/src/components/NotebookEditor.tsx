@@ -3,6 +3,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Cell } from "./Cell";
 import { AddCellControls } from "./AddCellControls";
 import { EmptyState } from "./EmptyState";
+import { GoogleAd } from "./GoogleAd";
 import type { Notebook } from "../types/notebook";
 
 interface NotebookEditorProps {
@@ -27,13 +28,14 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
     return (
         <ScrollArea className="flex-1 overflow-hidden h-full">
             <div className="max-w-4xl mx-auto py-6 md:py-12 px-4 md:px-8 w-full min-w-0">
+                <GoogleAd slot="top-banner" className="mb-8" />
                 <div className="w-full min-w-0">
                     {notebook.cells.map((cell, idx) => (
                         <div key={cell.id} className="relative">
                             <div
                                 className={`${activeCellId === cell.id
-                                        ? "ring-2 ring-primary ring-offset-2 rounded-xl"
-                                        : ""
+                                    ? "ring-2 ring-primary ring-offset-2 rounded-xl"
+                                    : ""
                                     }`}
                             >
                                 <Cell
@@ -57,6 +59,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
                         />
                     )}
                 </div>
+                <GoogleAd slot="bottom-banner" className="mt-8" />
             </div>
         </ScrollArea>
     );
