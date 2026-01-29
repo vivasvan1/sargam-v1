@@ -6,7 +6,7 @@ const ROOT_FOLDER_NAME = "sargamNotes";
 const DISCOVERY_DOCS = [
   "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest",
 ];
-const SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
+const SCOPES = "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
 
 // Type declarations for Google API
 declare global {
@@ -672,8 +672,6 @@ export async function updateFileById(fileId: string, content: string): Promise<S
     throw error;
   }
 }
-
-// Load file from Google Drive
 // Load file from Google Drive
 export async function loadFile(fileId: string): Promise<any> {
   // Try to get an authenticated token first
@@ -698,8 +696,8 @@ export async function loadFile(fileId: string): Promise<any> {
         throw new Error(error.error?.message || "Failed to load file");
       }
 
-      const content = await response.text();
-      return JSON.parse(content);
+        const content = await response.text();
+        return JSON.parse(content);
     } catch (error: any) {
       console.error("Error loading file with auth:", error);
       // If auth fails for a potentially public file, we might want to fall back 
@@ -711,30 +709,30 @@ export async function loadFile(fileId: string): Promise<any> {
     // CHECKME: User must provide this key
     const API_KEY = "REDACTED_GOOGLE_API_KEY"; // TODO: Put your Google API Key here
 
-    if (!API_KEY) {
-      throw new Error("Sign in to Google Drive or provide an API Key to load this file.");
+  if (!API_KEY) {
+    throw new Error("Sign in to Google Drive or provide an API Key to load this file.");
+  }
+
+  try {
+      // Access public file via API Key
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+        // 403 usually means the file is not public or key is invalid
+      if (response.status === 403 || response.status === 401) {
+        throw new Error("File is not public or invalid API Key. Please sign in.");
+      }
+        throw new Error(error.error?.message || "Failed to load public file");
     }
 
-    try {
-      // Access public file via API Key
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`
-      );
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        // 403 usually means the file is not public or key is invalid
-        if (response.status === 403 || response.status === 401) {
-          throw new Error("File is not public or invalid API Key. Please sign in.");
-        }
-        throw new Error(error.error?.message || "Failed to load public file");
-      }
-
-      const content = await response.text();
-      return JSON.parse(content);
-    } catch (error: any) {
-      console.error("Error loading public file:", error);
-      throw new Error(error.message || "Failed to load public file");
+    const content = await response.text();
+    return JSON.parse(content);
+  } catch (error: any) {
+    console.error("Error loading public file:", error);
+    throw new Error(error.message || "Failed to load public file");
     }
   }
 }
@@ -761,14 +759,14 @@ export async function getFileMetadata(fileId: string): Promise<GoogleFile> {
     throw new Error("Google API not initialized");
   }
 
-  try {
-    const response = await gapi.client.drive.files.get({
-      fileId: fileId,
-      fields: "id, name, modifiedTime, mimeType, parents, permissions, capabilities",
-    });
+    try {
+      const response = await gapi.client.drive.files.get({
+        fileId: fileId,
+        fields: "id, name, modifiedTime, mimeType, parents, permissions, capabilities",
+      });
 
-    return response.result;
-  } catch (error) {
+      return response.result;
+    } catch (error) {
     console.error("Error getting file metadata:", error);
     throw error;
   }

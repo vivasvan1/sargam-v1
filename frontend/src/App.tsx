@@ -131,6 +131,7 @@ function App() {
           setDriveFileId(fileId);
           setLastSavedContent(JSON.stringify(fileContent, null, 2));
           setSaveStatus("saved");
+          setIsReadOnly(true); // Default to read-only for shared files
 
           // Check if file is editable
           getFileMetadata(fileId).then(metadata => {
@@ -139,7 +140,11 @@ function App() {
             if (!editable) {
               toast.info("This notebook is read-only. Save a copy to edit.");
             }
-          }).catch(console.error);
+          }).catch(err => {
+            console.error("Failed to fetch full metadata, staying in read-only mode:", err);
+            setIsReadOnly(true);
+            toast.info("Notebook loaded in read-only mode.");
+          });
 
           toast.success("Loaded shared notebook");
         })
