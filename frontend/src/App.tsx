@@ -31,6 +31,7 @@ import { MenuBar } from "./components/MenuBar";
 import { useNotebook } from "./hooks/useNotebook";
 import type { Notebook } from "./types/notebook";
 import { NotebookSettingsProvider } from "./context/NotebookSettingsContext";
+import { Analytics } from "@vercel/analytics/react";
 
 // Notebook interfaces imported from types/notebook
 
@@ -500,6 +501,7 @@ function App() {
           />
         </div>
       </SidebarProvider>
+      <Analytics />
     </NotebookSettingsProvider >
   );
 }
