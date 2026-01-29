@@ -31,6 +31,8 @@ interface HeaderProps {
 
     currentFileId?: string | null;
     saveStatus?: "saved" | "unsaved" | "saving";
+    isReadOnly?: boolean;
+    onCreateCopy?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -42,6 +44,8 @@ export const Header: React.FC<HeaderProps> = ({
     onDownload,
     currentFileId,
     saveStatus = "saved",
+    isReadOnly = false,
+    onCreateCopy,
 }) => {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [isPublic, setIsPublic] = useState(false);
@@ -80,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="max-w-4xl flex items-center gap-2 md:gap-4 flex-1 min-w-0">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 group">
-                        {isEditingTitle ? (
+                        {isEditingTitle && !isReadOnly ? (
                             <Input
                                 type="text"
                                 value={title}
@@ -95,18 +99,20 @@ export const Header: React.FC<HeaderProps> = ({
                         ) : (
                             <>
                                 <h3
-                                    onDoubleClick={() => setIsEditingTitle(true)}
-                                    className="font-bold text-base md:text-xl truncate cursor-text hover:text-primary transition-colors"
+                                    onDoubleClick={() => !isReadOnly && setIsEditingTitle(true)}
+                                    className={`font-bold text-base md:text-xl truncate transition-colors ${!isReadOnly ? "cursor-text hover:text-primary" : ""}`}
                                 >
                                     {title || "Untitled Notebook"}
                                 </h3>
-                                <Button
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    onClick={() => setIsEditingTitle(true)}
-                                >
-                                    <Pencil className="w-3 h-3" />
-                                </Button>
+                                {!isReadOnly && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        onClick={() => setIsEditingTitle(true)}
+                                    >
+                                        <Pencil className="w-3 h-3" />
+                                    </Button>
+                                )}
                             </>
                         )}
                     </div>
@@ -121,11 +127,24 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-2 md:gap-3">
                 {googleDriveConnected && currentFileId && (
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <span className={`w-1 h-1 rounded-full ${saveStatus === "saving" ? "bg-blue-500 animate-pulse" : saveStatus === "unsaved" ? "bg-amber-500" : "bg-green-500"}`} />
-                        {saveStatus === "saving" && <span className="text-blue-500 animate-pulse">Saving...</span>}
-                        {saveStatus === "unsaved" && <span className="text-amber-500">Unsaved</span>}
-                        {saveStatus === "saved" && <span className="text-green-500">Saved</span>}
+                        <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                        {isReadOnly ? (
+                            <span className="text-muted-foreground">Read Only</span>
+                        ) : (
+                            <>
+                                {saveStatus === "saving" && <span className="text-blue-500 animate-pulse">Saving...</span>}
+                                {saveStatus === "unsaved" && <span className="text-amber-500">Unsaved</span>}
+                                {saveStatus === "saved" && <span className="text-green-500">Saved</span>}
+                            </>
+                        )}
                     </span>
+                )}
+                {isReadOnly && googleDriveConnected && (
+                    <Button onClick={onCreateCopy} variant="outline" size="sm" className="gap-2 shrink-0">
+                        <Cloud className="w-4 h-4" />
+                        <span className="hidden sm:inline">Create Copy in My Drive</span>
+                        <span className="sm:hidden">Create Copy</span>
+                    </Button>
                 )}
                 {isPublic && (
                     <Button onClick={handleShare} variant="default" size="default" title="Copy shareable link">
@@ -144,13 +163,22 @@ export const Header: React.FC<HeaderProps> = ({
                         sideOffset={5}
                         align="end"
                     >
-                        {googleDriveConnected && (
+                        {googleDriveConnected && !isReadOnly && (
                             <DropdownMenuItem
                                 onClick={onSaveToDrive}
                                 className="flex items-center gap-2 cursor-pointer"
                             >
                                 <Cloud className="w-4 h-4" />
                                 Save to Drive
+                            </DropdownMenuItem>
+                        )}
+                        {googleDriveConnected && isReadOnly && (
+                            <DropdownMenuItem
+                                onClick={onCreateCopy}
+                                className="flex items-center gap-2 cursor-pointer"
+                            >
+                                <Cloud className="w-4 h-4" />
+                                Create Copy
                             </DropdownMenuItem>
                         )}
                         <DropdownMenuItem

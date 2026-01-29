@@ -356,6 +356,17 @@ function App() {
     setLoadDialogOpen(true);
   };
 
+  const handleCreateCopy = () => {
+    if (!googleDriveConnected) {
+      handleGoogleDriveConnect();
+      return;
+    }
+    setDriveFileId(null);
+    setIsReadOnly(false);
+    setSaveDialogOpen(true);
+    toast.info("Saving a copy to your Drive...");
+  };
+
   const handleDriveLoad = (loadedNotebook: Notebook, fileId?: string) => {
     setNotebook(loadedNotebook);
     const fileName = loadedNotebook.metadata?.title
@@ -437,6 +448,8 @@ function App() {
               onDownload={handleDownload}
               currentFileId={driveFileId}
               saveStatus={saveStatus}
+              isReadOnly={isReadOnly}
+              onCreateCopy={handleCreateCopy}
             />
 
             <div className="border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-0.5">
