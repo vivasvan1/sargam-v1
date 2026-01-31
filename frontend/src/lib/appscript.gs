@@ -14,15 +14,23 @@ function doGet(e) {
   // Assuming headers are in row 1: ID, Name, Author, Description, Date
   var rows = data.slice(1);
 
-  var query = e.parameter.q ? e.parameter.q.toLowerCase() : "";
+  var rawQuery = e.parameter.q ? e.parameter.q : "";
+  var query = rawQuery.toLowerCase();
   var page = parseInt(e.parameter.page || "1");
   var pageSize = parseInt(e.parameter.pageSize || "10");
 
   var filteredRows = rows.filter(function (row) {
     if (!query) return true;
+    var id = (row[0] || "").toString();
     var name = (row[1] || "").toString().toLowerCase();
     var author = (row[2] || "").toString().toLowerCase();
-    return name.indexOf(query) !== -1 || author.indexOf(query) !== -1;
+
+    // Check for exact ID match (case-sensitive) OR partial match on name/author
+    return (
+      id === rawQuery ||
+      name.indexOf(query) !== -1 ||
+      author.indexOf(query) !== -1
+    );
   });
 
   var total = filteredRows.length;
@@ -55,8 +63,35 @@ function doPost(e) {
     var payload = JSON.parse(e.postData.contents);
 
     // Validation
-    if (!payload.id || !payload.name) {
-      throw new Error("Missing required fields");
+    if (!payload.id) {
+      throw new Error("Missing required field: id");
+    }
+
+    // Check for unpublish action
+    if (payload.action === "unpublish") {
+      var data = sheet.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][0] === payload.id) {
+          sheet.deleteRow(i + 1);
+          return ContentService.createTextOutput(
+            JSON.stringify({
+              status: "success",
+              action: "unpublish",
+              id: payload.id,
+            }),
+          ).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService.createTextOutput(
+        JSON.stringify({
+          status: "not_found",
+          message: "File not found in registry",
+        }),
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (!payload.name) {
+      throw new Error("Missing required field: name");
     }
 
     // Check for duplicates (simple check by ID)

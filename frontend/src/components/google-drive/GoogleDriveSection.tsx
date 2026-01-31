@@ -16,7 +16,7 @@ interface GoogleDriveSectionProps {
   onGoogleDriveConnect?: () => void;
   onGoogleDriveDisconnect?: () => void;
   onLoadFromDrive?: () => void;
-  onLoadDriveFile?: (notebook: any, fileId?: string) => void;
+  onLoadDriveFile?: (notebook: any, fileId?: string, isReadOnly?: boolean, isPublished?: boolean) => void;
   onClose?: () => void;
   currentFileId?: string | null;
 }

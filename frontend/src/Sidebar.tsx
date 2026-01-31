@@ -30,7 +30,7 @@ interface SidebarProps {
   onGoogleDriveConnect: () => void;
   onGoogleDriveDisconnect: () => void;
   onLoadFromDrive: () => void;
-  onLoadDriveFile: (notebook: any, fileId?: string) => void;
+  onLoadDriveFile: (notebook: any, fileId?: string, isReadOnly?: boolean, isPublished?: boolean) => void;
   currentFileId: string | null;
 }
 

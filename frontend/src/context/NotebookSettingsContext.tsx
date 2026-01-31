@@ -7,6 +7,8 @@ interface NotebookSettingsContextType {
     toggleVisualizer: () => void;
     showCode: boolean;
     toggleCode: () => void;
+    autoSaveEnabled: boolean;
+    toggleAutoSave: () => void;
 }
 
 const NotebookSettingsContext = createContext<NotebookSettingsContextType | undefined>(undefined);
@@ -17,9 +19,20 @@ export function NotebookSettingsProvider({ children }: { children: ReactNode }) 
     });
     const [showVisualizer, setShowVisualizer] = useState(true);
     const [showCode, setShowCode] = useState(false);
+    const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
+        const saved = localStorage.getItem("sargam-autosave-enabled");
+        return saved === null ? true : saved === "true";
+    });
 
     const toggleVisualizer = () => setShowVisualizer(prev => !prev);
     const toggleCode = () => setShowCode(prev => !prev);
+    const toggleAutoSave = () => {
+        setAutoSaveEnabled(prev => {
+            const newValue = !prev;
+            localStorage.setItem("sargam-autosave-enabled", String(newValue));
+            return newValue;
+        });
+    };
 
     const updateDefaultInstrument = (voiceName: string, instrumentId: string) => {
         setDefaultInstruments((prev) => ({
@@ -29,7 +42,16 @@ export function NotebookSettingsProvider({ children }: { children: ReactNode }) 
     };
 
     return (
-        <NotebookSettingsContext.Provider value={{ defaultInstruments, updateDefaultInstrument, showVisualizer, toggleVisualizer, showCode, toggleCode }}>
+        <NotebookSettingsContext.Provider value={{
+            defaultInstruments,
+            updateDefaultInstrument,
+            showVisualizer,
+            toggleVisualizer,
+            showCode,
+            toggleCode,
+            autoSaveEnabled,
+            toggleAutoSave
+        }}>
             {children}
         </NotebookSettingsContext.Provider>
     );

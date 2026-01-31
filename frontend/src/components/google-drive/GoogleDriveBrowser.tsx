@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Folder, FileMusic, Loader2, Trash2, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { listFiles, getSubfolders, loadFile, deleteFile, checkIfPublic, getShareableLink } from '@/lib/googleDrive';
+import { listFiles, getSubfolders, deleteFile, checkIfPublic, getShareableLink, loadNotebookAndMetadata } from '@/lib/googleDrive';
 import type { GoogleFile, GoogleFolder } from '@/lib/googleDrive';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface GoogleDriveBrowserProps {
-  onLoadFile?: (notebook: any, fileId?: string) => void;
+  onLoadFile?: (notebook: any, fileId?: string, isReadOnly?: boolean, isPublished?: boolean) => void;
   onClose?: () => void;
   currentFileId?: string | null;
 }
@@ -73,8 +73,8 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
   const handleFileClick = async (fileId: string) => {
     try {
       setIsFileIdLoading(fileId);
-      const notebook = await loadFile(fileId);
-      onLoadFile?.(notebook, fileId);
+      const { notebook, isReadOnly, isPublished } = await loadNotebookAndMetadata(fileId);
+      onLoadFile?.(notebook, fileId, isReadOnly, isPublished);
       onClose?.();
     } catch (error: any) {
       console.error('Error loading file:', error);

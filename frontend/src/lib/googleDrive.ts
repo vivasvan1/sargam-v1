@@ -1,12 +1,17 @@
 // Google Drive API service
 // Uses Google Identity Services (new) instead of deprecated auth2
 import { loadGapiInsideDOM } from "gapi-script";
+import { useAuthStore } from "@/store/useAuthStore";
 
 const ROOT_FOLDER_NAME = "sargamNotes";
 const DISCOVERY_DOCS = [
   "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest",
 ];
-const SCOPES = "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
+const SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
+
+// The URL of our deployed Google Apps Script Web App
+const REGISTRY_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAYl69gVoft_Qvlblqx9rOKO5DTOm3TIHVm6roCmtfEKJiKnRIA0SeN-9AFg295n0w/exec";
+const API_KEY = "REDACTED_GOOGLE_API_KEY";
 
 // Type declarations for Google API
 declare global {
@@ -121,6 +126,37 @@ function waitForGoogleIdentityServices(): Promise<typeof window.google> {
   });
 }
 
+
+// Wait for Auth to be initialized (resolved to either signed in or not)
+export function waitForAuthReady(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (isInitialized) {
+      resolve(true);
+      return;
+    }
+
+    // Check every 100ms
+    const interval = setInterval(() => {
+      if (isInitialized) {
+        clearInterval(interval);
+        resolve(true);
+      }
+    }, 100);
+
+    // Timeout after 10 seconds? No, maybe app takes time. 
+    // But we don't want to hang forever if initialize isn't called.
+    // However, App.tsx calls initialize.
+    // Let's set a 30s timeout just in case.
+    setTimeout(() => {
+      if (!isInitialized) {
+        clearInterval(interval);
+        console.warn("waitForAuthReady timed out, proceeding anyway.");
+        resolve(false);
+      }
+    }, 30000);
+  });
+}
+
 // Initialize Google API
 export async function initializeGoogleAPI(providedClientId: string): Promise<any> {
   if (isInitialized && gapi) {
@@ -188,8 +224,6 @@ export async function initializeGoogleAPI(providedClientId: string): Promise<any
       },
     });
 
-    isInitialized = true;
-
     // Check if we have a stored token
     const storedToken = sessionStorage.getItem("google_drive_token");
     if (storedToken) {
@@ -204,8 +238,13 @@ export async function initializeGoogleAPI(providedClientId: string): Promise<any
         sessionStorage.removeItem("google_drive_token");
         gapi.client.setToken(null);
         isSignedIn = false;
+        useAuthStore.getState().setAuthenticated(false);
+        useAuthStore.getState().setUser(null);
       }
     }
+
+    isInitialized = true;
+    useAuthStore.getState().setInitialized(true);
 
     return gapi;
   } catch (error: any) {
@@ -234,6 +273,9 @@ async function getUserInfo(): Promise<boolean> {
         email: userInfo.email,
         name: userInfo.name,
       };
+      // Update global store
+      useAuthStore.getState().setAuthenticated(true);
+      useAuthStore.getState().setUser(currentUser);
       return true;
     } else if (response.status === 401) {
       console.error("Google API token expired or invalid (401)");
@@ -242,6 +284,9 @@ async function getUserInfo(): Promise<boolean> {
     return false;
   } catch (error) {
     console.error("Error getting user info:", error);
+    // If we fail here, we might still be 'signed in' with a token but can't get info.
+    // However, if token is invalid, we should probably reset store or rely on existing logic.
+    // The existing logic returns false, so caller handles it.
     return false;
   }
 }
@@ -298,6 +343,9 @@ export async function authenticate(): Promise<GoogleUser> {
             isSignedIn = true;
             const fallbackUser = { email: "Connected", name: "User" };
             currentUser = fallbackUser;
+            // Update global store
+            useAuthStore.getState().setAuthenticated(true);
+            useAuthStore.getState().setUser(fallbackUser);
             resolve(fallbackUser);
           }
         },
@@ -340,6 +388,10 @@ export async function disconnect(): Promise<void> {
     rootFolderId = null;
     accessToken = null;
     sessionStorage.removeItem("google_drive_token");
+
+    // Update global store
+    useAuthStore.getState().setAuthenticated(false);
+    useAuthStore.getState().setUser(null);
   } catch (error) {
     console.error("Error disconnecting:", error);
   }
@@ -672,8 +724,9 @@ export async function updateFileById(fileId: string, content: string): Promise<S
     throw error;
   }
 }
+
 // Load file from Google Drive
-export async function loadFile(fileId: string): Promise<any> {
+async function loadFile(fileId: string): Promise<any> {
   // Try to get an authenticated token first
   const token = accessToken || (isInitialized && gapi?.client?.getToken()?.access_token);
 
@@ -702,40 +755,99 @@ export async function loadFile(fileId: string): Promise<any> {
       console.error("Error loading file with auth:", error);
       // If auth fails for a potentially public file, we might want to fall back 
       // but usually if you have a token it should work or the file is private.
-      throw new Error(error.message || "Failed to load file from Google Drive");
-    }
-  } else {
-    // No token available. Try to load using API Key (for public files)
-    // CHECKME: User must provide this key
-    const API_KEY = "REDACTED_GOOGLE_API_KEY"; // TODO: Put your Google API Key here
-
-    if (!API_KEY) {
-      throw new Error("Sign in to Google Drive or provide an API Key to load this file.");
-    }
-
-    try {
-      // Access public file via API Key
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`
-      );
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        // 403 usually means the file is not public or key is invalid
-        if (response.status === 403 || response.status === 401) {
-          throw new Error("File is not public or invalid API Key. Please sign in.");
-        }
-        throw new Error(error.error?.message || "Failed to load public file");
-      }
-
-      const content = await response.text();
-      return JSON.parse(content);
-    } catch (error: any) {
-      console.error("Error loading public file:", error);
-      throw new Error(error.message || "Failed to load public file");
+      // throw new Error(error.message || "Failed to load file from Google Drive");
     }
   }
+
+
+  // No token available Fallback to public access. Try to load using API Key (for public files)
+  if (!API_KEY) {
+    throw new Error("Sign in to Google Drive or provide an API Key to load this file.");
+  }
+
+  try {
+    // Access public file via API Key
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      // 403 usually means the file is not public or key is invalid
+      if (response.status === 403 || response.status === 401) {
+        throw new Error("File is not public or invalid API Key. Please sign in.");
+      }
+      throw new Error(error.error?.message || "Failed to load public file");
+    }
+
+    const content = await response.text();
+    return JSON.parse(content);
+  } catch (error: any) {
+    console.error("Error loading public file:", error);
+    throw new Error(error.message || "Failed to load public file");
+  }
 }
+
+// Load notebook and its metadata (permissions, publish status) in parallel
+export async function loadNotebookAndMetadata(fileId: string): Promise<{
+  notebook: any;
+  metadata: GoogleFile | null;
+  isPublished: boolean;
+  isReadOnly: boolean;
+}> {
+  // Wait for auth to resolve so we know if we can use a token
+  await waitForAuthReady();
+
+  try {
+    // 1. Start all fetches in parallel
+    const notebookPromise = loadFile(fileId);
+
+    // For metadata, we need to be careful. if loadFile falls back to public key, 
+    // getFileMetadata might fail if we are not authenticated.
+    // However, if we are authenticated, we should fetch it.
+    // If not authenticated, we can assume read-only and check published status via registry.
+
+    let metadataPromise: Promise<GoogleFile> | Promise<null>;
+    if (isAuthenticated()) {
+      metadataPromise = getFileMetadata(fileId);
+    } else {
+      // If not authenticated, we can't fetch full Drive metadata usually, 
+      // unless it's public and we use API key (which getFileMetadata doesn't currently support explicitly with key)
+      // But let's try to stick to existing logic: if auth, get metadata.
+      metadataPromise = Promise.resolve(null);
+    }
+
+    const publishedPromise = checkIsPublished(fileId);
+
+    // 2. Wait for all
+    const [notebook, metadata, isPublished] = await Promise.all([
+      notebookPromise,
+      metadataPromise,
+      publishedPromise
+    ]);
+
+    // 3. Determine read-only status
+    let isReadOnly = true; // Default to read-only
+    if (metadata) {
+      isReadOnly = !checkIfEditable(metadata);
+    } else {
+      // If we didn't get metadata (e.g. not logged in), it's read-only
+      isReadOnly = true;
+    }
+
+    return {
+      notebook,
+      metadata,
+      isPublished,
+      isReadOnly
+    };
+
+  } catch (error) {
+    console.error("Error in loadNotebookAndMetadata:", error);
+    throw error;
+  }
+}
+
 
 // Delete file from Google Drive
 export async function deleteFile(fileId: string): Promise<void> {
@@ -766,7 +878,16 @@ export async function getFileMetadata(fileId: string): Promise<GoogleFile> {
     });
 
     return response.result;
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.status === 404 || error?.result?.error?.code === 404 || (error?.result?.error?.message && error.result.error.message.includes("File not found"))) {
+      console.warn("File not found (404), returning minimal metadata for:", fileId);
+      return {
+        id: fileId,
+        name: "Unknown File",
+        permissions: [],
+        capabilities: { canEdit: false }
+      } as GoogleFile;
+    }
     console.error("Error getting file metadata:", error);
     throw error;
   }
@@ -798,10 +919,6 @@ function sanitizeFolderName(name: string): string {
 }
 
 // --- Public Registry & Sharing Functions ---
-
-// The URL of our deployed Google Apps Script Web App
-// Using the one provided by the user
-const REGISTRY_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxibtOQpGm010P_TMv98bfdprHBXqniqyC6MiFRy8Qe3VNwStwafrO6yYVmZlaSsR5E/exec";
 
 // Make a file public (Anyone with link can view)
 export async function setFilePublic(fileId: string): Promise<void> {
@@ -855,6 +972,44 @@ export async function publishToRegistry(fileId: string, name: string, descriptio
   } catch (error) {
     console.error("Error publishing to registry:", error);
     // throw new Error("Failed to publish to registry");
+  }
+}
+
+// Unpublish from the registry (Apps Script)
+export async function unpublishFromRegistry(fileId: string): Promise<void> {
+  try {
+    await fetch(REGISTRY_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
+      body: JSON.stringify({
+        id: fileId,
+        action: "unpublish",
+      }),
+    });
+  } catch (error) {
+    console.error("Error unpublishing from registry:", error);
+  }
+}
+
+// Check if a file is published in the registry
+export async function checkIsPublished(fileId: string): Promise<boolean> {
+  try {
+    const url = new URL(REGISTRY_SCRIPT_URL);
+    url.searchParams.append("q", fileId); // Search by ID
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      return false;
+    }
+    const data = await response.json();
+    // Check if any file in the results matches our ID exactly
+    return data.files.some((file: RegistryEntry) => file.id === fileId);
+  } catch (error) {
+    console.error("Error checking published status:", error);
+    return false;
   }
 }
 

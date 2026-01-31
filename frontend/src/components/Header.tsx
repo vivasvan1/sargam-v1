@@ -11,14 +11,14 @@ import {
 import { Button } from "./ui/button";
 import { SidebarTrigger } from "./ui/sidebar";
 import { Input } from "./ui/input";
-import { Separator } from "./ui/separator";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { getFileMetadata, checkIfPublic, getShareableLink } from "@/lib/googleDrive";
+import { getShareableLink } from "@/lib/googleDrive";
+import { useNotebookStore } from "@/store/useNotebookStore";
 import { toast } from "sonner";
 
 interface HeaderProps {
@@ -48,26 +48,9 @@ export const Header: React.FC<HeaderProps> = ({
     onCreateCopy,
 }) => {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
-    const [isPublic, setIsPublic] = useState(false);
+    const { isPublished } = useNotebookStore();
 
-    React.useEffect(() => {
-        if (!currentFileId) {
-            setIsPublic(false);
-            return;
-        }
-
-        const checkPublicStatus = async () => {
-            try {
-                const metadata = await getFileMetadata(currentFileId);
-                setIsPublic(checkIfPublic(metadata));
-            } catch (error) {
-                console.error("Failed to check public status", error);
-                setIsPublic(false);
-            }
-        };
-
-        checkPublicStatus();
-    }, [currentFileId, googleDriveConnected]);
+    // Removed local metadata fetching effect
 
     const handleShare = () => {
         if (currentFileId) {
@@ -127,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-2 md:gap-3">
                 {googleDriveConnected && currentFileId && (
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                        <span className={`w-1 h-1 rounded-full ${saveStatus === "saving" ? "bg-blue-500" : saveStatus === "unsaved" ? "bg-amber-500" : "bg-green-500"}`} />
                         {isReadOnly ? (
                             <span className="text-muted-foreground">Read Only</span>
                         ) : (
@@ -146,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
                         <span className="sm:hidden">Create Copy</span>
                     </Button>
                 )}
-                {isPublic && (
+                {isPublished && (
                     <Button onClick={handleShare} variant="default" size="default" title="Copy shareable link">
                         <Share2 className="w-5 h-5" />
                         Share

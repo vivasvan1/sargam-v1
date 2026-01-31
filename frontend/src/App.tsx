@@ -18,19 +18,18 @@ import {
   initializeGoogleAPI,
   authenticate,
   disconnect,
-  getCurrentUser,
-  isAuthenticated,
   updateFileById,
   publishToRegistry,
-  loadFile,
-  checkIfEditable,
-  getFileMetadata,
+  unpublishFromRegistry,
+  loadNotebookAndMetadata,
 } from "./lib/googleDrive";
-import type { GoogleUser } from "./lib/googleDrive";
+// GoogleUser type no longer needed here as it is in store
 import { MenuBar } from "./components/MenuBar";
 import { useNotebook } from "./hooks/useNotebook";
 import type { Notebook } from "./types/notebook";
-import { NotebookSettingsProvider } from "./context/NotebookSettingsContext";
+import { useNotebookSettings } from "./context/NotebookSettingsContext";
+import { useNotebookStore } from "./store/useNotebookStore";
+import { useAuthStore } from "./store/useAuthStore";
 import { Analytics } from "@vercel/analytics/react";
 
 // Notebook interfaces imported from types/notebook
@@ -86,28 +85,26 @@ function App() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Google Drive state
-  const [googleDriveConnected, setGoogleDriveConnected] = useState(false);
-  const [googleDriveUser, setGoogleDriveUser] = useState<GoogleUser | null>(
-    null
-  );
+  // Google Drive state (moved to global store)
+  const { isAuthenticated: googleDriveConnected, user: googleDriveUser } = useAuthStore();
+  // isInitialized is accessed directly in the effects via useAuthStore hook or check if needed
+  const isInitialized = useAuthStore(state => state.isInitialized);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [driveFileId, setDriveFileId] = useState<string | null>(null); // Track if notebook was saved to Drive
   const [isReadOnly, setIsReadOnly] = useState(false); // Track if current file is read-only
   const [lastSavedContent, setLastSavedContent] = useState<string | null>(null); // Track last saved content for change detection
   const [saveStatus, setSaveStatus] = useState<"saved" | "unsaved" | "saving">("saved");
+  const [isPublished, setIsPublished] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return !!urlParams.get("fileId");
+  });
 
   // Initialize Google API on mount
   useEffect(() => {
     if (GOOGLE_CLIENT_ID) {
       initializeGoogleAPI(GOOGLE_CLIENT_ID)
-        .then(() => {
-          // Check if already authenticated
-          if (isAuthenticated()) {
-            setGoogleDriveConnected(true);
-            setGoogleDriveUser(getCurrentUser());
-          }
-        })
         .catch((error) => {
           console.error("Failed to initialize Google API:", error);
         });
@@ -123,28 +120,27 @@ function App() {
     if (fileId) {
       // If fileId is present, try to load it (public file)
       toast.info("Loading shared notebook...");
-      loadFile(fileId)
-        .then((fileContent) => {
-          setNotebook(fileContent);
-          const title = fileContent.metadata?.title || "Shared Notebook";
+      loadNotebookAndMetadata(fileId)
+        .then(({ notebook, isReadOnly, isPublished }) => {
+          // Update local state hook (for editing)
+          setNotebook(notebook);
+
+          // Update global store (for Header/other components)
+          useNotebookStore.getState().setNotebook(notebook, fileId, notebook.metadata || null, isReadOnly, isPublished);
+
+          const title = notebook.metadata?.title || "Shared Notebook";
           setFilePath(`${title}.imnb`);
           setDriveFileId(fileId);
-          setLastSavedContent(JSON.stringify(fileContent, null, 2));
+          setLastSavedContent(JSON.stringify(notebook, null, 2));
           setSaveStatus("saved");
-          setIsReadOnly(true); // Default to read-only for shared files
 
-          // Check if file is editable
-          getFileMetadata(fileId).then(metadata => {
-            const editable = checkIfEditable(metadata);
-            setIsReadOnly(!editable);
-            if (!editable) {
-              toast.info("This notebook is read-only. Save a copy to edit.");
-            }
-          }).catch(err => {
-            console.error("Failed to fetch full metadata, staying in read-only mode:", err);
-            setIsReadOnly(true);
+          // Set derived states immediately
+          setIsReadOnly(isReadOnly);
+          if (isReadOnly) {
             toast.info("Notebook loaded in read-only mode.");
-          });
+          }
+
+          setIsPublished(isPublished);
 
           toast.success("Loaded shared notebook");
         })
@@ -154,15 +150,20 @@ function App() {
           // Fallback to default if loading fails
           loadDefaultNotebook().then((defaultNotebook) => {
             setNotebook(defaultNotebook);
+            useNotebookStore.getState().setNotebook(defaultNotebook, null, null, false, false);
             if (defaultNotebook.metadata?.title) {
               setFilePath("raag_khamaj_demo.imnb");
             }
           });
+        })
+        .finally(() => {
+          setIsLoading(false);
         });
     } else {
       // Load default notebook on mount if no fileId
       loadDefaultNotebook().then((defaultNotebook) => {
         setNotebook(defaultNotebook);
+        useNotebookStore.getState().setNotebook(defaultNotebook, null, null, false, false);
         if (defaultNotebook.metadata?.title) {
           setFilePath("raag_khamaj_demo.imnb");
         }
@@ -192,6 +193,8 @@ function App() {
   }, [driveFileId]);
 
   // Auto-save to Google Drive
+  const { autoSaveEnabled } = useNotebookSettings();
+
   useEffect(() => {
     // If content has changed, mark as unsaved
     if (lastSavedContent && JSON.stringify(notebook, null, 2) !== lastSavedContent) {
@@ -203,7 +206,8 @@ function App() {
     // 2. Notebook was previously saved to Drive (has file ID)
     // 3. Content has changed since last save
     // 4. File is not read-only
-    if (!googleDriveConnected || !driveFileId || isReadOnly) {
+    // 5. Auto-save is enabled by user
+    if (!googleDriveConnected || !driveFileId || isReadOnly || !autoSaveEnabled) {
       return;
     }
 
@@ -234,7 +238,7 @@ function App() {
     return () => {
       clearTimeout(autoSaveTimer);
     };
-  }, [notebook, googleDriveConnected, driveFileId, lastSavedContent, isReadOnly]);
+  }, [notebook, googleDriveConnected, driveFileId, lastSavedContent, isReadOnly, autoSaveEnabled]);
 
   const handleNew = () => {
     if (window.confirm("Start a new notebook? Unsaved changes will be lost.")) {
@@ -248,6 +252,7 @@ function App() {
       setIsReadOnly(false);
       setLastSavedContent(null);
       setActiveCellId(null);
+      setIsPublished(false);
     }
   };
 
@@ -264,6 +269,7 @@ function App() {
         setDriveFileId(null); // Clear Drive file ID for local file
         setIsReadOnly(false);
         setLastSavedContent(null);
+        setIsPublished(false);
         toast.success(`Loaded ${file.name}`);
       } catch (err) {
         console.error("Malformed IMNB file", err);
@@ -301,8 +307,7 @@ function App() {
     try {
       await initializeGoogleAPI(GOOGLE_CLIENT_ID);
       const user = await authenticate();
-      setGoogleDriveConnected(true);
-      setGoogleDriveUser(user);
+      // Store updates automatically via googleDrive.ts
       toast.success(`Connected to Google Drive as ${user?.email || "Connected"}`);
     } catch (error: any) {
       console.error("Error connecting to Google Drive:", error);
@@ -317,8 +322,7 @@ function App() {
   const handleGoogleDriveDisconnect = async () => {
     try {
       await disconnect();
-      setGoogleDriveConnected(false);
-      setGoogleDriveUser(null);
+      // Store updates automatically via googleDrive.ts 
       toast.success("Disconnected from Google Drive");
     } catch (error) {
       console.error("Error disconnecting from Google Drive:", error);
@@ -366,35 +370,69 @@ function App() {
       handleGoogleDriveConnect();
       return;
     }
+
+    // Prepend "Copy of " to the title
+    const currentTitle = notebook.metadata?.title || "Untitled Notebook";
+    const newTitle = `Copy of ${currentTitle}`;
+    updateTitle(newTitle);
+
     setDriveFileId(null);
     setIsReadOnly(false);
     setSaveDialogOpen(true);
     toast.info("Saving a copy to your Drive...");
   };
 
-  const handleDriveLoad = (loadedNotebook: Notebook, fileId?: string) => {
+  /*
+   * Refactored to accept full metadata.
+   * Signature matches what GoogleDriveBrowser will pass.
+   */
+  const handleDriveLoad = (
+    loadedNotebook: Notebook,
+    fileId?: string,
+    readOnlyStatus?: boolean,
+    publishedStatus?: boolean
+  ) => {
     setNotebook(loadedNotebook);
+
+    // Update global store
+    useNotebookStore.getState().setNotebook(
+      loadedNotebook,
+      fileId || null,
+      loadedNotebook.metadata || null,
+      readOnlyStatus || false,
+      publishedStatus || false
+    );
+
     const fileName = loadedNotebook.metadata?.title
       ? `${loadedNotebook.metadata.title}.imnb`
       : "untitled.imnb";
     setFilePath(fileName);
+
     if (fileId) {
       setDriveFileId(fileId);
       setLastSavedContent(JSON.stringify(loadedNotebook, null, 2));
 
-      // Check capabilities
-      getFileMetadata(fileId).then(metadata => {
-        const editable = checkIfEditable(metadata);
-        setIsReadOnly(!editable);
-        if (!editable) {
+      // Use the statuses passed from loadNotebookAndMetadata
+      if (typeof readOnlyStatus === 'boolean') {
+        setIsReadOnly(readOnlyStatus);
+        if (readOnlyStatus && useAuthStore.getState().isAuthenticated) {
           toast.info("This notebook is read-only. Save a copy to edit.");
-        } else {
-          setIsReadOnly(false);
         }
-      }).catch(console.error);
+      } else {
+        // Fallback behavior if not passed (though it should be now)
+        setIsReadOnly(false);
+      }
+
+      if (typeof publishedStatus === 'boolean') {
+        setIsPublished(publishedStatus);
+      } else {
+        setIsPublished(false);
+      }
+
     } else {
       setDriveFileId(null);
       setIsReadOnly(false);
+      setIsPublished(false);
     }
     toast.success("Notebook loaded from Google Drive");
   };
@@ -416,6 +454,7 @@ function App() {
       const title = notebook.metadata?.title || "Untitled Notebook";
 
       await publishToRegistry(driveFileId, title, "", authorName);
+      setIsPublished(true);
       toast.dismiss(loadingToast);
       toast.success("Successfully published to community!");
     } catch (error) {
@@ -424,8 +463,26 @@ function App() {
     }
   };
 
+  const handleUnpublish = async () => {
+    if (!driveFileId || !googleDriveConnected) return;
+
+    const confirm = window.confirm("Remove this notebook from the community registry?");
+    if (!confirm) return;
+
+    try {
+      const loadingToast = toast.loading("Unpublishing...");
+      await unpublishFromRegistry(driveFileId);
+      setIsPublished(false);
+      toast.dismiss(loadingToast);
+      toast.success("Removed from community");
+    } catch (error) {
+      console.error("Unpublishing failed:", error);
+      toast.error("Failed to remove from community");
+    }
+  };
+
   return (
-    <NotebookSettingsProvider>
+    <>
       <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <div className="flex h-screen w-full bg-background text-foreground overflow-hidden selection:bg-primary/10">
           <Sidebar
@@ -443,51 +500,63 @@ function App() {
             currentFileId={driveFileId}
           />
 
-          <SidebarInset className="flex-1 flex flex-col min-w-0 bg-muted/5 overflow-hidden">
-            <Header
-              title={notebook.metadata?.title || ""}
-              onTitleUpdate={updateTitle}
-              filePath={filePath}
-              googleDriveConnected={googleDriveConnected}
-              onSaveToDrive={handleSaveToDrive}
-              onDownload={handleDownload}
-              currentFileId={driveFileId}
-              saveStatus={saveStatus}
-              isReadOnly={isReadOnly}
-              onCreateCopy={handleCreateCopy}
-            />
-
-            <div className="border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-0.5">
-              <MenuBar
-                onNew={handleNew}
-                onOpen={() => fileInputRef.current?.click()}
-                onSaveDrive={handleSaveToDrive}
-                onLoadDrive={handleLoadFromDrive}
-                onPublish={handlePublish}
-                onDownload={handleDownload}
-                canUndo={canUndo}
-                canRedo={canRedo}
-                onUndo={undo}
-                onRedo={redo}
-                onAddMusic={() => addCell("music", -1)}
-                onAddMarkdown={() => addCell("markdown", -1)}
-                theme={theme}
-                setTheme={setTheme}
+          {isLoading ? (
+            <SidebarInset className="flex-1 flex flex-col items-center justify-center bg-muted/5">
+              <div className="flex flex-col items-center gap-4">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                <p className="text-muted-foreground animate-pulse">Loading notebook...</p>
+              </div>
+            </SidebarInset>
+          ) : (
+            <SidebarInset className="flex-1 flex flex-col min-w-0 bg-muted/5 overflow-hidden">
+              <Header
+                title={notebook.metadata?.title || ""}
+                onTitleUpdate={updateTitle}
+                filePath={filePath}
                 googleDriveConnected={googleDriveConnected}
+                onSaveToDrive={handleSaveToDrive}
+                onDownload={handleDownload}
                 currentFileId={driveFileId}
+                saveStatus={saveStatus}
+                isReadOnly={isReadOnly}
+                onCreateCopy={handleCreateCopy}
               />
-            </div>
 
-            <NotebookEditor
-              notebook={notebook}
-              activeCellId={activeCellId}
-              setActiveCellId={setActiveCellId}
-              updateCell={updateCell}
-              deleteCell={deleteCell}
-              addCell={addCell}
-              theme={theme}
-            />
-          </SidebarInset>
+              <div className="border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-0.5">
+                <MenuBar
+                  onNew={handleNew}
+                  onOpen={() => fileInputRef.current?.click()}
+                  onSaveDrive={handleSaveToDrive}
+                  onLoadDrive={handleLoadFromDrive}
+                  onPublish={handlePublish}
+                  onUnpublish={handleUnpublish}
+                  isPublished={isPublished}
+                  isReadOnly={isReadOnly}
+                  onDownload={handleDownload}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
+                  onUndo={undo}
+                  onRedo={redo}
+                  onAddMusic={() => addCell("music", -1)}
+                  onAddMarkdown={() => addCell("markdown", -1)}
+                  theme={theme}
+                  setTheme={setTheme}
+                  googleDriveConnected={googleDriveConnected}
+                  currentFileId={driveFileId}
+                />
+              </div>
+
+              <NotebookEditor
+                notebook={notebook}
+                activeCellId={activeCellId}
+                setActiveCellId={setActiveCellId}
+                updateCell={updateCell}
+                deleteCell={deleteCell}
+                addCell={addCell}
+                theme={theme}
+              />
+            </SidebarInset>
+          )}
 
           <GoogleDriveSaveDialog
             open={saveDialogOpen}
@@ -499,6 +568,14 @@ function App() {
                 setDriveFileId(fileId);
                 setIsReadOnly(false); // Just saved, so we own it
                 setLastSavedContent(JSON.stringify(notebook, null, 2));
+
+                // Update filePath to reflect the new saved name
+                const title = notebook.metadata?.title || "Untitled Notebook";
+                setFilePath(`${title}.imnb`);
+
+                // Update global store (new file is not published)
+                useNotebookStore.getState().setNotebook(notebook, fileId, notebook.metadata || null, false, false);
+                setIsPublished(false); // Ensure local state is also reset if needed
               }
             }}
           />
@@ -520,7 +597,7 @@ function App() {
         </div>
       </SidebarProvider>
       <Analytics />
-    </NotebookSettingsProvider >
+    </>
   );
 }
 

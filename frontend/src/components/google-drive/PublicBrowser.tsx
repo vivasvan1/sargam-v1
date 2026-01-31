@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Globe, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { fetchPublicRegistry, loadFile } from '@/lib/googleDrive';
+import { fetchPublicRegistry, loadNotebookAndMetadata } from '@/lib/googleDrive';
 import type { RegistryEntry } from '@/lib/googleDrive';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '../ui/separator';
 
 interface PublicBrowserProps {
-    onLoadFile?: (notebook: any, fileId?: string) => void;
+    onLoadFile?: (notebook: any, fileId?: string, isReadOnly?: boolean, isPublished?: boolean) => void;
     onClose?: () => void;
     currentFileId?: string | null;
 }
@@ -54,8 +54,8 @@ export function PublicBrowser({ onLoadFile, onClose, currentFileId }: PublicBrow
     const handleFileClick = async (fileId: string) => {
         setOpeningId(fileId);
         try {
-            const notebook = await loadFile(fileId);
-            onLoadFile?.(notebook, fileId);
+            const { notebook, isReadOnly, isPublished } = await loadNotebookAndMetadata(fileId);
+            onLoadFile?.(notebook, fileId, isReadOnly, isPublished);
             onClose?.();
             console.debug("Public notebook loaded");
         } catch (error: any) {

@@ -1,4 +1,3 @@
-import React from "react";
 import {
     Menubar,
     MenubarContent,
@@ -17,6 +16,9 @@ interface MenuBarProps {
     onSaveDrive: () => void;
     onLoadDrive: () => void;
     onPublish: () => void;
+    onUnpublish: () => void;
+    isPublished: boolean;
+    isReadOnly: boolean;
     onDownload: () => void;
     currentFileId?: string | null;
 
@@ -42,6 +44,9 @@ export function MenuBar({
     onSaveDrive,
     onLoadDrive,
     onPublish,
+    onUnpublish,
+    isPublished,
+    isReadOnly,
     onDownload,
     canUndo,
     canRedo,
@@ -49,13 +54,12 @@ export function MenuBar({
     onRedo,
     onAddMusic,
     onAddMarkdown,
-    theme,
     setTheme,
     googleDriveConnected,
     currentFileId,
 }: MenuBarProps) {
     const { open, toggleSidebar } = useSidebar();
-    const { showVisualizer, toggleVisualizer, showCode, toggleCode } = useNotebookSettings();
+    const { showVisualizer, toggleVisualizer, showCode, toggleCode, autoSaveEnabled, toggleAutoSave } = useNotebookSettings();
 
     return (
         <Menubar className="border-none bg-transparent h-auto p-0 shadow-none">
@@ -75,10 +79,19 @@ export function MenuBar({
                     <MenubarItem onClick={onLoadDrive}>
                         Load from Drive
                     </MenubarItem>
-                    <MenubarItem onClick={onPublish} disabled={!googleDriveConnected || !currentFileId}>
-                        Publish to Community
-                    </MenubarItem>
+                    {isPublished ? (
+                        <MenubarItem onClick={onUnpublish} disabled={!googleDriveConnected || !currentFileId || isReadOnly}>
+                            Unpublish from Community
+                        </MenubarItem>
+                    ) : (
+                        <MenubarItem onClick={onPublish} disabled={!googleDriveConnected || !currentFileId || isReadOnly}>
+                            Publish to Community
+                        </MenubarItem>
+                    )}
                     <MenubarSeparator />
+                    <MenubarItem onClick={toggleAutoSave}>
+                        {autoSaveEnabled ? "Disable" : "Enable"} Auto Save
+                    </MenubarItem>
                     <MenubarItem onClick={onDownload}>
                         Download .imnb
                     </MenubarItem>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Folder, FileMusic, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { listFiles, loadFile, getSubfolders } from '@/lib/googleDrive';
+import { listFiles, loadNotebookAndMetadata, getSubfolders } from '@/lib/googleDrive';
 import type { GoogleFile, GoogleFolder } from '@/lib/googleDrive';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import {
 interface GoogleDriveLoadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onLoad?: (notebook: any, fileId?: string) => void;
+  onLoad?: (notebook: any, fileId?: string, isReadOnly?: boolean, isPublished?: boolean) => void;
 }
 
 interface Breadcrumb {
@@ -100,8 +100,8 @@ export function GoogleDriveLoadDialog({ open, onOpenChange, onLoad }: GoogleDriv
 
     setLoading(true);
     try {
-      const notebook = await loadFile(selectedFileId);
-      onLoad?.(notebook, selectedFileId); // Pass both notebook and file ID
+      const { notebook, isReadOnly, isPublished } = await loadNotebookAndMetadata(selectedFileId);
+      onLoad?.(notebook, selectedFileId, isReadOnly, isPublished);
       toast.success('Notebook loaded from Google Drive');
       onOpenChange(false);
     } catch (error: any) {
@@ -273,4 +273,3 @@ export function GoogleDriveLoadDialog({ open, onOpenChange, onLoad }: GoogleDriv
     </Dialog>
   );
 }
-
