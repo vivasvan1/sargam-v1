@@ -137,7 +137,7 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
             <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
                 <TooltipTrigger asChild>
                     <div
-                        className="absolute top-[15%] bottom-[15%] rounded-md overflow-hidden transition-all duration-500 shadow-lg bg-linear-to-r from-primary/30 via-primary/15 to-primary/30 border-[1.5px] border-primary/40 cursor-pointer pointer-events-auto hover:border-primary/60"
+                        className="absolute top-[15%] bottom-[15%] rounded-md overflow-hidden transition-all duration-500 shadow-lg bg-linear-to-r from-primary/30 via-primary/15 to-primary/30 border-[1.5px] border-primary/40 cursor-pointer pointer-events-auto hover:border-primary/60 select-none"
                         onClick={handleClick}
                         onTouchStart={handleTouchStart}
                         onTouchEnd={handleTouchEnd}
@@ -197,7 +197,7 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
                 <TooltipTrigger asChild>
                     <div
                         className={cn(
-                            "absolute top-[10%] bottom-[10%] w-[4px] rounded-full transition-all duration-500 cursor-help pointer-events-auto",
+                            "absolute top-[10%] bottom-[10%] w-[4px] rounded-full transition-all duration-500 cursor-help pointer-events-auto select-none",
                             "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
                         )}
                         onClick={handleClick}
@@ -223,7 +223,7 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
             <TooltipTrigger asChild>
                 <div
                     className={cn(
-                        "absolute top-[15%] bottom-[15%] rounded-md flex items-center justify-center text-[10px] font-black tracking-tight transition-all duration-500 shadow-sm cursor-pointer pointer-events-auto hover:border-primary/50",
+                        "absolute top-[15%] bottom-[15%] rounded-md flex items-center justify-center text-[10px] font-black tracking-tight transition-all duration-500 shadow-sm cursor-pointer pointer-events-auto hover:border-primary/50 select-none",
                         event.swara
                             ? "bg-linear-to-br from-primary/25 to-primary/5 text-primary border border-primary/20"
                             : "bg-muted/10 border border-transparent opacity-40 hover:opacity-60"
