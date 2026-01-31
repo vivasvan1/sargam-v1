@@ -2,6 +2,7 @@ import { Play, Pause } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
 import type { MusicCell as ParsedMusicCell } from "../../utils/sargam_parser";
+import { NoteLegendModal } from "./NoteLegendModal";
 
 interface VisualizerHeaderProps {
     parsedData: ParsedMusicCell | null;
@@ -14,9 +15,12 @@ export function VisualizerHeader({ parsedData, isPlaying, onPlay, bpm }: Visuali
     return (
         <div className="flex items-center justify-between">
             <div className="space-y-1">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary/80">
-                    {isPlaying ? "Live " : ""}Score
-                </h3>
+                <div className="flex items-center gap-1">
+                    <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary/80">
+                        {isPlaying ? "Live " : ""}Score
+                    </h3>
+                    <NoteLegendModal />
+                </div>
                 <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">
                     {parsedData?.directives.tala || "Free Rhythm"} • {bpm} BPM
                 </p>
