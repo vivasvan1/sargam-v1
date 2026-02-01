@@ -30,7 +30,7 @@ export function Mixer({
     if (!show) return null;
 
     return (
-        <div className="relative z-9999 w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-[288px] md:w-72 bg-popover border border-border rounded-lg shadow-lg p-3 animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100vh-6rem)] md:max-h-[calc(100vh-8rem)]">
+        <div className="absolute z-9999 w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-[288px] md:w-72 bg-popover border border-border rounded-lg shadow-lg p-3 animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100vh-6rem)] md:max-h-[calc(100vh-8rem)]">
             <div className="flex items-center justify-between mb-2 shrink-0">
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Mixer
