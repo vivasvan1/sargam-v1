@@ -241,7 +241,7 @@ export async function createInstrument(
                 },
                 // If loading fails or takes too long, we might want to handle it,
                 // but Tone.Sampler handles missing files gracefully usually.
-            }).toDestination();
+            });
         });
     } else if (config.type === "tabla-sampler") {
         // For tabla sampler, we use a Player for each sample since they're not pitched
@@ -267,7 +267,7 @@ export async function createInstrument(
                             resolve({ type: "tabla-sampler", players });
                         }
                     },
-                }).toDestination();
+                });
                 players[bol] = player;
             });
 
@@ -280,14 +280,14 @@ export async function createInstrument(
         const synth = new Tone.PolySynth(
             Tone.Synth,
             config.options
-        ).toDestination();
+        );
         return Promise.resolve(synth);
     } else if (config.type === "synth-membrane") {
-        const synth = new Tone.MembraneSynth(config.options).toDestination();
+        const synth = new Tone.MembraneSynth(config.options);
         return Promise.resolve(synth);
     } else {
         // Default Synth
-        const synth = new Tone.PolySynth(Tone.Synth).toDestination();
+        const synth = new Tone.PolySynth(Tone.Synth);
         return Promise.resolve(synth);
     }
 }

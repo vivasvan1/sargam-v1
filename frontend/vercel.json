@@ -2,12 +2,12 @@
   "redirects": [
     {
       "source": "/licenses/privacy",
-      "destination": "https://speede-pi.vercel.app/licenses/privacy",
+      "destination": "https://experts.speede.site/licenses/privacy",
       "permanent": true
     },
     {
       "source": "/licenses/terms",
-      "destination": "https://speede-pi.vercel.app/licenses/terms",
+      "destination": "https://experts.speede.site/licenses/terms",
       "permanent": true
     }
   ],
