@@ -45,14 +45,14 @@ export function Mixer({
                     <X className="w-4 h-4" />
                 </Button>
             </div>
-            <div className="space-y-3 overflow-y-auto flex-1 min-h-0">
+            <div className="space-y-5 overflow-y-auto flex-1 min-h-0">
                 {/* Tala Control */}
                 {parsedData?.directives?.tala && (
                     <div className="space-y-1">
                         <div className="flex items-center justify-between">
                             <div className="flex flex-col gap-0.5 min-w-0 flex-1 mr-2">
-                                <span className="text-xs font-medium">
-                                    Tala (Rhythm)
+                                <span className="text-xs font-medium flex items-center justify-between">
+                                    <span>Tala (Rhythm)</span>
                                 </span>
                                 <select
                                     className="text-[10px] h-6 bg-muted/50 border-none rounded px-1 min-w-0"
@@ -93,20 +93,31 @@ export function Mixer({
                                 )}
                             </Button>
                         </div>
-                        <input
-                            type="range"
-                            min="-30"
-                            max="0"
-                            step="1"
-                            value={voiceControls["__tala"]?.volume ?? -5}
-                            onChange={(e) =>
-                                updateVoiceControl("__tala", {
-                                    volume: parseFloat(e.target.value),
-                                })
-                            }
-                            className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
-                            disabled={voiceControls["__tala"]?.muted}
-                        />
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="range"
+                                min="-30"
+                                max="0"
+                                step="1"
+                                value={
+                                    voiceControls["__tala"]?.volume ??
+                                    INSTRUMENTS[voiceControls["__tala"]?.instrument || (parsedData?.directives?.tala_pattern ? "tabla-sampler" : "tabla")]?.defaultVolume ??
+                                    -5
+                                }
+                                onChange={(e) =>
+                                    updateVoiceControl("__tala", {
+                                        volume: parseFloat(e.target.value),
+                                    })
+                                }
+                                className="flex-1 h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
+                                disabled={voiceControls["__tala"]?.muted}
+                            />
+                            <span className="text-[10px] font-mono whitespace-nowrap text-muted-foreground w-9 text-right shrink-0">
+                                {(voiceControls["__tala"]?.volume ??
+                                    INSTRUMENTS[voiceControls["__tala"]?.instrument || (parsedData?.directives?.tala_pattern ? "tabla-sampler" : "tabla")]?.defaultVolume ??
+                                    -5).toFixed(0)} dB
+                            </span>
+                        </div>
                     </div>
                 )}
 
@@ -116,12 +127,12 @@ export function Mixer({
                     .map((v) => (
                         <div
                             key={v}
-                            className="space-y-1.5 pt-1 border-t border-border/50 first:border-0 first:pt-0"
+                            className="space-y-4 pt-4 border-t border-border/50 first:border-0 first:pt-0"
                         >
                             <div className="flex items-center justify-between">
-                                <div className="flex flex-col gap-0.5 min-w-0 flex-1 mr-2">
-                                    <span className="text-xs font-medium uppercase truncate">
-                                        {v}
+                                <div className="flex flex-col gap-2 min-w-0 flex-1 mr-2">
+                                    <span className="text-xs font-medium uppercase truncate flex items-center justify-between">
+                                        <span>{v}</span>
                                     </span>
                                     <select
                                         className="text-[10px] h-6 bg-muted/50 border-none rounded px-1 min-w-0"
@@ -162,27 +173,38 @@ export function Mixer({
                                     </Button>
                                 </div>
                             </div>
-                            <input
-                                type="range"
-                                min="-30"
-                                max="0"
-                                step="1"
-                                value={voiceControls[v]?.volume ?? -5}
-                                onChange={(e) =>
-                                    updateVoiceControl(v, {
-                                        volume: parseFloat(e.target.value),
-                                    })
-                                }
-                                className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
-                                disabled={voiceControls[v]?.muted}
-                            />
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="range"
+                                    min="-30"
+                                    max="0"
+                                    step="1"
+                                    value={
+                                        voiceControls[v]?.volume ??
+                                        INSTRUMENTS[voiceControls[v]?.instrument]?.defaultVolume ??
+                                        -5
+                                    }
+                                    onChange={(e) =>
+                                        updateVoiceControl(v, {
+                                            volume: parseFloat(e.target.value),
+                                        })
+                                    }
+                                    className="flex-1 h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
+                                    disabled={voiceControls[v]?.muted}
+                                />
+                                <span className="text-[10px] font-mono whitespace-nowrap text-muted-foreground w-9 text-right shrink-0">
+                                    {(voiceControls[v]?.volume ??
+                                        INSTRUMENTS[voiceControls[v]?.instrument]?.defaultVolume ??
+                                        -5).toFixed(0)} dB
+                                </span>
+                            </div>
 
                             {/* Chikari Control - Only for Sitar */}
-                            {voiceControls[v]?.instrument === "sitar-sampler" && (
+                            {voiceControls[v]?.instrument.includes("sitar") && (
                                 <div className="mt-2 pl-4 border-l-2 border-primary/20 space-y-1">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-medium text-muted-foreground uppercase">
-                                            Chikari
+                                        <span className="text-[10px] font-medium text-muted-foreground uppercase flex items-center justify-between w-full">
+                                            <span>Chikari</span>
                                         </span>
                                         <Button
                                             onClick={() =>
@@ -204,20 +226,31 @@ export function Mixer({
                                             )}
                                         </Button>
                                     </div>
-                                    <input
-                                        type="range"
-                                        min="-30"
-                                        max="0"
-                                        step="1"
-                                        value={voiceControls[v]?.chikariVolume ?? -5}
-                                        onChange={(e) =>
-                                            updateVoiceControl(v, {
-                                                chikariVolume: parseFloat(e.target.value),
-                                            })
-                                        }
-                                        className="w-full h-1 bg-muted rounded-full appearance-none cursor-pointer accent-primary/70"
-                                        disabled={voiceControls[v]?.chikariMuted}
-                                    />
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="range"
+                                            min="-30"
+                                            max="0"
+                                            step="1"
+                                            value={
+                                                voiceControls[v]?.chikariVolume ??
+                                                INSTRUMENTS[voiceControls[v]?.instrument]?.defaultChikariVolume ??
+                                                -5
+                                            }
+                                            onChange={(e) =>
+                                                updateVoiceControl(v, {
+                                                    chikariVolume: parseFloat(e.target.value),
+                                                })
+                                            }
+                                            className="flex-1 h-1 bg-muted rounded-full appearance-none cursor-pointer accent-primary/70"
+                                            disabled={voiceControls[v]?.chikariMuted}
+                                        />
+                                        <span className="text-[10px] font-mono whitespace-nowrap text-muted-foreground w-9 text-right shrink-0">
+                                            {(voiceControls[v]?.chikariVolume ??
+                                                INSTRUMENTS[voiceControls[v]?.instrument]?.defaultChikariVolume ??
+                                                -5).toFixed(0)} dB
+                                        </span>
+                                    </div>
                                 </div>
                             )}
                         </div>

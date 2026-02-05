@@ -21,6 +21,8 @@ export interface InstrumentConfig {
     samples?: Record<string, string>;
     baseUrl?: string;
     options?: Tone.MembraneSynthOptions | any;
+    defaultVolume?: number;
+    defaultChikariVolume?: number;
 }
 
 export const INSTRUMENTS: Record<string, InstrumentConfig> = {
@@ -29,6 +31,7 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
         name: "Synthesizer",
         type: "synth",
         category: "melody",
+        defaultVolume: -10,
     },
     harmonium: {
         id: "harmonium",
@@ -43,6 +46,7 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
             G4: "harmonium/G4.mp3",
         },
         baseUrl: BASE_URL,
+        defaultVolume: -10,
     },
     flute: {
         id: "flute",
@@ -61,6 +65,7 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
             E6: "flute/E6.mp3",
         },
         baseUrl: BASE_URL,
+        defaultVolume: -10,
     },
     piano: {
         id: "piano",
@@ -75,6 +80,7 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
             G4: "piano/G4.mp3",
         },
         baseUrl: BASE_URL,
+        defaultVolume: -10,
     },
     guitar: {
         id: "guitar",
@@ -87,6 +93,7 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
             G3: "guitar-acoustic/G3.mp3",
         },
         baseUrl: BASE_URL,
+        defaultVolume: -8,
     },
     tabla: {
         id: "tabla",
@@ -105,6 +112,7 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
                 attackCurve: "exponential",
             },
         },
+        defaultVolume: -6,
     },
     "tabla-sampler": {
         id: "tabla-sampler",
@@ -132,6 +140,73 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
             tun: "tabla-tun.wav",
         },
         baseUrl: "/",
+        defaultVolume: -10,
+    },
+    "sitar-custom-sampler": {
+        id: "sitar-custom-sampler",
+        name: "Sitar (Custom Samples)",
+        type: "sampler",
+        category: "melody",
+        samples: {
+            // A1: "A1.mp3",
+            // A2: "A2.mp3",
+            // A3: "A3.mp3",
+            // A4: "A4.mp3",
+            // A5: "A5.mp3",
+            // A6: "A6.mp3",
+            // A7: "A7.mp3",
+
+            // B1: "B1.mp3",
+            // B2: "B2.mp3",
+            // B3: "B3.mp3",
+            // B4: "B4.mp3",
+            // B5: "B5.mp3",
+            // B6: "B6.mp3",
+            // B7: "B7.mp3",
+
+            // C1: "C1.mp3",
+            // C2: "C2.mp3",
+            // C3: "C3.mp3",
+            // C4: "C4.mp3",
+            // C5: "C5.mp3",
+            // C6: "C6.mp3",
+            // C7: "C7.mp3",
+
+            // D1: "D1.mp3",
+            // D2: "D2.mp3",
+            // D3: "D3.mp3",
+            D4: "sitar_D4_long.mp3",
+            // D5: "D5.mp3",
+            // D6: "D6.mp3",
+            // D7: "D7.mp3",
+
+            // E1: "E1.mp3",
+            // E2: "E2.mp3",
+            // E3: "E3.mp3",
+            // E4: "E4.mp3",
+            // E5: "E5.mp3",
+            // E6: "E6.mp3",
+            // E7: "E7.mp3",
+
+            // F1: "F1.mp3",
+            // F2: "F2.mp3",
+            // F3: "F3.mp3",
+            // F4: "F4.mp3",
+            // F5: "F5.mp3",
+            // F6: "F6.mp3",
+            // F7: "F7.mp3",
+
+            // G1: "G1.mp3",
+            // G2: "G2.mp3",
+            // G3: "G3.mp3",
+            // G4: "G4.mp3",
+            // G5: "G5.mp3",
+            // G6: "G6.mp3",
+            // G7: "G7.mp3",
+        },
+        baseUrl: "/",
+        defaultVolume: -25,
+        defaultChikariVolume: -25,
     },
     "sitar-sampler": {
         id: "sitar-sampler",
@@ -197,6 +272,8 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
         },
         baseUrl:
             "https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/gh-pages/FluidR3_GM/sitar-mp3/",
+        defaultVolume: 0,
+        defaultChikariVolume: -20,
     },
 };
 

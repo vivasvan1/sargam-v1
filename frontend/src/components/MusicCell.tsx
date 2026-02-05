@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { parseMusicCell } from "../utils/sargam_parser";
 import type { MusicCell as ParsedMusicCell } from "../utils/sargam_parser";
 import { MusicVisualizer } from "./MusicVisualizer";
-import { createInstrument, isRhythmicInstrument, isTonalInstrument } from "../lib/instruments";
+import { createInstrument, isRhythmicInstrument, isTonalInstrument, INSTRUMENTS } from "../lib/instruments";
 import type { Instrument } from "../lib/instruments";
 import { Mixer, type VoiceControl } from "./music-cell/Mixer";
 import { Controls } from "./music-cell/Controls";
@@ -77,12 +77,15 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           if (prev[v]) {
             next[v] = prev[v];
           } else {
-            // Use global default if available for "default" voice
             const instrument = v === "default" && defaultInstruments["default"]
               ? defaultInstruments["default"]
               : "harmonium";
-
-            next[v] = { volume: -5, muted: false, instrument };
+            const instConfig = INSTRUMENTS[instrument];
+            next[v] = {
+              volume: instConfig?.defaultVolume ?? -5,
+              muted: false,
+              instrument
+            };
             hasChanges = true;
           }
         });
@@ -92,10 +95,12 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           if (prev["__tala"]) {
             next["__tala"] = prev["__tala"];
           } else {
+            const instrument = data.directives.tala_pattern ? "tabla-sampler" : "tabla";
+            const instConfig = INSTRUMENTS[instrument];
             next["__tala"] = {
-              volume: -5,
+              volume: instConfig?.defaultVolume ?? -5,
               muted: false,
-              instrument: data.directives.tala_pattern ? "tabla-sampler" : "tabla"
+              instrument
             };
             hasChanges = true;
           }
@@ -103,10 +108,12 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
 
         // Initialize Chikari settings for sitar
         Object.keys(next).forEach(v => {
-          if (next[v].instrument === "sitar-sampler" && next[v].chikariVolume === undefined) {
+          const isSitar = next[v].instrument.includes("sitar");
+          if (isSitar && next[v].chikariVolume === undefined) {
+            const instConfig = INSTRUMENTS[next[v].instrument];
             next[v] = {
               ...next[v],
-              chikariVolume: -5,
+              chikariVolume: instConfig?.defaultChikariVolume ?? -5,
               chikariMuted: false
             };
             hasChanges = true;
@@ -141,12 +148,17 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   useEffect(() => {
     if (defaultInstruments["default"]) {
       setVoiceControls(prev => {
-        if (prev["default"] && prev["default"].instrument !== defaultInstruments["default"]) {
+        const currentInstrument = prev["default"]?.instrument;
+        const nextInstrument = defaultInstruments["default"];
+        if (prev["default"] && currentInstrument !== nextInstrument) {
+          const instConfig = INSTRUMENTS[nextInstrument];
           return {
             ...prev,
             default: {
               ...prev["default"],
-              instrument: defaultInstruments["default"]
+              instrument: nextInstrument,
+              volume: instConfig?.defaultVolume ?? -5,
+              ...(nextInstrument.includes("sitar") ? { chikariVolume: instConfig?.defaultChikariVolume ?? -10 } : {})
             }
           };
         }
@@ -241,10 +253,26 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   }, [voiceControls]);
 
   const updateVoiceControl = (voiceName: string, updates: Partial<VoiceControl>) => {
-    setVoiceControls((prev) => ({
-      ...prev,
-      [voiceName]: { ...prev[voiceName], ...updates },
-    }));
+    setVoiceControls((prev) => {
+      const current = prev[voiceName];
+      const next = { ...current, ...updates };
+
+      // If instrument changed, reset volumes to defaults
+      if (updates.instrument && updates.instrument !== current?.instrument) {
+        const instConfig = INSTRUMENTS[updates.instrument];
+        if (instConfig) {
+          next.volume = instConfig.defaultVolume ?? -5;
+          if (updates.instrument.includes("sitar")) {
+            next.chikariVolume = instConfig.defaultChikariVolume ?? -10;
+          }
+        }
+      }
+
+      return {
+        ...prev,
+        [voiceName]: next,
+      };
+    });
 
     // If updating instrument for default voice, propagate globally
     if (voiceName === "default" && updates.instrument) {
@@ -446,7 +474,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       let chikariVolumeNode: Tone.Volume | undefined;
       const hasChikari = voice.events.some(e => e.type === 'note' && (e as any).swara === '^');
       if (hasChikari) {
-        chikariSynth = await createInstrument("sitar-sampler");
+        chikariSynth = await createInstrument("sitar-custom-sampler");
         if (isTonalInstrument(chikariSynth)) {
           chikariVolumeNode = new Tone.Volume(volControl.chikariVolume ?? -5).toDestination();
           chikariVolumeNode.mute = volControl.chikariMuted ?? false;
@@ -472,9 +500,9 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
 
             const frequencies = isChingari
               ? [
-                swaraToFrequency("P", undefined, 1, SA_FREQ, scales), // p'
-                swaraToFrequency("S", undefined, 1, SA_FREQ, scales), // s'
-                swaraToFrequency("S", undefined, 2, SA_FREQ, scales), // s''
+                swaraToFrequency("P", undefined, 0, SA_FREQ, scales), // P
+                swaraToFrequency("S", undefined, 0, SA_FREQ, scales), // S
+                swaraToFrequency("S", undefined, 1, SA_FREQ, scales), // S'
               ]
               : [
                 swaraToFrequency(
