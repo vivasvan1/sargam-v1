@@ -35,6 +35,13 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
                 if (element) {
                     element.scrollIntoView({ behavior: "smooth", block: "start" });
                     setActiveCellId(scrollCellId);
+
+                    // Remove cellId from URL to prevent re-triggering
+                    const url = new URL(window.location.href);
+                    if (url.searchParams.has("cellId")) {
+                        url.searchParams.delete("cellId");
+                        window.history.replaceState({}, "", url.toString());
+                    }
                 }
             }, 500);
             return () => clearTimeout(timer);
