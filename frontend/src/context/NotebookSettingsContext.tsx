@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
 interface NotebookSettingsContextType {
     defaultInstruments: Record<string, string>;
@@ -9,6 +9,8 @@ interface NotebookSettingsContextType {
     toggleCode: () => void;
     autoSaveEnabled: boolean;
     toggleAutoSave: () => void;
+    language: "en" | "hi";
+    setLanguage: (lang: "en" | "hi") => void;
 }
 
 const NotebookSettingsContext = createContext<NotebookSettingsContextType | undefined>(undefined);
@@ -23,6 +25,20 @@ export function NotebookSettingsProvider({ children }: { children: ReactNode }) 
         const saved = localStorage.getItem("sargam-autosave-enabled");
         return saved === null ? true : saved === "true";
     });
+    const [language, setLanguage] = useState<"en" | "hi">(() => {
+        const saved = localStorage.getItem("sargam-language");
+        return (saved as "en" | "hi") || "en";
+    });
+
+    useEffect(() => {
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === "sargam-language") {
+                setLanguage((e.newValue as "en" | "hi") || "en");
+            }
+        };
+        window.addEventListener("storage", handleStorageChange);
+        return () => window.removeEventListener("storage", handleStorageChange);
+    }, []);
 
     const toggleVisualizer = () => setShowVisualizer(prev => !prev);
     const toggleCode = () => setShowCode(prev => !prev);
@@ -32,6 +48,11 @@ export function NotebookSettingsProvider({ children }: { children: ReactNode }) 
             localStorage.setItem("sargam-autosave-enabled", String(newValue));
             return newValue;
         });
+    };
+
+    const updateLanguage = (newLang: "en" | "hi") => {
+        setLanguage(newLang);
+        localStorage.setItem("sargam-language", newLang);
     };
 
     const updateDefaultInstrument = (voiceName: string, instrumentId: string) => {
@@ -50,7 +71,9 @@ export function NotebookSettingsProvider({ children }: { children: ReactNode }) 
             showCode,
             toggleCode,
             autoSaveEnabled,
-            toggleAutoSave
+            toggleAutoSave,
+            language,
+            setLanguage: updateLanguage
         }}>
             {children}
         </NotebookSettingsContext.Provider>

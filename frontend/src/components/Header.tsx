@@ -16,9 +16,15 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
 } from "./ui/dropdown-menu";
 import { getShareableLink } from "@/lib/googleDrive";
 import { useNotebookStore } from "@/store/useNotebookStore";
+import { useNotebookSettings } from "@/context/NotebookSettingsContext";
 import { toast } from "sonner";
 
 interface HeaderProps {
@@ -49,6 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const { isPublished } = useNotebookStore();
+    const { language, setLanguage } = useNotebookSettings();
 
     // Removed local metadata fetching effect
 
@@ -164,6 +171,20 @@ export const Header: React.FC<HeaderProps> = ({
                                 Create Copy
                             </DropdownMenuItem>
                         )}
+                        <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                                <span className="flex items-center gap-2">
+                                    <span className="text-xs">🌐</span>
+                                    Language
+                                </span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                                <DropdownMenuRadioGroup value={language} onValueChange={(val) => setLanguage(val as "en" | "hi")}>
+                                    <DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
+                                    <DropdownMenuRadioItem value="hi">Hindi</DropdownMenuRadioItem>
+                                </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                        </DropdownMenuSub>
                         <DropdownMenuItem
                             onClick={onDownload}
                             className="flex items-center gap-2 cursor-pointer"

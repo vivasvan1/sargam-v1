@@ -15,7 +15,7 @@ export function AddCellControls({ onAdd }: AddCellControlsProps) {
                     onClick={() => onAdd('music')}
                     variant="outline"
                     size="sm"
-                    className="rounded-full text-[10px] font-bold uppercase tracking-wider min-h-[44px] md:min-h-0 touch-manipulation"
+                    className="rounded-full text-[10px] font-bold uppercase tracking-wider min-h-[44px] md:min-h-0 touch-manipulation dark:bg-background dark:hover:bg-secondary"
                     aria-label="Add music cell"
                 >
                     <Plus className="w-3.5 h-3.5 md:w-3 md:h-3" />
@@ -25,7 +25,7 @@ export function AddCellControls({ onAdd }: AddCellControlsProps) {
                     onClick={() => onAdd('markdown')}
                     variant="outline"
                     size="sm"
-                    className="rounded-full text-[10px] font-bold uppercase tracking-wider min-h-[44px] md:min-h-0 touch-manipulation"
+                    className="rounded-full text-[10px] font-bold uppercase tracking-wider min-h-[44px] md:min-h-0 touch-manipulation dark:bg-background dark:hover:bg-secondary"
                     aria-label="Add markdown cell"
                 >
                     <Plus className="w-3.5 h-3.5 md:w-3 md:h-3" />

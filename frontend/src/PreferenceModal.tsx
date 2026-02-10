@@ -3,6 +3,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Moon, Sun, Settings } from 'lucide-react';
 import { cn } from './lib/utils';
+import { useNotebookSettings } from './context/NotebookSettingsContext';
 
 interface PreferenceModalProps {
     theme: "light" | "dark" | "system";
@@ -10,6 +11,7 @@ interface PreferenceModalProps {
 }
 
 export function PreferenceModal({ theme, setTheme }: PreferenceModalProps) {
+    const { language, setLanguage } = useNotebookSettings();
     return (
         <Dialog>
             <DialogTrigger asChild>
@@ -42,6 +44,41 @@ export function PreferenceModal({ theme, setTheme }: PreferenceModalProps) {
                                 onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
                             />
                             <Moon className={cn("w-4 h-4", theme === 'dark' ? "text-primary" : "text-muted-foreground")} />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label htmlFor="language-mode" className="text-sm font-semibold">
+                                Language
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                Select display language for notes
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+                            <button
+                                onClick={() => setLanguage('en')}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                    language === 'en'
+                                        ? "bg-background shadow-xs text-foreground"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                            >
+                                English
+                            </button>
+                            <button
+                                onClick={() => setLanguage('hi')}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                    language === 'hi'
+                                        ? "bg-background shadow-xs text-foreground"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                            >
+                                Hindi
+                            </button>
                         </div>
                     </div>
 

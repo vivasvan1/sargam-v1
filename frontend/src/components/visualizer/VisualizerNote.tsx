@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useNotebookSettings } from "@/context/NotebookSettingsContext";
 
 interface NoteEvent {
     swara?: string;
@@ -30,7 +31,19 @@ const SWARA_NAMES: Record<string, string> = {
     "N": "Ni",
 };
 
+const SWARA_NAMES_HI: Record<string, string> = {
+    "S": "सा",
+    "R": "रे",
+    "G": "गा",
+    "M": "मा",
+    "P": "पा",
+    "D": "धा",
+    "N": "नी",
+};
+
 export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }: VisualizerNoteProps) {
+    const { language } = useNotebookSettings();
+
     // Check for meend ornament
     const meendOrnament = event.ornaments?.find(
         (o: any) => o.name === "meend" || o.name === "slide"
@@ -86,7 +99,7 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
 
     const getNoteLabel = (swara: string | undefined, variant: string | undefined, octave: number | undefined) => {
         if (!swara) return "";
-        let name = SWARA_NAMES[swara] || swara;
+        let name = (language === 'hi' ? SWARA_NAMES_HI[swara] : SWARA_NAMES[swara]) || swara;
 
         let label = name;
         if (variant === 'k' || variant === 'b') label += " (Komal)";
@@ -133,6 +146,14 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
     }, [event.startTime, onSeek]);
 
     if (hasMeend && targetSwara) {
+        const displaySwaraStart = (language === 'hi' ? SWARA_NAMES_HI[event.swara || ""] : event.swara) || event.swara;
+        const displaySwaraEnd = (language === 'hi' ? SWARA_NAMES_HI[targetSwara || ""] : targetSwara) || targetSwara;
+
+        const isKomalStart = (event.variant === 'k' || event.variant === 'b');
+        const isKomalEnd = (targetVariant === 'k' || targetVariant === 'b');
+
+        const isHindi = language === 'hi';
+
         return (
             <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
                 <TooltipTrigger asChild>
@@ -148,9 +169,9 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
                         }}
                     >
                         <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                            <span className="text-[10px] font-black text-primary drop-shadow-sm">
-                                {event.swara}
-                                {event.variant || ""}
+                            <span className={cn("text-[10px] font-black text-primary drop-shadow-sm", isHindi && isKomalStart && "underline decoration-2 underline-offset-2")}>
+                                {displaySwaraStart}
+                                {!isHindi && event.variant || ""}
                             </span>
                             {event.octave !== 0 && (
                                 <span className="text-[7px] opacity-60 ml-0.5">
@@ -165,9 +186,9 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
                             </svg>
                         </div>
                         <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                            <span className="text-[10px] font-black text-primary drop-shadow-sm">
-                                {targetSwara}
-                                {targetVariant}
+                            <span className={cn("text-[10px] font-black text-primary drop-shadow-sm", isHindi && isKomalEnd && "underline decoration-2 underline-offset-2")}>
+                                {displaySwaraEnd}
+                                {!isHindi && targetVariant}
                             </span>
                             {targetOctave !== 0 && (
                                 <span className="text-[7px] opacity-60 ml-0.5">
@@ -218,6 +239,11 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
         );
     }
 
+    const displaySwara = (language === 'hi' ? SWARA_NAMES_HI[event.swara || ""] : event.swara) || event.swara;
+    const isKomal = (event.variant === 'k' || event.variant === 'b');
+    const isHindi = language === 'hi';
+    const showUnderline = isHindi && isKomal;
+
     return (
         <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
             <TooltipTrigger asChild>
@@ -237,9 +263,9 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
                         width: `${width}px`,
                     }}
                 >
-                    <span className="drop-shadow-sm flex items-center">
-                        {event.swara}
-                        {event.variant || ""}
+                    <span className={cn("drop-shadow-sm flex items-center", showUnderline && "underline decoration-2 underline-offset-2")}>
+                        {displaySwara}
+                        {!isHindi && event.variant || ""}
                         {event.octave !== 0 && (
                             <span className="opacity-60 ml-0.5">
                                 {getOctaveMarks(event.octave!)}
