@@ -208,7 +208,7 @@ export function VisualizerNote({
                 {/* {(!isHindi && event.variant) || ""} */}
               </span>
               {event.octave !== 0 && (
-                <span className="text-[7px] ml-0.5">
+                <span className="text-[7px] ">
                   {getOctaveMarks(event.octave!)}
                 </span>
               )}
@@ -248,7 +248,7 @@ export function VisualizerNote({
                 {/* {!isHindi && targetVariant} */}
               </span>
               {targetOctave !== 0 && (
-                <span className="text-[7px] ml-0.5">
+                <span className="text-[7px] ">
                   {getOctaveMarks(targetOctave)}
                 </span>
               )}
@@ -388,7 +388,7 @@ export function VisualizerNote({
             {displaySwara}
             {/* {(!isHindi && event.variant) || ""} */}
             {event.octave !== 0 && (
-              <span className="ml-0.5">{getOctaveMarks(event.octave!)}</span>
+              <span className="">{getOctaveMarks(event.octave!)}</span>
             )}
           </span>
         </div>
