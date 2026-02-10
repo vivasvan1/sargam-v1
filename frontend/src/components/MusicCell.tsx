@@ -1,16 +1,21 @@
-import { useState, useRef, useEffect } from "react";
-import CodeMirror from "@uiw/react-codemirror";
-import { markdown } from "@codemirror/lang-markdown";
-import * as Tone from "tone";
-import { toast } from "sonner";
-import { parseMusicCell } from "../utils/sargam_parser";
-import type { MusicCell as ParsedMusicCell } from "../utils/sargam_parser";
-import { MusicVisualizer } from "./MusicVisualizer";
-import { createInstrument, isRhythmicInstrument, isTonalInstrument, INSTRUMENTS } from "../lib/instruments";
-import type { Instrument } from "../lib/instruments";
-import { Mixer, type VoiceControl } from "./music-cell/Mixer";
-import { Controls } from "./music-cell/Controls";
-import { useNotebookSettings } from "../context/NotebookSettingsContext";
+import { useState, useRef, useEffect } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { markdown } from '@codemirror/lang-markdown';
+import * as Tone from 'tone';
+import { toast } from 'sonner';
+import { parseMusicCell } from '../utils/sargam_parser';
+import type { MusicCell as ParsedMusicCell } from '../utils/sargam_parser';
+import { MusicVisualizer } from './MusicVisualizer';
+import {
+  createInstrument,
+  isRhythmicInstrument,
+  isTonalInstrument,
+  INSTRUMENTS,
+} from '../lib/instruments';
+import type { Instrument } from '../lib/instruments';
+import { Mixer, type VoiceControl } from './music-cell/Mixer';
+import { Controls } from './music-cell/Controls';
+import { useNotebookSettings } from '../context/NotebookSettingsContext';
 
 interface MusicCellProps {
   cell: {
@@ -37,14 +42,23 @@ interface ActiveNode {
 
 export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   const content = Array.isArray(cell.source)
-    ? cell.source.join("\n")
+    ? cell.source.join('\n')
     : cell.source;
   const [isPlaying, setIsPlaying] = useState(false);
-  const [lastParsedData, setLastParsedData] = useState<ParsedMusicCell | null>(null);
-  const [voiceControls, setVoiceControls] = useState<Record<string, VoiceControl>>({});
+  const [lastParsedData, setLastParsedData] = useState<ParsedMusicCell | null>(
+    null
+  );
+  const [voiceControls, setVoiceControls] = useState<
+    Record<string, VoiceControl>
+  >({});
   const [showMixer, setShowMixer] = useState(false);
   const activeNodesRef = useRef<Record<string, ActiveNode>>({});
-  const { defaultInstruments, updateDefaultInstrument, showVisualizer, showCode } = useNotebookSettings();
+  const {
+    defaultInstruments,
+    updateDefaultInstrument,
+    showVisualizer,
+    showCode,
+  } = useNotebookSettings();
   const [localShowVisualizer, setLocalShowVisualizer] = useState(true);
   const [localShowCode, setLocalShowCode] = useState(true);
   const [initialStartTime, setInitialStartTime] = useState(0);
@@ -59,13 +73,13 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   }, [showCode]);
 
   const handleChange = (val: string) => {
-    onChange({ ...cell, source: val.split("\n") });
+    onChange({ ...cell, source: val.split('\n') });
   };
 
   // Parse content whenever it changes to update controls
   useEffect(() => {
     try {
-      const data = parseMusicCell(content.split("\n"));
+      const data = parseMusicCell(content.split('\n'));
       setLastParsedData(data);
 
       setVoiceControls((prev) => {
@@ -77,14 +91,15 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           if (prev[v]) {
             next[v] = prev[v];
           } else {
-            const instrument = v === "default" && defaultInstruments["default"]
-              ? defaultInstruments["default"]
-              : "harmonium";
+            const instrument =
+              v === 'default' && defaultInstruments['default']
+                ? defaultInstruments['default']
+                : 'harmonium';
             const instConfig = INSTRUMENTS[instrument];
             next[v] = {
               volume: instConfig?.defaultVolume ?? -5,
               muted: false,
-              instrument
+              instrument,
             };
             hasChanges = true;
           }
@@ -92,29 +107,31 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
 
         // Sync Tala
         if (data.directives.tala) {
-          if (prev["__tala"]) {
-            next["__tala"] = prev["__tala"];
+          if (prev['__tala']) {
+            next['__tala'] = prev['__tala'];
           } else {
-            const instrument = data.directives.tala_pattern ? "tabla-sampler" : "tabla";
+            const instrument = data.directives.tala_pattern
+              ? 'tabla-sampler'
+              : 'tabla';
             const instConfig = INSTRUMENTS[instrument];
-            next["__tala"] = {
+            next['__tala'] = {
               volume: instConfig?.defaultVolume ?? -5,
               muted: false,
-              instrument
+              instrument,
             };
             hasChanges = true;
           }
         }
 
         // Initialize Chikari settings for sitar
-        Object.keys(next).forEach(v => {
-          const isSitar = next[v].instrument.includes("sitar");
+        Object.keys(next).forEach((v) => {
+          const isSitar = next[v].instrument.includes('sitar');
           if (isSitar && next[v].chikariVolume === undefined) {
             const instConfig = INSTRUMENTS[next[v].instrument];
             next[v] = {
               ...next[v],
               chikariVolume: instConfig?.defaultChikariVolume ?? -5,
-              chikariMuted: false
+              chikariMuted: false,
             };
             hasChanges = true;
           }
@@ -141,25 +158,27 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     } catch (e) {
       // silent fail on type; waiting for valid input
     }
-  }, [content, defaultInstruments]); // Add defaultInstruments to dependency to likely trigger re-init if needed? 
+  }, [content, defaultInstruments]); // Add defaultInstruments to dependency to likely trigger re-init if needed?
   // Actually, we want a separate effect for reactive updates to avoid re-parsing content.
 
   // Effect to sync local state with global default changes
   useEffect(() => {
-    if (defaultInstruments["default"]) {
-      setVoiceControls(prev => {
-        const currentInstrument = prev["default"]?.instrument;
-        const nextInstrument = defaultInstruments["default"];
-        if (prev["default"] && currentInstrument !== nextInstrument) {
+    if (defaultInstruments['default']) {
+      setVoiceControls((prev) => {
+        const currentInstrument = prev['default']?.instrument;
+        const nextInstrument = defaultInstruments['default'];
+        if (prev['default'] && currentInstrument !== nextInstrument) {
           const instConfig = INSTRUMENTS[nextInstrument];
           return {
             ...prev,
             default: {
-              ...prev["default"],
+              ...prev['default'],
               instrument: nextInstrument,
               volume: instConfig?.defaultVolume ?? -5,
-              ...(nextInstrument.includes("sitar") ? { chikariVolume: instConfig?.defaultChikariVolume ?? -10 } : {})
-            }
+              ...(nextInstrument.includes('sitar')
+                ? { chikariVolume: instConfig?.defaultChikariVolume ?? -10 }
+                : {}),
+            },
           };
         }
         return prev;
@@ -185,13 +204,13 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
 
     try {
       // Re-parse to get the latest exact structure for playback
-      const data = parseMusicCell(content.split("\n"));
+      const data = parseMusicCell(content.split('\n'));
       setLastParsedData(data);
       await playMusic(data, voiceControls, initialStartTime);
       setIsPlaying(true);
     } catch (e) {
       console.error(e);
-      toast.error("Could not parse musical notation");
+      toast.error('Could not parse musical notation');
     }
   };
 
@@ -199,38 +218,48 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     Tone.getTransport().stop();
     Tone.getTransport().cancel();
 
-    Object.values(activeNodesRef.current).forEach(({ synth, volumeNode, part, chikariSynth, chikariVolumeNode }) => {
-      try {
-        if (part) part.dispose();
-        if (isRhythmicInstrument(synth)) {
-          Object.values(synth.players).forEach((player) => {
-            try {
-              player.stop();
-              player.dispose();
-            } catch (e) { /* ignore */ }
-          });
-        } else if (isTonalInstrument(synth)) {
-          if (synth instanceof Tone.PolySynth || synth instanceof Tone.Sampler) {
-            (synth as any).releaseAll?.();
-          }
-          synth.dispose();
-        }
-
-        if (chikariSynth) {
-          if (isTonalInstrument(chikariSynth)) {
-            if (chikariSynth instanceof Tone.PolySynth || chikariSynth instanceof Tone.Sampler) {
-              (chikariSynth as any).releaseAll?.();
+    Object.values(activeNodesRef.current).forEach(
+      ({ synth, volumeNode, part, chikariSynth, chikariVolumeNode }) => {
+        try {
+          if (part) part.dispose();
+          if (isRhythmicInstrument(synth)) {
+            Object.values(synth.players).forEach((player) => {
+              try {
+                player.stop();
+                player.dispose();
+              } catch (e) {
+                /* ignore */
+              }
+            });
+          } else if (isTonalInstrument(synth)) {
+            if (
+              synth instanceof Tone.PolySynth ||
+              synth instanceof Tone.Sampler
+            ) {
+              (synth as any).releaseAll?.();
             }
-            chikariSynth.dispose();
+            synth.dispose();
           }
-        }
 
-        volumeNode?.dispose();
-        chikariVolumeNode?.dispose();
-      } catch (e) {
-        /* ignore */
+          if (chikariSynth) {
+            if (isTonalInstrument(chikariSynth)) {
+              if (
+                chikariSynth instanceof Tone.PolySynth ||
+                chikariSynth instanceof Tone.Sampler
+              ) {
+                (chikariSynth as any).releaseAll?.();
+              }
+              chikariSynth.dispose();
+            }
+          }
+
+          volumeNode?.dispose();
+          chikariVolumeNode?.dispose();
+        } catch (e) {
+          /* ignore */
+        }
       }
-    });
+    );
     activeNodesRef.current = {};
     setIsPlaying(false);
   };
@@ -252,7 +281,10 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     });
   }, [voiceControls]);
 
-  const updateVoiceControl = (voiceName: string, updates: Partial<VoiceControl>) => {
+  const updateVoiceControl = (
+    voiceName: string,
+    updates: Partial<VoiceControl>
+  ) => {
     setVoiceControls((prev) => {
       const current = prev[voiceName];
       const next = { ...current, ...updates };
@@ -262,7 +294,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
         const instConfig = INSTRUMENTS[updates.instrument];
         if (instConfig) {
           next.volume = instConfig.defaultVolume ?? -5;
-          if (updates.instrument.includes("sitar")) {
+          if (updates.instrument.includes('sitar')) {
             next.chikariVolume = instConfig.defaultChikariVolume ?? -10;
           }
         }
@@ -275,35 +307,41 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     });
 
     // If updating instrument for default voice, propagate globally
-    if (voiceName === "default" && updates.instrument) {
-      updateDefaultInstrument("default", updates.instrument);
+    if (voiceName === 'default' && updates.instrument) {
+      updateDefaultInstrument('default', updates.instrument);
     }
   };
 
   // Helper function to convert swara notation to frequency
-  const swaraToFrequency = (swara: string, variant: string | undefined, octave: number | undefined, SA_FREQ: number, scales: Record<string, number>): number => {
+  const swaraToFrequency = (
+    swara: string,
+    variant: string | undefined,
+    octave: number | undefined,
+    SA_FREQ: number,
+    scales: Record<string, number>
+  ): number => {
     // Normalize swara names
     let normalizedSwara = swara;
     if (swara.length > 1) {
       const upper = swara.toUpperCase();
-      if (upper === "SA") normalizedSwara = "S";
-      else if (upper === "RI") normalizedSwara = "R";
-      else if (upper === "GA") normalizedSwara = "G";
-      else if (upper === "MA") normalizedSwara = "M";
-      else if (upper === "PA") normalizedSwara = "P";
-      else if (upper === "DHA") normalizedSwara = "D";
-      else if (upper === "NI") normalizedSwara = "N";
+      if (upper === 'SA') normalizedSwara = 'S';
+      else if (upper === 'RI') normalizedSwara = 'R';
+      else if (upper === 'GA') normalizedSwara = 'G';
+      else if (upper === 'MA') normalizedSwara = 'M';
+      else if (upper === 'PA') normalizedSwara = 'P';
+      else if (upper === 'DHA') normalizedSwara = 'D';
+      else if (upper === 'NI') normalizedSwara = 'N';
       else normalizedSwara = swara[0].toUpperCase();
     } else if (swara === 'm') {
-      normalizedSwara = "M";
+      normalizedSwara = 'M';
     }
 
     // Calculate semitones from scale
     let semitones = scales[normalizedSwara] || 0;
 
     // Apply variant
-    if (variant === "k" || variant === "b") semitones -= 1;
-    if (variant === "t" || variant === "#") semitones += 1;
+    if (variant === 'k' || variant === 'b') semitones -= 1;
+    if (variant === 't' || variant === '#') semitones += 1;
 
     // Apply octave offset
     semitones += (octave || 0) * 12;
@@ -312,32 +350,44 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     return SA_FREQ * Math.pow(2, semitones / 12);
   };
 
-  const playMusic = async (parsedData: ParsedMusicCell, currentControls: Record<string, VoiceControl>, startOffset: number = 0) => {
+  const playMusic = async (
+    parsedData: ParsedMusicCell,
+    currentControls: Record<string, VoiceControl>,
+    startOffset: number = 0
+  ) => {
     Tone.getTransport().stop();
     Tone.getTransport().cancel();
 
     // Clean up previous
-    Object.entries(activeNodesRef.current).forEach(([vName, { synth, volumeNode, part, chikariSynth, chikariVolumeNode }]) => {
-      try {
-        if (part) part.dispose();
-        if (isRhythmicInstrument(synth)) {
-          Object.values(synth.players).forEach((player) => {
-            try { player.stop(); player.dispose(); } catch (e) { }
-          });
-        } else if (isTonalInstrument(synth)) {
-          synth.dispose();
-        }
-        if (chikariSynth && isTonalInstrument(chikariSynth)) {
-          chikariSynth.dispose();
-        }
-        volumeNode?.dispose();
-        chikariVolumeNode?.dispose();
-      } catch (e) { }
-    });
+    Object.entries(activeNodesRef.current).forEach(
+      ([
+        vName,
+        { synth, volumeNode, part, chikariSynth, chikariVolumeNode },
+      ]) => {
+        try {
+          if (part) part.dispose();
+          if (isRhythmicInstrument(synth)) {
+            Object.values(synth.players).forEach((player) => {
+              try {
+                player.stop();
+                player.dispose();
+              } catch (e) {}
+            });
+          } else if (isTonalInstrument(synth)) {
+            synth.dispose();
+          }
+          if (chikariSynth && isTonalInstrument(chikariSynth)) {
+            chikariSynth.dispose();
+          }
+          volumeNode?.dispose();
+          chikariVolumeNode?.dispose();
+        } catch (e) {}
+      }
+    );
     activeNodesRef.current = {};
 
     const bpmRaw =
-      parsedData.directives.tempo || parsedData.directives.bpm || "120";
+      parsedData.directives.tempo || parsedData.directives.bpm || '120';
     const bpm = parseFloat(bpmRaw) || 120;
     Tone.getTransport().bpm.value = bpm;
     const beatDur = 60 / bpm; // Duration of one beat in seconds
@@ -346,10 +396,12 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
 
     // Setup Tala
     if (parsedData.directives.tala) {
-      const talaCtrl = currentControls["__tala"] || {
+      const talaCtrl = currentControls['__tala'] || {
         volume: -5,
         muted: false,
-        instrument: parsedData.directives.tala_pattern ? "tabla-sampler" : "tabla",
+        instrument: parsedData.directives.tala_pattern
+          ? 'tabla-sampler'
+          : 'tabla',
       };
       const talaVol = new Tone.Volume(talaCtrl.volume).toDestination();
       talaVol.mute = talaCtrl.muted;
@@ -357,17 +409,24 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       // Check if we have a tala pattern directive
       if (parsedData.directives.tala_pattern) {
         const pattern = parsedData.directives.tala_pattern.trim();
-        const tablaInstrument = await createInstrument("tabla-sampler");
+        const tablaInstrument = await createInstrument('tabla-sampler');
 
         if (isRhythmicInstrument(tablaInstrument)) {
           // Connect all players to volume node
-          Object.values(tablaInstrument.players).forEach(player => player.connect(talaVol));
+          Object.values(tablaInstrument.players).forEach((player) =>
+            player.connect(talaVol)
+          );
 
           // Parse pattern
-          const parseTalaPattern = (patternStr: string, defaultDur: number, beatDurSeconds: number) => {
-            const events: { bol: string, duration: number, time: number }[] = [];
+          const parseTalaPattern = (
+            patternStr: string,
+            defaultDur: number,
+            beatDurSeconds: number
+          ) => {
+            const events: { bol: string; duration: number; time: number }[] =
+              [];
             const cleanPattern = patternStr.split('#')[0].trim();
-            const tokens = cleanPattern.split(/\s+/).filter(t => t);
+            const tokens = cleanPattern.split(/\s+/).filter((t) => t);
 
             let time = 0;
             for (const token of tokens) {
@@ -395,24 +454,31 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
             return events;
           };
 
-          const defaultTalaDur = parseFloat(parsedData.directives.default_duration || "1.0");
+          const defaultTalaDur = parseFloat(
+            parsedData.directives.default_duration || '1.0'
+          );
           const talaEvents = parseTalaPattern(pattern, defaultTalaDur, beatDur);
-          const cycleDuration = talaEvents.length > 0
-            ? talaEvents[talaEvents.length - 1].time + (talaEvents[talaEvents.length - 1].duration * beatDur)
-            : 4 * beatDur;
+          const cycleDuration =
+            talaEvents.length > 0
+              ? talaEvents[talaEvents.length - 1].time +
+                talaEvents[talaEvents.length - 1].duration * beatDur
+              : 4 * beatDur;
 
-          const talaPart = new Tone.Part((time, event) => {
-            const player = tablaInstrument.players[event.bol];
-            if (player && player.buffer.loaded) {
-              player.start(time);
-            }
-          }, talaEvents.map(e => ({ time: e.time, bol: e.bol })));
+          const talaPart = new Tone.Part(
+            (time, event) => {
+              const player = tablaInstrument.players[event.bol];
+              if (player && player.buffer.loaded) {
+                player.start(time);
+              }
+            },
+            talaEvents.map((e) => ({ time: e.time, bol: e.bol }))
+          );
 
           talaPart.loop = true;
           talaPart.loopEnd = cycleDuration;
           talaPart.start(0);
 
-          activeNodesRef.current["__tala"] = {
+          activeNodesRef.current['__tala'] = {
             synth: tablaInstrument,
             volumeNode: talaVol,
             part: talaPart,
@@ -420,16 +486,20 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
         }
       } else {
         // Fallback or explicit simple tabla
-        const membrane = await createInstrument(talaCtrl.instrument || "tabla");
+        const membrane = await createInstrument(talaCtrl.instrument || 'tabla');
         if (isTonalInstrument(membrane)) {
           membrane.connect(talaVol);
 
           const talaLoop = new Tone.Loop((time) => {
-            (membrane as Tone.MembraneSynth).triggerAttackRelease("C2", "8n", time);
-          }, "4n");
+            (membrane as Tone.MembraneSynth).triggerAttackRelease(
+              'C2',
+              '8n',
+              time
+            );
+          }, '4n');
           talaLoop.start(0);
 
-          activeNodesRef.current["__tala"] = {
+          activeNodesRef.current['__tala'] = {
             synth: membrane,
             volumeNode: talaVol,
             part: talaLoop,
@@ -446,24 +516,34 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
         const freq = Tone.Frequency(tonicSpec).toFrequency();
         if (!isNaN(freq) && freq > 0) SA_FREQ = freq;
       } catch (e) {
-        console.warn("Invalid tonic:", tonicSpec);
+        console.warn('Invalid tonic:', tonicSpec);
       }
     }
 
     const scales: Record<string, number> = {
-      S: 0, r: 1, R: 2, g: 3, G: 4, M: 5, P: 7, d: 8, D: 9, n: 10, N: 11,
+      S: 0,
+      r: 1,
+      R: 2,
+      g: 3,
+      G: 4,
+      M: 5,
+      P: 7,
+      d: 8,
+      D: 9,
+      n: 10,
+      N: 11,
     };
 
     for (const [voiceName, voice] of Object.entries(parsedData.voices)) {
       const volControl = currentControls[voiceName] || {
         volume: -5,
         muted: false,
-        instrument: "harmonium",
+        instrument: 'harmonium',
       };
       const volumeNode = new Tone.Volume(volControl.volume).toDestination();
       volumeNode.mute = volControl.muted;
 
-      const synth = await createInstrument(volControl.instrument || "synth");
+      const synth = await createInstrument(volControl.instrument || 'synth');
       // Voices MUST be tonal for now (unless we support rhythmic voices which is rare in this context)
       if (isTonalInstrument(synth)) {
         synth.connect(volumeNode);
@@ -472,17 +552,26 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       // Check for chikari (^) in this voice
       let chikariSynth: Instrument | undefined;
       let chikariVolumeNode: Tone.Volume | undefined;
-      const hasChikari = voice.events.some(e => e.type === 'note' && (e as any).swara === '^');
+      const hasChikari = voice.events.some(
+        (e) => e.type === 'note' && (e as any).swara === '^'
+      );
       if (hasChikari) {
-        chikariSynth = await createInstrument("sitar-custom-sampler");
+        chikariSynth = await createInstrument('sitar-custom-sampler');
         if (isTonalInstrument(chikariSynth)) {
-          chikariVolumeNode = new Tone.Volume(volControl.chikariVolume ?? -5).toDestination();
+          chikariVolumeNode = new Tone.Volume(
+            volControl.chikariVolume ?? -5
+          ).toDestination();
           chikariVolumeNode.mute = volControl.chikariMuted ?? false;
           chikariSynth.connect(chikariVolumeNode);
         }
       }
 
-      activeNodesRef.current[voiceName] = { synth, volumeNode, chikariSynth, chikariVolumeNode };
+      activeNodesRef.current[voiceName] = {
+        synth,
+        volumeNode,
+        chikariSynth,
+        chikariVolumeNode,
+      };
 
       if (!isTonalInstrument(synth)) {
         // Skip scheduling for non-tonal instruments on melody tracks for now
@@ -502,28 +591,30 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
             return;
           }
 
-          if (event.type === "note" && 'swara' in event && event.swara) {
+          if (event.type === 'note' && 'swara' in event && event.swara) {
             const isChingari = event.swara === '^';
 
             const frequencies = isChingari
               ? [
-                swaraToFrequency("P", undefined, 0, SA_FREQ, scales), // P
-                swaraToFrequency("S", undefined, 0, SA_FREQ, scales), // S
-                swaraToFrequency("S", undefined, 1, SA_FREQ, scales), // S'
-              ]
+                  swaraToFrequency('P', undefined, 0, SA_FREQ, scales), // P
+                  swaraToFrequency('S', undefined, 0, SA_FREQ, scales), // S
+                  swaraToFrequency('S', undefined, 1, SA_FREQ, scales), // S'
+                ]
               : [
-                swaraToFrequency(
-                  event.swara,
-                  event.variant,
-                  event.octave,
-                  SA_FREQ,
-                  scales
-                ),
-              ];
+                  swaraToFrequency(
+                    event.swara,
+                    event.variant,
+                    event.octave,
+                    SA_FREQ,
+                    scales
+                  ),
+                ];
 
-            const meendOrnament = !isChingari && event.ornaments?.find(
-              (o) => o.name === "meend" || o.name === "slide"
-            );
+            const meendOrnament =
+              !isChingari &&
+              event.ornaments?.find(
+                (o) => o.name === 'meend' || o.name === 'slide'
+              );
 
             if (meendOrnament && meendOrnament.params.length > 0) {
               const startFreq = frequencies[0];
@@ -534,21 +625,30 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               let targetOctave = 0;
 
               const upper = targetSwara.toUpperCase();
-              if (upper.startsWith("SA")) targetSwara = "S";
-              else if (upper.startsWith("RI")) targetSwara = "R";
-              else if (upper.startsWith("GA")) targetSwara = "G";
-              else if (upper.startsWith("MA")) targetSwara = "M";
-              else if (upper.startsWith("PA")) targetSwara = "P";
-              else if (upper.startsWith("DHA")) targetSwara = "D";
-              else if (upper.startsWith("NI")) targetSwara = "N";
+              if (upper.startsWith('SA')) targetSwara = 'S';
+              else if (upper.startsWith('RI')) targetSwara = 'R';
+              else if (upper.startsWith('GA')) targetSwara = 'G';
+              else if (upper.startsWith('MA')) targetSwara = 'M';
+              else if (upper.startsWith('PA')) targetSwara = 'P';
+              else if (upper.startsWith('DHA')) targetSwara = 'D';
+              else if (upper.startsWith('NI')) targetSwara = 'N';
               else {
                 const firstChar = targetSwara[0]?.toUpperCase();
-                if (firstChar && ["S", "R", "G", "M", "P", "D", "N"].includes(firstChar)) targetSwara = firstChar;
-                else targetSwara = "S";
+                if (
+                  firstChar &&
+                  ['S', 'R', 'G', 'M', 'P', 'D', 'N'].includes(firstChar)
+                )
+                  targetSwara = firstChar;
+                else targetSwara = 'S';
               }
 
-              if (targetSwaraStr.includes("k") || targetSwaraStr.includes("b")) targetVariant = "k";
-              else if (targetSwaraStr.includes("t") || targetSwaraStr.includes("#")) targetVariant = "t";
+              if (targetSwaraStr.includes('k') || targetSwaraStr.includes('b'))
+                targetVariant = 'k';
+              else if (
+                targetSwaraStr.includes('t') ||
+                targetSwaraStr.includes('#')
+              )
+                targetVariant = 't';
 
               const octaveUp = (targetSwaraStr.match(/'/g) || []).length;
               const octaveDown = (targetSwaraStr.match(/,/g) || []).length;
@@ -575,7 +675,11 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
                 const parsedStart = parseFloat(meendOrnament.params[1]);
                 const parsedSlide = parseFloat(meendOrnament.params[2]);
                 const parsedEnd = parseFloat(meendOrnament.params[3]);
-                if (!isNaN(parsedStart) && !isNaN(parsedSlide) && !isNaN(parsedEnd)) {
+                if (
+                  !isNaN(parsedStart) &&
+                  !isNaN(parsedSlide) &&
+                  !isNaN(parsedEnd)
+                ) {
                   const totalSpecified = parsedStart + parsedSlide + parsedEnd;
                   if (totalSpecified > 0) {
                     const scale = event.duration / totalSpecified;
@@ -607,11 +711,19 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
                       for (let i = 1; i <= steps; i++) {
                         const stepTime = t + startDur + i * stepDur;
                         const stepFreq = startFreq + i * freqStep;
-                        if (i > 1) mSynth.triggerRelease(stepTime - stepDur * 0.1);
-                        mSynth.triggerAttack(stepFreq, stepTime - stepDur * 0.1);
+                        if (i > 1)
+                          mSynth.triggerRelease(stepTime - stepDur * 0.1);
+                        mSynth.triggerAttack(
+                          stepFreq,
+                          stepTime - stepDur * 0.1
+                        );
                       }
                     } else {
-                      mSynth.frequency.rampTo(targetFreq, slideDur, t + startDur);
+                      mSynth.frequency.rampTo(
+                        targetFreq,
+                        slideDur,
+                        t + startDur
+                      );
                     }
                   }
                   mSynth.triggerRelease(t + startDur + slideDur + endDur);
@@ -625,7 +737,8 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
                     for (let i = 1; i <= steps; i++) {
                       const stepTime = t + i * stepDur;
                       const stepFreq = startFreq + i * freqStep;
-                      if (i > 1) mSynth.triggerRelease(stepTime - stepDur * 0.1);
+                      if (i > 1)
+                        mSynth.triggerRelease(stepTime - stepDur * 0.1);
                       mSynth.triggerAttack(stepFreq, stepTime - stepDur * 0.1);
                     }
                     mSynth.triggerRelease(t + slideDur);
@@ -637,19 +750,28 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               }, time);
             } else {
               // Normal Note Playback
-              const instrument = isChingari && chikariSynth && isTonalInstrument(chikariSynth)
-                ? chikariSynth
-                : synth;
+              const instrument =
+                isChingari && chikariSynth && isTonalInstrument(chikariSynth)
+                  ? chikariSynth
+                  : synth;
 
               Tone.getTransport().schedule((t) => {
-                if (instrument instanceof Tone.PolySynth || instrument instanceof Tone.Sampler || instrument instanceof Tone.MembraneSynth) {
-                  frequencies.forEach(f => {
+                if (
+                  instrument instanceof Tone.PolySynth ||
+                  instrument instanceof Tone.Sampler ||
+                  instrument instanceof Tone.MembraneSynth
+                ) {
+                  frequencies.forEach((f) => {
                     instrument.triggerAttackRelease(f, durSeconds, t);
                   });
                 } else {
                   // Fallback for other tonal instruments if any
-                  frequencies.forEach(f => {
-                    (instrument as any).triggerAttackRelease?.(f, durSeconds, t);
+                  frequencies.forEach((f) => {
+                    (instrument as any).triggerAttackRelease?.(
+                      f,
+                      durSeconds,
+                      t
+                    );
                   });
                 }
               }, time);
@@ -690,7 +812,13 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       />
       <div className="p-1 overflow-x-auto max-w-full">
         <div className="min-w-0">
-          <div className={localShowCode ? "" : "relative h-[50px] overflow-hidden select-none"}>
+          <div
+            className={
+              localShowCode
+                ? ''
+                : 'relative h-[50px] overflow-hidden select-none'
+            }
+          >
             <CodeMirror
               value={content}
               height="auto"

@@ -44,12 +44,14 @@
 ### Installation
 
 1.  **Clone the repository**
+
     ```bash
     git clone https://github.com/vivasvan1/sargam-v1.git
     cd sargam-v1
     ```
 
 2.  **Install Frontend Dependencies**
+
     ```bash
     cd frontend
     npm install
@@ -58,6 +60,7 @@
     ```
 
 3.  **Run Development Server**
+
     ```bash
     npm run dev
     ```
@@ -83,4 +86,5 @@ This project is optimized for deployment on Vercel.
 2.  Run `vercel` in the `frontend` directory.
 
 ---
+
 Built with ❤️ for Indian Classical Music.

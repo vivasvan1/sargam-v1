@@ -1,8 +1,8 @@
-import { Music2, ChevronRight, Trash2, Link2 } from "lucide-react";
-import { MusicCell } from "./MusicCell";
-import { MarkdownCell } from "./MarkdownCell";
-import { Button } from "./ui/button";
-import { toast } from "sonner";
+import { Music2, ChevronRight, Trash2, Link2 } from 'lucide-react';
+import { MusicCell } from './MusicCell';
+import { MarkdownCell } from './MarkdownCell';
+import { Button } from './ui/button';
+import { toast } from 'sonner';
 
 interface CellProps {
   cell: {
@@ -19,14 +19,20 @@ interface CellProps {
   theme: string;
 }
 
-export function Cell({ cell, onChange, onDelete, theme, onFocus }: CellProps & { onFocus?: () => void }) {
-  const isMusic = cell.cell_type === "music";
+export function Cell({
+  cell,
+  onChange,
+  onDelete,
+  theme,
+  onFocus,
+}: CellProps & { onFocus?: () => void }) {
+  const isMusic = cell.cell_type === 'music';
 
   const handleShareLink = () => {
     const url = new URL(window.location.href);
-    url.searchParams.set("cellId", cell.id);
+    url.searchParams.set('cellId', cell.id);
     navigator.clipboard.writeText(url.toString());
-    toast.success("Cell link copied to clipboard");
+    toast.success('Cell link copied to clipboard');
   };
 
   return (
@@ -66,12 +72,21 @@ export function Cell({ cell, onChange, onDelete, theme, onFocus }: CellProps & {
 
       <div className="p-0 overflow-x-auto max-w-full">
         {isMusic ? (
-          <MusicCell cell={cell} theme={theme} onChange={onChange} onFocus={onFocus} />
+          <MusicCell
+            cell={cell}
+            theme={theme}
+            onChange={onChange}
+            onFocus={onFocus}
+          />
         ) : (
-          <MarkdownCell cell={cell} theme={theme} onChange={onChange} onFocus={onFocus} />
+          <MarkdownCell
+            cell={cell}
+            theme={theme}
+            onChange={onChange}
+            onFocus={onFocus}
+          />
         )}
       </div>
     </div>
   );
 }
-

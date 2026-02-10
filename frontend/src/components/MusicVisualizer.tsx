@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import * as Tone from "tone";
-import type { MusicCell as ParsedMusicCell } from "../utils/sargam_parser";
-import { VisualizerHeader } from "./visualizer/VisualizerHeader";
-import { VisualizerBeatNumbers } from "./visualizer/VisualizerGrid";
-import { VisualizerLine } from "./visualizer/VisualizerLine";
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import * as Tone from 'tone';
+import type { MusicCell as ParsedMusicCell } from '../utils/sargam_parser';
+import { VisualizerHeader } from './visualizer/VisualizerHeader';
+import { VisualizerBeatNumbers } from './visualizer/VisualizerGrid';
+import { VisualizerLine } from './visualizer/VisualizerLine';
 
 interface MusicVisualizerProps {
   parsedData: ParsedMusicCell | null;
@@ -62,7 +62,7 @@ export function MusicVisualizer({
     mainVoice.events.forEach((event) => {
       // Include duration-based events, comments, and bars
       const e = event as any;
-      if (e.duration === undefined && e.type !== "comment" && e.type !== "bar")
+      if (e.duration === undefined && e.type !== 'comment' && e.type !== 'bar')
         return;
 
       const lineIdx = event.line_index || 0;
@@ -77,9 +77,9 @@ export function MusicVisualizer({
       let visualDuration = 0;
       let audioDuration = 0;
 
-      if (e.type === "comment" || e.type === "bar") {
+      if (e.type === 'comment' || e.type === 'bar') {
         // No duration for these
-      } else if (e.type === "skip") {
+      } else if (e.type === 'skip') {
         visualDuration = (e.duration || 0) * beatDur;
         audioDuration = 0; // Skip consumes 0 audio time
       } else {
@@ -99,7 +99,7 @@ export function MusicVisualizer({
 
       lines[lineIdx].duration += visualDuration;
 
-      if (event.type !== "comment") {
+      if (event.type !== 'comment') {
         currentVisualTime += visualDuration;
         currentAudioTime += audioDuration;
       }
@@ -155,7 +155,7 @@ export function MusicVisualizer({
       if (!voiceData) return;
 
       const now =
-        typeof overrideTime === "number"
+        typeof overrideTime === 'number'
           ? overrideTime
           : Tone.getTransport().seconds;
       currentTimeRef.current = now;
@@ -276,7 +276,7 @@ export function MusicVisualizer({
         }
       }
     },
-    [voiceData, PIXELS_PER_SECOND],
+    [voiceData, PIXELS_PER_SECOND]
   );
 
   // Handle seek-on-pause visual update AFTER line change has mounted
@@ -324,8 +324,8 @@ export function MusicVisualizer({
       // Focus view on start
       if (containerRef.current) {
         containerRef.current.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
+          behavior: 'smooth',
+          block: 'nearest',
         });
       }
     } else {

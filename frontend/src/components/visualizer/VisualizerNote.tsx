@@ -1,12 +1,12 @@
-import { useState, useRef, useCallback } from "react";
-import { cn } from "@/lib/utils";
+import { useState, useRef, useCallback } from 'react';
+import { cn } from '@/lib/utils';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useNotebookSettings } from "@/context/NotebookSettingsContext";
-import { useIsMobile } from "@/hooks/use-mobile";
+} from '@/components/ui/tooltip';
+import { useNotebookSettings } from '@/context/NotebookSettingsContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface NoteEvent {
   swara?: string;
@@ -28,23 +28,23 @@ interface VisualizerNoteProps {
 }
 
 const SWARA_NAMES: Record<string, string> = {
-  S: "Sa",
-  R: "Re",
-  G: "Ga",
-  M: "Ma",
-  P: "Pa",
-  D: "Dha",
-  N: "Ni",
+  S: 'Sa',
+  R: 'Re',
+  G: 'Ga',
+  M: 'Ma',
+  P: 'Pa',
+  D: 'Dha',
+  N: 'Ni',
 };
 
 const SWARA_NAMES_HI: Record<string, string> = {
-  S: "सा",
-  R: "रे",
-  G: "गा",
-  M: "मा",
-  P: "पा",
-  D: "धा",
-  N: "नी",
+  S: 'सा',
+  R: 'रे',
+  G: 'गा',
+  M: 'मा',
+  P: 'पा',
+  D: 'धा',
+  N: 'नी',
 };
 
 export function VisualizerNote({
@@ -59,43 +59,43 @@ export function VisualizerNote({
 
   // Check for meend ornament
   const meendOrnament = event.ornaments?.find(
-    (o: any) => o.name === "meend" || o.name === "slide",
+    (o: any) => o.name === 'meend' || o.name === 'slide'
   );
   const hasMeend = meendOrnament && meendOrnament.params.length > 0;
 
   // Parse target swara from meend
   let targetSwara = null;
   let targetOctave = 0;
-  let targetVariant = "";
+  let targetVariant = '';
 
   if (hasMeend) {
     const targetStr = meendOrnament.params[0]?.trim();
     if (targetStr) {
       const upper = targetStr.toUpperCase();
-      if (upper.startsWith("SA")) targetSwara = "S";
-      else if (upper.startsWith("RI")) targetSwara = "R";
-      else if (upper.startsWith("GA")) targetSwara = "G";
-      else if (upper.startsWith("MA")) targetSwara = "M";
-      else if (upper.startsWith("PA")) targetSwara = "P";
-      else if (upper.startsWith("DHA")) targetSwara = "D";
-      else if (upper.startsWith("NI")) targetSwara = "N";
+      if (upper.startsWith('SA')) targetSwara = 'S';
+      else if (upper.startsWith('RI')) targetSwara = 'R';
+      else if (upper.startsWith('GA')) targetSwara = 'G';
+      else if (upper.startsWith('MA')) targetSwara = 'M';
+      else if (upper.startsWith('PA')) targetSwara = 'P';
+      else if (upper.startsWith('DHA')) targetSwara = 'D';
+      else if (upper.startsWith('NI')) targetSwara = 'N';
       else if (targetStr[0]) {
         const firstChar = targetStr[0];
-        if (["S", "R", "G", "M", "P", "D", "N", "m"].includes(firstChar)) {
-          targetSwara = firstChar === "m" ? "M" : firstChar;
+        if (['S', 'R', 'G', 'M', 'P', 'D', 'N', 'm'].includes(firstChar)) {
+          targetSwara = firstChar === 'm' ? 'M' : firstChar;
         } else {
           const upperFirst = firstChar.toUpperCase();
-          if (["S", "R", "G", "M", "P", "D", "N"].includes(upperFirst)) {
+          if (['S', 'R', 'G', 'M', 'P', 'D', 'N'].includes(upperFirst)) {
             targetSwara = upperFirst;
           }
         }
       }
 
       // Parse target variant
-      if (targetStr.includes("k") || targetStr.includes("b"))
-        targetVariant = "k";
-      else if (targetStr.includes("t") || targetStr.includes("#"))
-        targetVariant = "t";
+      if (targetStr.includes('k') || targetStr.includes('b'))
+        targetVariant = 'k';
+      else if (targetStr.includes('t') || targetStr.includes('#'))
+        targetVariant = 't';
 
       // Parse target octave
       const octaveUp = (targetStr.match(/'/g) || []).length;
@@ -109,25 +109,25 @@ export function VisualizerNote({
 
   const getOctaveMarks = (octave: number) => {
     if (octave === 0) return null;
-    return octave > 0 ? "'".repeat(octave) : ",".repeat(Math.abs(octave));
+    return octave > 0 ? "'".repeat(octave) : ','.repeat(Math.abs(octave));
   };
 
   const getNoteLabel = (
     swara: string | undefined,
     variant: string | undefined,
-    octave: number | undefined,
+    octave: number | undefined
   ) => {
-    if (!swara) return "";
+    if (!swara) return '';
     let name =
-      (language === "hi" ? SWARA_NAMES_HI[swara] : SWARA_NAMES[swara]) || swara;
+      (language === 'hi' ? SWARA_NAMES_HI[swara] : SWARA_NAMES[swara]) || swara;
 
     let label = name;
-    if (variant === "k" || variant === "b") label += " (Komal)";
-    else if (variant === "t" || variant === "#" || variant === "Mt")
-      label += " (Tivra)";
+    if (variant === 'k' || variant === 'b') label += ' (Komal)';
+    else if (variant === 't' || variant === '#' || variant === 'Mt')
+      label += ' (Tivra)';
 
     if (octave && octave !== 0) {
-      label += ` ${octave > 0 ? "+" : ""}${octave}`;
+      label += ` ${octave > 0 ? '+' : ''}${octave}`;
     }
     return label;
   };
@@ -168,18 +168,18 @@ export function VisualizerNote({
 
   if (hasMeend && targetSwara) {
     const displaySwaraStart =
-      (language === "hi" ? SWARA_NAMES_HI[event.swara || ""] : event.swara) ||
+      (language === 'hi' ? SWARA_NAMES_HI[event.swara || ''] : event.swara) ||
       event.swara;
     const displaySwaraEnd =
-      (language === "hi" ? SWARA_NAMES_HI[targetSwara || ""] : targetSwara) ||
+      (language === 'hi' ? SWARA_NAMES_HI[targetSwara || ''] : targetSwara) ||
       targetSwara;
 
-    const isKomalStart = event.variant === "k" || event.variant === "b";
+    const isKomalStart = event.variant === 'k' || event.variant === 'b';
     const isTivraStart =
-      event.variant === "t" || event.variant === "#" || event.variant === "Mt";
-    const isKomalEnd = targetVariant === "k" || targetVariant === "b";
+      event.variant === 't' || event.variant === '#' || event.variant === 'Mt';
+    const isKomalEnd = targetVariant === 'k' || targetVariant === 'b';
     const isTivraEnd =
-      targetVariant === "t" || targetVariant === "#" || targetVariant === "Mt";
+      targetVariant === 't' || targetVariant === '#' || targetVariant === 'Mt';
 
     return (
       <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
@@ -198,9 +198,9 @@ export function VisualizerNote({
             <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
               <span
                 className={cn(
-                  "text-xs font-black text-primary drop-shadow-sm",
-                  isKomalStart && "underline decoration-2 underline-offset-2",
-                  isTivraStart && "overline decoration-2 overline-offset-2",
+                  'text-xs font-black text-primary drop-shadow-sm',
+                  isKomalStart && 'underline decoration-2 underline-offset-2',
+                  isTivraStart && 'overline decoration-2 overline-offset-2'
                 )}
               >
                 {displaySwaraStart}
@@ -238,9 +238,9 @@ export function VisualizerNote({
             <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
               <span
                 className={cn(
-                  "text-xs font-black text-primary drop-shadow-sm",
-                  isKomalEnd && "underline decoration-2 underline-offset-2",
-                  isTivraEnd && "overline decoration-2 overline-offset-2",
+                  'text-xs font-black text-primary drop-shadow-sm',
+                  isKomalEnd && 'underline decoration-2 underline-offset-2',
+                  isTivraEnd && 'overline decoration-2 overline-offset-2'
                 )}
               >
                 {displaySwaraEnd}
@@ -261,21 +261,21 @@ export function VisualizerNote({
         </TooltipTrigger>
         <TooltipContent side="top">
           {getNoteLabel(event.swara, event.variant, event.octave)}
-          {" → "}
+          {' → '}
           {getNoteLabel(targetSwara, targetVariant, targetOctave)}
         </TooltipContent>
       </Tooltip>
     );
   }
 
-  if (event.swara === "^") {
+  if (event.swara === '^') {
     return (
       <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
         <TooltipTrigger asChild>
           <div
             className={cn(
-              "absolute top-[5%] bottom-[5%] w-[4px] rounded-full transition-all duration-500 cursor-help pointer-events-auto select-none",
-              "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]",
+              'absolute top-[5%] bottom-[5%] w-[4px] rounded-full transition-all duration-500 cursor-help pointer-events-auto select-none',
+              'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
             )}
             onClick={handleClick}
             onTouchStart={handleTouchStart}
@@ -293,7 +293,7 @@ export function VisualizerNote({
     );
   }
 
-  if (event.type === "skip") {
+  if (event.type === 'skip') {
     return (
       <div
         className="absolute top-[10%] bottom-[10%] flex items-center justify-center select-none"
@@ -306,34 +306,34 @@ export function VisualizerNote({
   }
 
   const displaySwara =
-    (language === "hi" ? SWARA_NAMES_HI[event.swara || ""] : event.swara) ||
+    (language === 'hi' ? SWARA_NAMES_HI[event.swara || ''] : event.swara) ||
     event.swara;
-  const isKomal = event.variant === "k" || event.variant === "b";
+  const isKomal = event.variant === 'k' || event.variant === 'b';
   const isTivra =
-    event.variant === "t" || event.variant === "#" || event.variant === "Mt";
-  const isHindi = language === "hi";
+    event.variant === 't' || event.variant === '#' || event.variant === 'Mt';
+  const isHindi = language === 'hi';
   const showUnderline = isKomal;
   const showOverline = isTivra;
 
   console.log(
     isMobile
-      ? "text-sm"
+      ? 'text-sm'
       : zoomLevel <= 1
-        ? "text-xxs"
+        ? 'text-xxs'
         : zoomLevel <= 1.25
-          ? "text-xs"
-          : "text-sm",
+          ? 'text-xs'
+          : 'text-sm'
   );
   return (
     <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
       <TooltipTrigger asChild>
         <div
           className={cn(
-            "absolute top-[5%] bottom-[5%] rounded-md flex items-center justify-center",
-            "font-black transition-all duration-500 shadow-sm cursor-pointer pointer-events-auto hover:border-primary/70 select-none",
+            'absolute top-[5%] bottom-[5%] rounded-md flex items-center justify-center',
+            'font-black transition-all duration-500 shadow-sm cursor-pointer pointer-events-auto hover:border-primary/70 select-none',
             event.swara
-              ? "bg-linear-to-br from-primary/40 to-primary/10 text-primary border border-primary/40"
-              : "bg-muted/10 border border-transparent opacity-40 hover:opacity-60",
+              ? 'bg-linear-to-br from-primary/40 to-primary/10 text-primary border border-primary/40'
+              : 'bg-muted/10 border border-transparent opacity-40 hover:opacity-60'
           )}
           onClick={handleClick}
           onDoubleClick={() => {
@@ -350,28 +350,26 @@ export function VisualizerNote({
           <span className="hidden text-xxs"></span>
           <span
             className={cn(
-              "drop-shadow-sm flex items-center",
+              'drop-shadow-sm flex items-center',
               isMobile
                 ? zoomLevel <= 1
-                  ? "text-xxs"
+                  ? 'text-xxs'
                   : zoomLevel <= 1.25
-                    ? "text-xs"
-                    : "text-sm"
+                    ? 'text-xs'
+                    : 'text-sm'
                 : zoomLevel <= 1
-                  ? "text-xxs"
+                  ? 'text-xxs'
                   : zoomLevel <= 1.25
-                    ? "text-xs"
-                    : "text-sm",
-              showUnderline && "underline decoration-2 underline-offset-2",
-              showOverline && "overline decoration-2 overline-offset-2",
+                    ? 'text-xs'
+                    : 'text-sm',
+              showUnderline && 'underline decoration-2 underline-offset-2',
+              showOverline && 'overline decoration-2 overline-offset-2'
             )}
           >
             {displaySwara}
             {/* {(!isHindi && event.variant) || ""} */}
             {event.octave !== 0 && (
-              <span className="ml-0.5">
-                {getOctaveMarks(event.octave!)}
-              </span>
+              <span className="ml-0.5">{getOctaveMarks(event.octave!)}</span>
             )}
           </span>
         </div>

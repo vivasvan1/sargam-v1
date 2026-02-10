@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogClose,
+} from '@/components/ui/dialog';
 import { Folder, FileMusic, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { listFiles, loadNotebookAndMetadata, getSubfolders } from '@/lib/googleDrive';
+import {
+  listFiles,
+  loadNotebookAndMetadata,
+  getSubfolders,
+} from '@/lib/googleDrive';
 import type { GoogleFile, GoogleFolder } from '@/lib/googleDrive';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -18,7 +27,12 @@ import {
 interface GoogleDriveLoadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onLoad?: (notebook: any, fileId?: string, isReadOnly?: boolean, isPublished?: boolean) => void;
+  onLoad?: (
+    notebook: any,
+    fileId?: string,
+    isReadOnly?: boolean,
+    isPublished?: boolean
+  ) => void;
 }
 
 interface Breadcrumb {
@@ -26,7 +40,11 @@ interface Breadcrumb {
   isRoot: boolean;
 }
 
-export function GoogleDriveLoadDialog({ open, onOpenChange, onLoad }: GoogleDriveLoadDialogProps) {
+export function GoogleDriveLoadDialog({
+  open,
+  onOpenChange,
+  onLoad,
+}: GoogleDriveLoadDialogProps) {
   const [files, setFiles] = useState<GoogleFile[]>([]);
   const [subfolders, setSubfolders] = useState<GoogleFolder[]>([]);
   const [currentFolder, setCurrentFolder] = useState<string | null>(null); // null = root, string = subfolder name
@@ -100,7 +118,8 @@ export function GoogleDriveLoadDialog({ open, onOpenChange, onLoad }: GoogleDriv
 
     setLoading(true);
     try {
-      const { notebook, isReadOnly, isPublished } = await loadNotebookAndMetadata(selectedFileId);
+      const { notebook, isReadOnly, isPublished } =
+        await loadNotebookAndMetadata(selectedFileId);
       onLoad?.(notebook, selectedFileId, isReadOnly, isPublished);
       toast.success('Notebook loaded from Google Drive');
       onOpenChange(false);
@@ -115,7 +134,11 @@ export function GoogleDriveLoadDialog({ open, onOpenChange, onLoad }: GoogleDriv
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Unknown';
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return (
+      date.toLocaleDateString() +
+      ' ' +
+      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    );
   };
 
   return (
@@ -134,8 +157,10 @@ export function GoogleDriveLoadDialog({ open, onOpenChange, onLoad }: GoogleDriv
             <BreadcrumbItem>
               {currentFolder === null ? (
                 <>
-                  <BreadcrumbPage className='cursor-default'>sargamNotes</BreadcrumbPage>
-                  <span className='text-muted-foreground'>/</span>
+                  <BreadcrumbPage className="cursor-default">
+                    sargamNotes
+                  </BreadcrumbPage>
+                  <span className="text-muted-foreground">/</span>
                 </>
               ) : (
                 <BreadcrumbLink
@@ -191,7 +216,9 @@ export function GoogleDriveLoadDialog({ open, onOpenChange, onLoad }: GoogleDriv
                     >
                       <Folder className="w-5 h-5 text-primary" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{folder.name}</div>
+                        <div className="font-medium truncate">
+                          {folder.name}
+                        </div>
                       </div>
                     </Button>
                   ))}
@@ -213,8 +240,9 @@ export function GoogleDriveLoadDialog({ open, onOpenChange, onLoad }: GoogleDriv
                       variant="ghost"
                       size="default"
                       className={cn(
-                        "w-full justify-start text-start p-6",
-                        selectedFileId === file.id && "bg-primary/10 border border-primary"
+                        'w-full justify-start text-start p-6',
+                        selectedFileId === file.id &&
+                          'bg-primary/10 border border-primary'
                       )}
                     >
                       <FileMusic className="w-5 h-5 text-primary" />
@@ -242,11 +270,7 @@ export function GoogleDriveLoadDialog({ open, onOpenChange, onLoad }: GoogleDriv
         {/* Actions */}
         <div className="mt-6 flex justify-end gap-3 shrink-0 border-t border-border pt-4">
           <DialogClose asChild>
-            <Button
-              variant="secondary"
-              size="default"
-              disabled={loading}
-            >
+            <Button variant="secondary" size="default" disabled={loading}>
               Cancel
             </Button>
           </DialogClose>

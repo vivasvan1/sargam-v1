@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GoogleDriveBrowser } from './GoogleDriveBrowser';
 import { PublicBrowser } from './PublicBrowser';
-import { FaGoogleDrive } from "react-icons/fa";
+import { FaGoogleDrive } from 'react-icons/fa';
 
 interface GoogleDriveUser {
   email?: string;
@@ -16,7 +16,12 @@ interface GoogleDriveSectionProps {
   onGoogleDriveConnect?: () => void;
   onGoogleDriveDisconnect?: () => void;
   onLoadFromDrive?: () => void;
-  onLoadDriveFile?: (notebook: any, fileId?: string, isReadOnly?: boolean, isPublished?: boolean) => void;
+  onLoadDriveFile?: (
+    notebook: any,
+    fileId?: string,
+    isReadOnly?: boolean,
+    isPublished?: boolean
+  ) => void;
   onClose?: () => void;
   currentFileId?: string | null;
 }
@@ -28,9 +33,8 @@ export function GoogleDriveSection({
   onGoogleDriveDisconnect,
   onLoadDriveFile,
   onClose,
-  currentFileId
+  currentFileId,
 }: GoogleDriveSectionProps) {
-
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-3">
       <Tabs defaultValue="public" className="flex-1 flex flex-col min-h-0">
@@ -46,7 +50,10 @@ export function GoogleDriveSection({
         </div>
 
         <div className="flex-1 min-h-0 mt-2">
-          <TabsContent value="public" className="h-full m-0 data-[state=inactive]:hidden flex flex-col">
+          <TabsContent
+            value="public"
+            className="h-full m-0 data-[state=inactive]:hidden flex flex-col"
+          >
             <PublicBrowser
               onLoadFile={onLoadDriveFile}
               onClose={onClose}
@@ -54,7 +61,10 @@ export function GoogleDriveSection({
             />
           </TabsContent>
 
-          <TabsContent value="personal" className="h-full m-0 data-[state=inactive]:hidden flex flex-col">
+          <TabsContent
+            value="personal"
+            className="h-full m-0 data-[state=inactive]:hidden flex flex-col"
+          >
             {/* Connection Status & Actions */}
             <div className="px-2 pb-2 shrink-0">
               {!googleDriveConnected ? (
@@ -107,4 +117,3 @@ export function GoogleDriveSection({
     </div>
   );
 }
-

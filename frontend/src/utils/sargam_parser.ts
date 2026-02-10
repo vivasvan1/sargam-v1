@@ -49,7 +49,13 @@ export interface SkipEvent {
   line_index?: number;
 }
 
-export type Event = NoteEvent | RestEvent | HoldEvent | BarEvent | CommentEvent | SkipEvent;
+export type Event =
+  | NoteEvent
+  | RestEvent
+  | HoldEvent
+  | BarEvent
+  | CommentEvent
+  | SkipEvent;
 
 export interface Voice {
   name: string;
@@ -122,7 +128,7 @@ export function parseMusicCell(lines: string[]): MusicCell {
         currentVoice.events.push({
           type: 'comment',
           text: trimmed,
-          line_index: currentLineIndex
+          line_index: currentLineIndex,
         });
 
         // Comments take up a line, so we increment line index logic
@@ -187,7 +193,10 @@ export function parseMusicCell(lines: string[]): MusicCell {
   return { directives, voices };
 }
 
-export function parseToken(token: string, defaultDuration: number): Event | null {
+export function parseToken(
+  token: string,
+  defaultDuration: number
+): Event | null {
   if (token === '|') return { type: 'bar', double: false };
   if (token === '||') return { type: 'bar', double: true };
   if (token.startsWith('^')) {
@@ -253,7 +262,7 @@ export function parseToken(token: string, defaultDuration: number): Event | null
 
   // 4. Parse Swara, Octave, and the rest (Variant, Microtone)
   // Check for lowercase komal swaras (r, g, d, n) - these are equivalent to Rk, Gk, Dk, Nk
-  const komalMap: Record<string, string> = { 'r': 'R', 'g': 'G', 'd': 'D', 'n': 'N' };
+  const komalMap: Record<string, string> = { r: 'R', g: 'G', d: 'D', n: 'N' };
   let isLowercaseKomal = false;
 
   let swara = notePart;
@@ -287,13 +296,28 @@ export function parseToken(token: string, defaultDuration: number): Event | null
 
   // Normalize swara names (e.g., 'm' -> 'M', 'SA' -> 'S')
   const normalizationMap: Record<string, string> = {
-    'SA': 'S', 'sa': 'S', 'Sa': 'S',
-    'RI': 'R', 'ri': 'R', 'Ri': 'R',
-    'GA': 'G', 'ga': 'G', 'Ga': 'G',
-    'MA': 'M', 'ma': 'M', 'Ma': 'M', 'm': 'M',
-    'PA': 'P', 'pa': 'P', 'Pa': 'P',
-    'DHA': 'D', 'dha': 'D', 'Dha': 'D',
-    'NI': 'N', 'ni': 'N', 'Ni': 'N'
+    SA: 'S',
+    sa: 'S',
+    Sa: 'S',
+    RI: 'R',
+    ri: 'R',
+    Ri: 'R',
+    GA: 'G',
+    ga: 'G',
+    Ga: 'G',
+    MA: 'M',
+    ma: 'M',
+    Ma: 'M',
+    m: 'M',
+    PA: 'P',
+    pa: 'P',
+    Pa: 'P',
+    DHA: 'D',
+    dha: 'D',
+    Dha: 'D',
+    NI: 'N',
+    ni: 'N',
+    Ni: 'N',
   };
 
   if (normalizationMap[swara]) {
@@ -322,7 +346,7 @@ export function parseToken(token: string, defaultDuration: number): Event | null
         const value = parseFloat(m[2]);
         const unit = m[3];
         microtone = [sign * value, unit];
-        variant = 'k';  // Still komal, but with microtone
+        variant = 'k'; // Still komal, but with microtone
       } else {
         // If there are other modifiers, they should be combined with 'k'
         // For now, just use 'k' as the variant
@@ -408,7 +432,7 @@ export function parseToken(token: string, defaultDuration: number): Event | null
             paramStrings.push(paramCurrent.trim());
           }
 
-          params = paramStrings.filter(p => p);
+          params = paramStrings.filter((p) => p);
         }
         ornaments.push({ name, params });
       } else {
@@ -425,6 +449,6 @@ export function parseToken(token: string, defaultDuration: number): Event | null
     microtone,
     duration,
     ornaments,
-    lyric
+    lyric,
   };
 }

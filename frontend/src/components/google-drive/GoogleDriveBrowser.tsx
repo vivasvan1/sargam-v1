@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Folder, FileMusic, Loader2, Trash2, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { listFiles, getSubfolders, deleteFile, checkIfPublic, getShareableLink, loadNotebookAndMetadata } from '@/lib/googleDrive';
+import {
+  listFiles,
+  getSubfolders,
+  deleteFile,
+  checkIfPublic,
+  getShareableLink,
+  loadNotebookAndMetadata,
+} from '@/lib/googleDrive';
 import type { GoogleFile, GoogleFolder } from '@/lib/googleDrive';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -14,15 +21,24 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 
 interface GoogleDriveBrowserProps {
-  onLoadFile?: (notebook: any, fileId?: string, isReadOnly?: boolean, isPublished?: boolean) => void;
+  onLoadFile?: (
+    notebook: any,
+    fileId?: string,
+    isReadOnly?: boolean,
+    isPublished?: boolean
+  ) => void;
   onClose?: () => void;
   currentFileId?: string | null;
 }
 
-export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: GoogleDriveBrowserProps) {
+export function GoogleDriveBrowser({
+  onLoadFile,
+  onClose,
+  currentFileId,
+}: GoogleDriveBrowserProps) {
   const [files, setFiles] = useState<GoogleFile[]>([]);
   const [subfolders, setSubfolders] = useState<GoogleFolder[]>([]);
   const [currentPath, setCurrentPath] = useState<string[]>([]); // Array of folder names representing the path
@@ -39,7 +55,8 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
     setLoading(true);
     try {
       // Get the current folder name (last in path, or null for root)
-      const currentFolder = currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
+      const currentFolder =
+        currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
 
       // Load files
       const fileList = await listFiles(null, currentFolder);
@@ -73,7 +90,8 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
   const handleFileClick = async (fileId: string) => {
     try {
       setIsFileIdLoading(fileId);
-      const { notebook, isReadOnly, isPublished } = await loadNotebookAndMetadata(fileId);
+      const { notebook, isReadOnly, isPublished } =
+        await loadNotebookAndMetadata(fileId);
       onLoadFile?.(notebook, fileId, isReadOnly, isPublished);
       onClose?.();
     } catch (error: any) {
@@ -166,7 +184,9 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
                     className="w-full justify-start h-auto py-1.5"
                   >
                     <Folder className="w-3.5 h-3.5 text-primary shrink-0" />
-                    <span className="text-xs font-medium truncate flex-1">{folder.name}</span>
+                    <span className="text-xs font-medium truncate flex-1">
+                      {folder.name}
+                    </span>
                   </Button>
                 ))}
               </div>
@@ -181,16 +201,23 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
                   </div>
                 )}
                 {files.map((file) => (
-                  <div key={file.id} className="group relative flex items-center w-full min-w-0">
+                  <div
+                    key={file.id}
+                    className="group relative flex items-center w-full min-w-0"
+                  >
                     <Button
                       disabled={isFileIdLoading != null}
                       onClick={() => handleFileClick(file.id)}
-                      variant={currentFileId === file.id ? "default" : "ghost"}
+                      variant={currentFileId === file.id ? 'default' : 'ghost'}
                       title={file.name}
                       size="sm"
                       className="flex-1 min-w-0 justify-start h-auto py-1.5 pr-8 gap-2 border"
                     >
-                      {(isFileIdLoading && isFileIdLoading === file.id) ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" /> : <FileMusic className="w-3.5 h-3.5 shrink-0" />}
+                      {isFileIdLoading && isFileIdLoading === file.id ? (
+                        <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                      ) : (
+                        <FileMusic className="w-3.5 h-3.5 shrink-0" />
+                      )}
                       <div className="flex-1 min-w-0 flex flex-col items-start pr-8">
                         <div className="text-xs font-medium truncate w-full text-left">
                           {file.name}
@@ -231,12 +258,16 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
         )}
       </div>
 
-      <AlertDialog open={!!deletingFileId} onOpenChange={(open) => !open && setDeletingFileId(null)}>
+      <AlertDialog
+        open={!!deletingFileId}
+        onOpenChange={(open) => !open && setDeletingFileId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the notebook from your Google Drive.
+              This action cannot be undone. This will permanently delete the
+              notebook from your Google Drive.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -249,7 +280,7 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -257,4 +288,3 @@ export function GoogleDriveBrowser({ onLoadFile, onClose, currentFileId }: Googl
     </div>
   );
 }
-

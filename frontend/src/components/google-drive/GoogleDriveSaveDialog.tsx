@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogClose,
+} from '@/components/ui/dialog';
 import { Save, Folder } from 'lucide-react';
 import { getSubfolders, saveFile } from '@/lib/googleDrive';
 import type { GoogleFolder } from '@/lib/googleDrive';
@@ -21,7 +26,12 @@ interface GoogleDriveSaveDialogProps {
   onSave?: (fileId: string) => void;
 }
 
-export function GoogleDriveSaveDialog({ open, onOpenChange, notebook, onSave }: GoogleDriveSaveDialogProps) {
+export function GoogleDriveSaveDialog({
+  open,
+  onOpenChange,
+  notebook,
+  onSave,
+}: GoogleDriveSaveDialogProps) {
   const [fileName, setFileName] = useState('');
   const [subfolderOption, setSubfolderOption] = useState('none');
   const [newSubfolderName, setNewSubfolderName] = useState('');
@@ -72,11 +82,12 @@ export function GoogleDriveSaveDialog({ open, onOpenChange, notebook, onSave }: 
     setLoading(true);
     try {
       const content = JSON.stringify(notebook, null, 2);
-      const subfolder = subfolderOption === 'new'
-        ? newSubfolderName.trim()
-        : subfolderOption === 'none'
-          ? null
-          : subfolderOption;
+      const subfolder =
+        subfolderOption === 'new'
+          ? newSubfolderName.trim()
+          : subfolderOption === 'none'
+            ? null
+            : subfolderOption;
 
       const result = await saveFile(fileName, content, subfolder);
 
@@ -127,7 +138,10 @@ export function GoogleDriveSaveDialog({ open, onOpenChange, notebook, onSave }: 
 
           {/* Subfolder Selection */}
           <div className="space-y-2">
-            <label htmlFor="subfolder" className="text-sm font-semibold flex items-center gap-2">
+            <label
+              htmlFor="subfolder"
+              className="text-sm font-semibold flex items-center gap-2"
+            >
               <Folder className="w-4 h-4" />
               Subfolder (Optional)
             </label>
@@ -164,11 +178,7 @@ export function GoogleDriveSaveDialog({ open, onOpenChange, notebook, onSave }: 
 
         <div className="mt-8 flex justify-end gap-3">
           <DialogClose asChild>
-            <Button
-              variant="secondary"
-              size="default"
-              disabled={loading}
-            >
+            <Button variant="secondary" size="default" disabled={loading}>
               Cancel
             </Button>
           </DialogClose>
@@ -195,4 +205,3 @@ export function GoogleDriveSaveDialog({ open, onOpenChange, notebook, onSave }: 
     </Dialog>
   );
 }
-

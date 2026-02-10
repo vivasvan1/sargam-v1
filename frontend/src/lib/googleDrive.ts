@@ -1,17 +1,19 @@
 // Google Drive API service
 // Uses Google Identity Services (new) instead of deprecated auth2
-import { loadGapiInsideDOM } from "gapi-script";
-import { useAuthStore } from "@/store/useAuthStore";
+import { loadGapiInsideDOM } from 'gapi-script';
+import { useAuthStore } from '@/store/useAuthStore';
 
-const ROOT_FOLDER_NAME = "sargamNotes";
+const ROOT_FOLDER_NAME = 'sargamNotes';
 const DISCOVERY_DOCS = [
-  "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest",
+  'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
 ];
-const SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
+const SCOPES =
+  'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
 // The URL of our deployed Google Apps Script Web App
-const REGISTRY_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAYl69gVoft_Qvlblqx9rOKO5DTOm3TIHVm6roCmtfEKJiKnRIA0SeN-9AFg295n0w/exec";
-const API_KEY = "REDACTED_GOOGLE_API_KEY";
+const REGISTRY_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbzAYl69gVoft_Qvlblqx9rOKO5DTOm3TIHVm6roCmtfEKJiKnRIA0SeN-9AFg295n0w/exec';
+
 
 // Type declarations for Google API
 declare global {
@@ -72,7 +74,9 @@ interface SaveFileResult {
 export function checkIfPublic(file: GoogleFile): boolean {
   console.log(file, file.permissions);
   if (!file.permissions) return false;
-  return file.permissions.some(p => p.type === 'anyone' || p.type === 'domain');
+  return file.permissions.some(
+    (p) => p.type === 'anyone' || p.type === 'domain'
+  );
 }
 
 // Helper to check if a file is editable
@@ -99,7 +103,7 @@ let clientId: string | null = null;
 function waitForGoogleIdentityServices(): Promise<typeof window.google> {
   return new Promise((resolve, reject) => {
     if (
-      typeof window !== "undefined" &&
+      typeof window !== 'undefined' &&
       window.google &&
       window.google.accounts
     ) {
@@ -112,7 +116,7 @@ function waitForGoogleIdentityServices(): Promise<typeof window.google> {
     const interval = setInterval(() => {
       attempts++;
       if (
-        typeof window !== "undefined" &&
+        typeof window !== 'undefined' &&
         window.google &&
         window.google.accounts
       ) {
@@ -120,12 +124,11 @@ function waitForGoogleIdentityServices(): Promise<typeof window.google> {
         resolve(window.google);
       } else if (attempts >= maxAttempts) {
         clearInterval(interval);
-        reject(new Error("Google Identity Services not loaded after timeout"));
+        reject(new Error('Google Identity Services not loaded after timeout'));
       }
     }, 100);
   });
 }
-
 
 // Wait for Auth to be initialized (resolved to either signed in or not)
 export function waitForAuthReady(): Promise<boolean> {
@@ -143,14 +146,14 @@ export function waitForAuthReady(): Promise<boolean> {
       }
     }, 100);
 
-    // Timeout after 10 seconds? No, maybe app takes time. 
+    // Timeout after 10 seconds? No, maybe app takes time.
     // But we don't want to hang forever if initialize isn't called.
     // However, App.tsx calls initialize.
     // Let's set a 30s timeout just in case.
     setTimeout(() => {
       if (!isInitialized) {
         clearInterval(interval);
-        console.warn("waitForAuthReady timed out, proceeding anyway.");
+        console.warn('waitForAuthReady timed out, proceeding anyway.');
         resolve(false);
       }
     }, 30000);
@@ -158,21 +161,23 @@ export function waitForAuthReady(): Promise<boolean> {
 }
 
 // Initialize Google API
-export async function initializeGoogleAPI(providedClientId: string): Promise<any> {
+export async function initializeGoogleAPI(
+  providedClientId: string
+): Promise<any> {
   if (isInitialized && gapi) {
     return gapi;
   }
 
   if (!providedClientId) {
-    throw new Error("Google Client ID is required");
+    throw new Error('Google Client ID is required');
   }
 
   clientId = providedClientId;
 
   try {
     // First, ensure gapi is available
-    if (typeof window === "undefined") {
-      throw new Error("Window is undefined");
+    if (typeof window === 'undefined') {
+      throw new Error('Window is undefined');
     }
 
     // Wait for Google Identity Services
@@ -189,17 +194,17 @@ export async function initializeGoogleAPI(providedClientId: string): Promise<any
     if (!gapi.client) {
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error("Timeout loading Google API client library"));
+          reject(new Error('Timeout loading Google API client library'));
         }, 15000);
 
-        gapi.load("client", {
+        gapi.load('client', {
           callback: () => {
             clearTimeout(timeout);
             resolve();
           },
           onerror: (error: any) => {
             clearTimeout(timeout);
-            reject(new Error("Failed to load Google API client: " + error));
+            reject(new Error('Failed to load Google API client: ' + error));
           },
         });
       });
@@ -207,7 +212,7 @@ export async function initializeGoogleAPI(providedClientId: string): Promise<any
 
     // Now initialize the client with discovery docs
     if (!gapi.client.init) {
-      throw new Error("gapi.client.init is not available");
+      throw new Error('gapi.client.init is not available');
     }
 
     await gapi.client.init({
@@ -225,7 +230,7 @@ export async function initializeGoogleAPI(providedClientId: string): Promise<any
     });
 
     // Check if we have a stored token
-    const storedToken = sessionStorage.getItem("google_drive_token");
+    const storedToken = sessionStorage.getItem('google_drive_token');
     if (storedToken) {
       accessToken = storedToken;
       gapi.client.setToken({ access_token: accessToken });
@@ -235,7 +240,7 @@ export async function initializeGoogleAPI(providedClientId: string): Promise<any
       } else {
         // Token might be expired
         accessToken = null;
-        sessionStorage.removeItem("google_drive_token");
+        sessionStorage.removeItem('google_drive_token');
         gapi.client.setToken(null);
         isSignedIn = false;
         useAuthStore.getState().setAuthenticated(false);
@@ -248,8 +253,8 @@ export async function initializeGoogleAPI(providedClientId: string): Promise<any
 
     return gapi;
   } catch (error: any) {
-    console.error("Error initializing Google API:", error);
-    throw new Error("Failed to initialize Google API: " + error.message);
+    console.error('Error initializing Google API:', error);
+    throw new Error('Failed to initialize Google API: ' + error.message);
   }
 }
 
@@ -259,7 +264,7 @@ async function getUserInfo(): Promise<boolean> {
 
   try {
     const response = await fetch(
-      "https://www.googleapis.com/oauth2/v2/userinfo",
+      'https://www.googleapis.com/oauth2/v2/userinfo',
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -278,12 +283,12 @@ async function getUserInfo(): Promise<boolean> {
       useAuthStore.getState().setUser(currentUser);
       return true;
     } else if (response.status === 401) {
-      console.error("Google API token expired or invalid (401)");
+      console.error('Google API token expired or invalid (401)');
       return false;
     }
     return false;
   } catch (error) {
-    console.error("Error getting user info:", error);
+    console.error('Error getting user info:', error);
     // If we fail here, we might still be 'signed in' with a token but can't get info.
     // However, if token is invalid, we should probably reset store or rely on existing logic.
     // The existing logic returns false, so caller handles it.
@@ -295,7 +300,7 @@ async function getUserInfo(): Promise<boolean> {
 export async function authenticate(): Promise<GoogleUser> {
   if (!isInitialized || !gapi || !tokenClient) {
     throw new Error(
-      "Google API not initialized. Call initializeGoogleAPI first."
+      'Google API not initialized. Call initializeGoogleAPI first.'
     );
   }
 
@@ -311,20 +316,20 @@ export async function authenticate(): Promise<GoogleUser> {
           if (tokenResponse.error) {
             tokenReceived = true;
             if (
-              tokenResponse.error === "popup_closed_by_user" ||
-              tokenResponse.error === "access_denied"
+              tokenResponse.error === 'popup_closed_by_user' ||
+              tokenResponse.error === 'access_denied'
             ) {
-              reject(new Error("Sign-in cancelled"));
+              reject(new Error('Sign-in cancelled'));
             } else {
               reject(
-                new Error("Authentication failed: " + tokenResponse.error)
+                new Error('Authentication failed: ' + tokenResponse.error)
               );
             }
             return;
           }
 
           accessToken = tokenResponse.access_token!;
-          sessionStorage.setItem("google_drive_token", accessToken);
+          sessionStorage.setItem('google_drive_token', accessToken);
 
           // Set the token for gapi client
           gapi.client.setToken({ access_token: accessToken });
@@ -341,7 +346,7 @@ export async function authenticate(): Promise<GoogleUser> {
             // we prefer having the user identity.
             // If it fails right after auth, it's likely a scope issue.
             isSignedIn = true;
-            const fallbackUser = { email: "Connected", name: "User" };
+            const fallbackUser = { email: 'Connected', name: 'User' };
             currentUser = fallbackUser;
             // Update global store
             useAuthStore.getState().setAuthenticated(true);
@@ -352,12 +357,12 @@ export async function authenticate(): Promise<GoogleUser> {
       });
 
       // Request access token
-      authTokenClient.requestAccessToken({ prompt: "consent" });
+      authTokenClient.requestAccessToken({ prompt: 'consent' });
 
       // Timeout after 60 seconds
       setTimeout(() => {
         if (!tokenReceived) {
-          reject(new Error("Authentication timeout"));
+          reject(new Error('Authentication timeout'));
         }
       }, 60000);
     } catch (error) {
@@ -376,7 +381,7 @@ export async function disconnect(): Promise<void> {
     // Revoke the token
     if (accessToken && window.google && window.google.accounts) {
       window.google.accounts.oauth2.revoke(accessToken, () => {
-        console.log("Token revoked");
+        console.log('Token revoked');
       });
     }
 
@@ -387,13 +392,13 @@ export async function disconnect(): Promise<void> {
     currentUser = null;
     rootFolderId = null;
     accessToken = null;
-    sessionStorage.removeItem("google_drive_token");
+    sessionStorage.removeItem('google_drive_token');
 
     // Update global store
     useAuthStore.getState().setAuthenticated(false);
     useAuthStore.getState().setUser(null);
   } catch (error) {
-    console.error("Error disconnecting:", error);
+    console.error('Error disconnecting:', error);
   }
 }
 
@@ -414,15 +419,15 @@ export async function ensureRootFolder(): Promise<string | null> {
   }
 
   if (!isInitialized || !gapi) {
-    throw new Error("Google API not initialized");
+    throw new Error('Google API not initialized');
   }
 
   // First, try to find existing folder
   try {
     const response = await gapi.client.drive.files.list({
       q: `name='${ROOT_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false`,
-      fields: "files(id, name)",
-      spaces: "drive",
+      fields: 'files(id, name)',
+      spaces: 'drive',
     });
 
     if (response.result.files && response.result.files.length > 0) {
@@ -430,32 +435,34 @@ export async function ensureRootFolder(): Promise<string | null> {
       return rootFolderId;
     }
   } catch (error) {
-    console.error("Error searching for root folder:", error);
+    console.error('Error searching for root folder:', error);
   }
 
   // If not found, create it
   try {
     const fileMetadata = {
       name: ROOT_FOLDER_NAME,
-      mimeType: "application/vnd.google-apps.folder",
+      mimeType: 'application/vnd.google-apps.folder',
     };
 
     const response = await gapi.client.drive.files.create({
       resource: fileMetadata,
-      fields: "id, name",
+      fields: 'id, name',
     });
 
     rootFolderId = response.result.id;
     return rootFolderId;
   } catch (error) {
-    console.error("Error creating root folder:", error);
-    throw new Error("Failed to create root folder");
+    console.error('Error creating root folder:', error);
+    throw new Error('Failed to create root folder');
   }
 }
 
 // Get or create subfolder
-export async function getOrCreateSubfolder(subfolderName: string): Promise<string | null> {
-  if (!subfolderName || subfolderName.trim() === "") {
+export async function getOrCreateSubfolder(
+  subfolderName: string
+): Promise<string | null> {
+  if (!subfolderName || subfolderName.trim() === '') {
     return null;
   }
 
@@ -466,39 +473,41 @@ export async function getOrCreateSubfolder(subfolderName: string): Promise<strin
   try {
     const response = await gapi.client.drive.files.list({
       q: `name='${sanitized}' and mimeType='application/vnd.google-apps.folder' and '${rootId}' in parents and trashed=false`,
-      fields: "files(id, name)",
-      spaces: "drive",
+      fields: 'files(id, name)',
+      spaces: 'drive',
     });
 
     if (response.result.files && response.result.files.length > 0) {
       return response.result.files[0].id;
     }
   } catch (error) {
-    console.error("Error searching for subfolder:", error);
+    console.error('Error searching for subfolder:', error);
   }
 
   // Create subfolder if not found
   try {
     const fileMetadata = {
       name: sanitized,
-      mimeType: "application/vnd.google-apps.folder",
+      mimeType: 'application/vnd.google-apps.folder',
       parents: [rootId],
     };
 
     const response = await gapi.client.drive.files.create({
       resource: fileMetadata,
-      fields: "id, name",
+      fields: 'id, name',
     });
 
     return response.result.id;
   } catch (error) {
-    console.error("Error creating subfolder:", error);
+    console.error('Error creating subfolder:', error);
     throw new Error(`Failed to create subfolder: ${sanitized}`);
   }
 }
 
 // List subfolders in root or a specific folder
-export async function getSubfolders(subfolderName: string | null = null): Promise<GoogleFolder[]> {
+export async function getSubfolders(
+  subfolderName: string | null = null
+): Promise<GoogleFolder[]> {
   let parentId: string | null = null;
 
   if (subfolderName) {
@@ -510,20 +519,23 @@ export async function getSubfolders(subfolderName: string | null = null): Promis
   try {
     const response = await gapi.client.drive.files.list({
       q: `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: "files(id, name, modifiedTime)",
-      spaces: "drive",
-      orderBy: "name",
+      fields: 'files(id, name, modifiedTime)',
+      spaces: 'drive',
+      orderBy: 'name',
     });
 
     return response.result.files || [];
   } catch (error) {
-    console.error("Error listing subfolders:", error);
+    console.error('Error listing subfolders:', error);
     return [];
   }
 }
 
 // List .imnb files in a folder
-export async function listFiles(folderId: string | null = null, subfolderName: string | null = null): Promise<GoogleFile[]> {
+export async function listFiles(
+  folderId: string | null = null,
+  subfolderName: string | null = null
+): Promise<GoogleFile[]> {
   let parentId: string | null = null;
 
   if (subfolderName) {
@@ -537,34 +549,38 @@ export async function listFiles(folderId: string | null = null, subfolderName: s
   try {
     const response = await gapi.client.drive.files.list({
       q: `'${parentId}' in parents and name contains '.imnb' and trashed=false`,
-      fields: "files(id, name, modifiedTime, mimeType, permissions)",
-      spaces: "drive",
-      orderBy: "modifiedTime desc",
+      fields: 'files(id, name, modifiedTime, mimeType, permissions)',
+      spaces: 'drive',
+      orderBy: 'modifiedTime desc',
     });
 
     return response.result.files || [];
   } catch (error) {
-    console.error("Error listing files:", error);
+    console.error('Error listing files:', error);
     return [];
   }
 }
 
 // Save file to Google Drive
-export async function saveFile(title: string, content: string, subfolderName: string | null = null): Promise<SaveFileResult> {
+export async function saveFile(
+  title: string,
+  content: string,
+  subfolderName: string | null = null
+): Promise<SaveFileResult> {
   if (!isInitialized || !gapi) {
-    throw new Error("Google API not initialized");
+    throw new Error('Google API not initialized');
   }
 
   const rootId = await ensureRootFolder();
   const sanitizedTitle = sanitizeFileName(title);
-  const fileName = sanitizedTitle.endsWith(".imnb")
+  const fileName = sanitizedTitle.endsWith('.imnb')
     ? sanitizedTitle
     : `${sanitizedTitle}.imnb`;
 
   // Determine parent folder
   let parentId = rootId;
-  if (subfolderName && subfolderName.trim() !== "") {
-    parentId = await getOrCreateSubfolder(subfolderName.trim()) || rootId;
+  if (subfolderName && subfolderName.trim() !== '') {
+    parentId = (await getOrCreateSubfolder(subfolderName.trim())) || rootId;
   }
 
   // Check if file already exists
@@ -572,24 +588,24 @@ export async function saveFile(title: string, content: string, subfolderName: st
   try {
     const listResponse = await gapi.client.drive.files.list({
       q: `name='${fileName}' and '${parentId}' in parents and trashed=false`,
-      fields: "files(id)",
-      spaces: "drive",
+      fields: 'files(id)',
+      spaces: 'drive',
     });
 
     if (listResponse.result.files && listResponse.result.files.length > 0) {
       existingFileId = listResponse.result.files[0].id;
     }
   } catch (error) {
-    console.error("Error checking for existing file:", error);
+    console.error('Error checking for existing file:', error);
   }
 
   // Convert content to Blob
-  const blob = new Blob([content], { type: "application/json" });
-  const file = new File([blob], fileName, { type: "application/json" });
+  const blob = new Blob([content], { type: 'application/json' });
+  const file = new File([blob], fileName, { type: 'application/json' });
 
   const token = accessToken || gapi.client.getToken()?.access_token;
   if (!token) {
-    throw new Error("No access token available. Please authenticate first.");
+    throw new Error('No access token available. Please authenticate first.');
   }
 
   try {
@@ -604,15 +620,15 @@ export async function saveFile(title: string, content: string, subfolderName: st
 
       const form = new FormData();
       form.append(
-        "metadata",
-        new Blob([JSON.stringify(metadata)], { type: "application/json" })
+        'metadata',
+        new Blob([JSON.stringify(metadata)], { type: 'application/json' })
       );
-      form.append("file", file);
+      form.append('file', file);
 
       response = await fetch(
         `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`,
         {
-          method: "PATCH",
+          method: 'PATCH',
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -628,15 +644,15 @@ export async function saveFile(title: string, content: string, subfolderName: st
 
       const form = new FormData();
       form.append(
-        "metadata",
-        new Blob([JSON.stringify(metadata)], { type: "application/json" })
+        'metadata',
+        new Blob([JSON.stringify(metadata)], { type: 'application/json' })
       );
-      form.append("file", file);
+      form.append('file', file);
 
       response = await fetch(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
         {
-          method: "POST",
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -647,7 +663,7 @@ export async function saveFile(title: string, content: string, subfolderName: st
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || "Failed to save file");
+      throw new Error(error.error?.message || 'Failed to save file');
     }
 
     const result = await response.json();
@@ -657,33 +673,36 @@ export async function saveFile(title: string, content: string, subfolderName: st
       webViewLink: result.webViewLink,
     };
   } catch (error: any) {
-    console.error("Error saving file:", error);
+    console.error('Error saving file:', error);
     throw error;
   }
 }
 
 // Update file by ID (for auto-save)
-export async function updateFileById(fileId: string, content: string): Promise<SaveFileResult> {
+export async function updateFileById(
+  fileId: string,
+  content: string
+): Promise<SaveFileResult> {
   if (!isInitialized || !gapi) {
-    throw new Error("Google API not initialized");
+    throw new Error('Google API not initialized');
   }
 
   const token = accessToken || gapi.client.getToken()?.access_token;
   if (!token) {
-    throw new Error("No access token available. Please authenticate first.");
+    throw new Error('No access token available. Please authenticate first.');
   }
 
   try {
     // Get current file metadata to preserve name
     const metadataResponse = await gapi.client.drive.files.get({
       fileId: fileId,
-      fields: "name",
+      fields: 'name',
     });
     const fileName = metadataResponse.result.name;
 
     // Convert content to Blob
-    const blob = new Blob([content], { type: "application/json" });
-    const file = new File([blob], fileName, { type: "application/json" });
+    const blob = new Blob([content], { type: 'application/json' });
+    const file = new File([blob], fileName, { type: 'application/json' });
 
     const metadata = {
       name: fileName,
@@ -692,15 +711,15 @@ export async function updateFileById(fileId: string, content: string): Promise<S
 
     const form = new FormData();
     form.append(
-      "metadata",
-      new Blob([JSON.stringify(metadata)], { type: "application/json" })
+      'metadata',
+      new Blob([JSON.stringify(metadata)], { type: 'application/json' })
     );
-    form.append("file", file);
+    form.append('file', file);
 
     const response = await fetch(
       `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -710,7 +729,7 @@ export async function updateFileById(fileId: string, content: string): Promise<S
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || "Failed to update file");
+      throw new Error(error.error?.message || 'Failed to update file');
     }
 
     const result = await response.json();
@@ -720,7 +739,7 @@ export async function updateFileById(fileId: string, content: string): Promise<S
       webViewLink: result.webViewLink,
     };
   } catch (error: any) {
-    console.error("Error updating file:", error);
+    console.error('Error updating file:', error);
     throw error;
   }
 }
@@ -728,7 +747,8 @@ export async function updateFileById(fileId: string, content: string): Promise<S
 // Load file from Google Drive
 async function loadFile(fileId: string): Promise<any> {
   // Try to get an authenticated token first
-  const token = accessToken || (isInitialized && gapi?.client?.getToken()?.access_token);
+  const token =
+    accessToken || (isInitialized && gapi?.client?.getToken()?.access_token);
 
   // If we have a token, use the standard authenticated request
   if (token) {
@@ -745,24 +765,25 @@ async function loadFile(fileId: string): Promise<any> {
       if (!response.ok) {
         const error = await response
           .json()
-          .catch(() => ({ error: { message: "Failed to load file" } }));
-        throw new Error(error.error?.message || "Failed to load file");
+          .catch(() => ({ error: { message: 'Failed to load file' } }));
+        throw new Error(error.error?.message || 'Failed to load file');
       }
 
       const content = await response.text();
       return JSON.parse(content);
     } catch (error: any) {
-      console.error("Error loading file with auth:", error);
-      // If auth fails for a potentially public file, we might want to fall back 
+      console.error('Error loading file with auth:', error);
+      // If auth fails for a potentially public file, we might want to fall back
       // but usually if you have a token it should work or the file is private.
       // throw new Error(error.message || "Failed to load file from Google Drive");
     }
   }
 
-
   // No token available Fallback to public access. Try to load using API Key (for public files)
   if (!API_KEY) {
-    throw new Error("Sign in to Google Drive or provide an API Key to load this file.");
+    throw new Error(
+      'Sign in to Google Drive or provide an API Key to load this file.'
+    );
   }
 
   try {
@@ -775,16 +796,18 @@ async function loadFile(fileId: string): Promise<any> {
       const error = await response.json().catch(() => ({}));
       // 403 usually means the file is not public or key is invalid
       if (response.status === 403 || response.status === 401) {
-        throw new Error("File is not public or invalid API Key. Please sign in.");
+        throw new Error(
+          'File is not public or invalid API Key. Please sign in.'
+        );
       }
-      throw new Error(error.error?.message || "Failed to load public file");
+      throw new Error(error.error?.message || 'Failed to load public file');
     }
 
     const content = await response.text();
     return JSON.parse(content);
   } catch (error: any) {
-    console.error("Error loading public file:", error);
-    throw new Error(error.message || "Failed to load public file");
+    console.error('Error loading public file:', error);
+    throw new Error(error.message || 'Failed to load public file');
   }
 }
 
@@ -802,7 +825,7 @@ export async function loadNotebookAndMetadata(fileId: string): Promise<{
     // 1. Start all fetches in parallel
     const notebookPromise = loadFile(fileId);
 
-    // For metadata, we need to be careful. if loadFile falls back to public key, 
+    // For metadata, we need to be careful. if loadFile falls back to public key,
     // getFileMetadata might fail if we are not authenticated.
     // However, if we are authenticated, we should fetch it.
     // If not authenticated, we can assume read-only and check published status via registry.
@@ -811,7 +834,7 @@ export async function loadNotebookAndMetadata(fileId: string): Promise<{
     if (isAuthenticated()) {
       metadataPromise = getFileMetadata(fileId);
     } else {
-      // If not authenticated, we can't fetch full Drive metadata usually, 
+      // If not authenticated, we can't fetch full Drive metadata usually,
       // unless it's public and we use API key (which getFileMetadata doesn't currently support explicitly with key)
       // But let's try to stick to existing logic: if auth, get metadata.
       metadataPromise = Promise.resolve(null);
@@ -823,7 +846,7 @@ export async function loadNotebookAndMetadata(fileId: string): Promise<{
     const [notebook, metadata, isPublished] = await Promise.all([
       notebookPromise,
       metadataPromise,
-      publishedPromise
+      publishedPromise,
     ]);
 
     // 3. Determine read-only status
@@ -839,20 +862,18 @@ export async function loadNotebookAndMetadata(fileId: string): Promise<{
       notebook,
       metadata,
       isPublished,
-      isReadOnly
+      isReadOnly,
     };
-
   } catch (error) {
-    console.error("Error in loadNotebookAndMetadata:", error);
+    console.error('Error in loadNotebookAndMetadata:', error);
     throw error;
   }
 }
 
-
 // Delete file from Google Drive
 export async function deleteFile(fileId: string): Promise<void> {
   if (!isInitialized || !gapi) {
-    throw new Error("Google API not initialized");
+    throw new Error('Google API not initialized');
   }
 
   try {
@@ -860,35 +881,48 @@ export async function deleteFile(fileId: string): Promise<void> {
       fileId: fileId,
     });
   } catch (error: any) {
-    console.error("Error deleting file:", error);
-    throw new Error(error.result?.error?.message || error.message || "Failed to delete file from Google Drive");
+    console.error('Error deleting file:', error);
+    throw new Error(
+      error.result?.error?.message ||
+        error.message ||
+        'Failed to delete file from Google Drive'
+    );
   }
 }
 
 // Get file metadata
 export async function getFileMetadata(fileId: string): Promise<GoogleFile> {
   if (!isInitialized || !gapi) {
-    throw new Error("Google API not initialized");
+    throw new Error('Google API not initialized');
   }
 
   try {
     const response = await gapi.client.drive.files.get({
       fileId: fileId,
-      fields: "id, name, modifiedTime, mimeType, parents, permissions, capabilities",
+      fields:
+        'id, name, modifiedTime, mimeType, parents, permissions, capabilities',
     });
 
     return response.result;
   } catch (error: any) {
-    if (error?.status === 404 || error?.result?.error?.code === 404 || (error?.result?.error?.message && error.result.error.message.includes("File not found"))) {
-      console.warn("File not found (404), returning minimal metadata for:", fileId);
+    if (
+      error?.status === 404 ||
+      error?.result?.error?.code === 404 ||
+      (error?.result?.error?.message &&
+        error.result.error.message.includes('File not found'))
+    ) {
+      console.warn(
+        'File not found (404), returning minimal metadata for:',
+        fileId
+      );
       return {
         id: fileId,
-        name: "Unknown File",
+        name: 'Unknown File',
         permissions: [],
-        capabilities: { canEdit: false }
+        capabilities: { canEdit: false },
       } as GoogleFile;
     }
-    console.error("Error getting file metadata:", error);
+    console.error('Error getting file metadata:', error);
     throw error;
   }
 }
@@ -898,11 +932,11 @@ function sanitizeFileName(name: string): string {
   // Remove invalid characters and limit length
   return (
     name
-      .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
-      .replace(/^\.+/, "")
-      .replace(/\.+$/, "")
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+      .replace(/^\.+/, '')
+      .replace(/\.+$/, '')
       .substring(0, 255)
-      .trim() || "untitled"
+      .trim() || 'untitled'
   );
 }
 
@@ -910,11 +944,11 @@ function sanitizeFileName(name: string): string {
 function sanitizeFolderName(name: string): string {
   return (
     name
-      .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
-      .replace(/^\.+/, "")
-      .replace(/\.+$/, "")
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+      .replace(/^\.+/, '')
+      .replace(/\.+$/, '')
       .substring(0, 255)
-      .trim() || "untitled"
+      .trim() || 'untitled'
   );
 }
 
@@ -923,20 +957,23 @@ function sanitizeFolderName(name: string): string {
 // Make a file public (Anyone with link can view)
 export async function setFilePublic(fileId: string): Promise<void> {
   if (!isInitialized || !gapi) {
-    throw new Error("Google API not initialized");
+    throw new Error('Google API not initialized');
   }
 
   try {
     await gapi.client.drive.permissions.create({
       fileId: fileId,
       resource: {
-        role: "reader",
-        type: "anyone",
+        role: 'reader',
+        type: 'anyone',
       },
     });
   } catch (error: any) {
-    console.error("Error setting file public:", error);
-    throw new Error("Failed to make file public: " + (error.result?.error?.message || error.message));
+    console.error('Error setting file public:', error);
+    throw new Error(
+      'Failed to make file public: ' +
+        (error.result?.error?.message || error.message)
+    );
   }
 }
 
@@ -949,7 +986,12 @@ export interface RegistryEntry {
 }
 
 // Publish to the registry (Apps Script)
-export async function publishToRegistry(fileId: string, name: string, description: string = "", author: string = "Anonymous"): Promise<void> {
+export async function publishToRegistry(
+  fileId: string,
+  name: string,
+  description: string = '',
+  author: string = 'Anonymous'
+): Promise<void> {
   // 1. Ensure file is public first
   await setFilePublic(fileId);
 
@@ -957,10 +999,10 @@ export async function publishToRegistry(fileId: string, name: string, descriptio
   // We use mode: 'no-cors' which makes the response opaque.
   try {
     await fetch(REGISTRY_SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
+      method: 'POST',
+      mode: 'no-cors',
       headers: {
-        "Content-Type": "text/plain;charset=utf-8",
+        'Content-Type': 'text/plain;charset=utf-8',
       },
       body: JSON.stringify({
         id: fileId,
@@ -970,7 +1012,7 @@ export async function publishToRegistry(fileId: string, name: string, descriptio
       }),
     });
   } catch (error) {
-    console.error("Error publishing to registry:", error);
+    console.error('Error publishing to registry:', error);
     // throw new Error("Failed to publish to registry");
   }
 }
@@ -979,18 +1021,18 @@ export async function publishToRegistry(fileId: string, name: string, descriptio
 export async function unpublishFromRegistry(fileId: string): Promise<void> {
   try {
     await fetch(REGISTRY_SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
+      method: 'POST',
+      mode: 'no-cors',
       headers: {
-        "Content-Type": "text/plain;charset=utf-8",
+        'Content-Type': 'text/plain;charset=utf-8',
       },
       body: JSON.stringify({
         id: fileId,
-        action: "unpublish",
+        action: 'unpublish',
       }),
     });
   } catch (error) {
-    console.error("Error unpublishing from registry:", error);
+    console.error('Error unpublishing from registry:', error);
   }
 }
 
@@ -998,7 +1040,7 @@ export async function unpublishFromRegistry(fileId: string): Promise<void> {
 export async function checkIsPublished(fileId: string): Promise<boolean> {
   try {
     const url = new URL(REGISTRY_SCRIPT_URL);
-    url.searchParams.append("q", fileId); // Search by ID
+    url.searchParams.append('q', fileId); // Search by ID
 
     const response = await fetch(url.toString());
     if (!response.ok) {
@@ -1008,32 +1050,31 @@ export async function checkIsPublished(fileId: string): Promise<boolean> {
     // Check if any file in the results matches our ID exactly
     return data.files.some((file: RegistryEntry) => file.id === fileId);
   } catch (error) {
-    console.error("Error checking published status:", error);
+    console.error('Error checking published status:', error);
     return false;
   }
 }
 
 // Fetch public files from registry with search and pagination
 export async function fetchPublicRegistry(
-  search: string = "",
+  search: string = '',
   page: number = 1,
   pageSize: number = 10
 ): Promise<{ total: number; files: RegistryEntry[] }> {
   try {
     const url = new URL(REGISTRY_SCRIPT_URL);
-    if (search) url.searchParams.append("q", search);
-    if (page) url.searchParams.append("page", page.toString());
-    if (pageSize) url.searchParams.append("pageSize", pageSize.toString());
+    if (search) url.searchParams.append('q', search);
+    if (page) url.searchParams.append('page', page.toString());
+    if (pageSize) url.searchParams.append('pageSize', pageSize.toString());
 
     const response = await fetch(url.toString());
     if (!response.ok) {
-      throw new Error("Failed to fetch registry");
+      throw new Error('Failed to fetch registry');
     }
     const data = await response.json();
     return data as { total: number; files: RegistryEntry[] };
   } catch (error) {
-    console.error("Error fetching registry:", error);
+    console.error('Error fetching registry:', error);
     return { total: 0, files: [] };
   }
 }
-

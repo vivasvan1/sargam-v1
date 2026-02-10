@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { Sidebar } from "./Sidebar";
-import "./App.css";
+import React, { useState, useEffect } from 'react';
+import { Sidebar } from './Sidebar';
+import './App.css';
 
 // Components
-import { GoogleDriveSaveDialog } from "@/components/google-drive/GoogleDriveSaveDialog";
-import { GoogleDriveLoadDialog } from "@/components/google-drive/GoogleDriveLoadDialog";
-import { Header } from "./components/Header";
-import { NotebookEditor } from "./components/NotebookEditor";
+import { GoogleDriveSaveDialog } from '@/components/google-drive/GoogleDriveSaveDialog';
+import { GoogleDriveLoadDialog } from '@/components/google-drive/GoogleDriveLoadDialog';
+import { Header } from './components/Header';
+import { NotebookEditor } from './components/NotebookEditor';
 
 // Libs
-import { toast, Toaster } from "sonner";
-import {
-  SidebarProvider,
-  SidebarInset,
-} from "@/components/ui/sidebar";
+import { toast, Toaster } from 'sonner';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import {
   initializeGoogleAPI,
   authenticate,
@@ -22,40 +19,42 @@ import {
   publishToRegistry,
   unpublishFromRegistry,
   loadNotebookAndMetadata,
-} from "./lib/googleDrive";
+} from './lib/googleDrive';
 // GoogleUser type no longer needed here as it is in store
-import { MenuBar } from "./components/MenuBar";
-import { useNotebook } from "./hooks/useNotebook";
-import type { Notebook } from "./types/notebook";
-import { useNotebookSettings } from "./context/NotebookSettingsContext";
-import { useNotebookStore } from "./store/useNotebookStore";
-import { useAuthStore } from "./store/useAuthStore";
-import { Analytics } from "@vercel/analytics/react";
+import { MenuBar } from './components/MenuBar';
+import { useNotebook } from './hooks/useNotebook';
+import type { Notebook } from './types/notebook';
+import { useNotebookSettings } from './context/NotebookSettingsContext';
+import { useNotebookStore } from './store/useNotebookStore';
+import { useAuthStore } from './store/useAuthStore';
+import { Analytics } from '@vercel/analytics/react';
 
 // Notebook interfaces imported from types/notebook
 
 // Load default notebook
 const loadDefaultNotebook = async (): Promise<Notebook> => {
   try {
-    const response = await fetch("/Raag Brindavani Sarang Composition - Saptak Music School - Ahmedabad.imnb");
+    const response = await fetch(
+      '/Raag Brindavani Sarang Composition - Saptak Music School - Ahmedabad.imnb'
+    );
     if (response.ok) {
       const content = await response.json();
       return content;
     }
   } catch (err) {
-    console.error("Failed to load default notebook", err);
+    console.error('Failed to load default notebook', err);
   }
   // Fallback to empty notebook
   return {
     imnb_version: 1,
-    metadata: { title: "New Notebook" },
+    metadata: { title: 'New Notebook' },
     cells: [],
   };
 };
 
 // Google Client ID - should be set via environment variable or config
 // For development, you can set this in a .env file as VITE_GOOGLE_CLIENT_ID
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 function App() {
   const {
@@ -71,43 +70,45 @@ function App() {
     canRedo,
   } = useNotebook({
     imnb_version: 1,
-    metadata: { title: "New Notebook" },
+    metadata: { title: 'New Notebook' },
     cells: [],
   });
 
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
-  const [filePath, setFilePath] = useState("raag_khamaj_demo.imnb");
+  const [filePath, setFilePath] = useState('raag_khamaj_demo.imnb');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [theme, setTheme] = useState<"light" | "dark" | "system">(() => {
-    const storedTheme = localStorage.getItem("sargam-theme");
-    return (storedTheme as "light" | "dark" | "system") || "light";
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    const storedTheme = localStorage.getItem('sargam-theme');
+    return (storedTheme as 'light' | 'dark' | 'system') || 'light';
   });
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Google Drive state
   // Google Drive state (moved to global store)
-  const { isAuthenticated: googleDriveConnected, user: googleDriveUser } = useAuthStore();
+  const { isAuthenticated: googleDriveConnected, user: googleDriveUser } =
+    useAuthStore();
   // isInitialized is accessed directly in the effects via useAuthStore hook or check if needed
-  const isInitialized = useAuthStore(state => state.isInitialized);
+  const isInitialized = useAuthStore((state) => state.isInitialized);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [driveFileId, setDriveFileId] = useState<string | null>(null); // Track if notebook was saved to Drive
   const [isReadOnly, setIsReadOnly] = useState(false); // Track if current file is read-only
   const [lastSavedContent, setLastSavedContent] = useState<string | null>(null); // Track last saved content for change detection
-  const [saveStatus, setSaveStatus] = useState<"saved" | "unsaved" | "saving">("saved");
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>(
+    'saved'
+  );
   const [isPublished, setIsPublished] = useState(false);
   const [isLoading, setIsLoading] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    return !!urlParams.get("fileId");
+    return !!urlParams.get('fileId');
   });
 
   // Initialize Google API on mount
   useEffect(() => {
     if (GOOGLE_CLIENT_ID) {
-      initializeGoogleAPI(GOOGLE_CLIENT_ID)
-        .catch((error) => {
-          console.error("Failed to initialize Google API:", error);
-        });
+      initializeGoogleAPI(GOOGLE_CLIENT_ID).catch((error) => {
+        console.error('Failed to initialize Google API:', error);
+      });
     }
   }, []);
 
@@ -115,44 +116,56 @@ function App() {
   useEffect(() => {
     // Check for fileId in URL
     const urlParams = new URLSearchParams(window.location.search);
-    const fileId = urlParams.get("fileId");
+    const fileId = urlParams.get('fileId');
 
     if (fileId) {
       // If fileId is present, try to load it (public file)
-      toast.info("Loading shared notebook...");
+      toast.info('Loading shared notebook...');
       loadNotebookAndMetadata(fileId)
         .then(({ notebook, isReadOnly, isPublished }) => {
           // Update local state hook (for editing)
           setNotebook(notebook);
 
           // Update global store (for Header/other components)
-          useNotebookStore.getState().setNotebook(notebook, fileId, notebook.metadata || null, isReadOnly, isPublished);
+          useNotebookStore
+            .getState()
+            .setNotebook(
+              notebook,
+              fileId,
+              notebook.metadata || null,
+              isReadOnly,
+              isPublished
+            );
 
-          const title = notebook.metadata?.title || "Shared Notebook";
+          const title = notebook.metadata?.title || 'Shared Notebook';
           setFilePath(`${title}.imnb`);
           setDriveFileId(fileId);
           setLastSavedContent(JSON.stringify(notebook, null, 2));
-          setSaveStatus("saved");
+          setSaveStatus('saved');
 
           // Set derived states immediately
           setIsReadOnly(isReadOnly);
           if (isReadOnly) {
-            toast.info("Notebook loaded in read-only mode.");
+            toast.info('Notebook loaded in read-only mode.');
           }
 
           setIsPublished(isPublished);
 
-          toast.success("Loaded shared notebook");
+          toast.success('Loaded shared notebook');
         })
         .catch((error) => {
-          console.error("Failed to load shared notebook:", error);
-          toast.error("Failed to load shared notebook. It might not be public.");
+          console.error('Failed to load shared notebook:', error);
+          toast.error(
+            'Failed to load shared notebook. It might not be public.'
+          );
           // Fallback to default if loading fails
           loadDefaultNotebook().then((defaultNotebook) => {
             setNotebook(defaultNotebook);
-            useNotebookStore.getState().setNotebook(defaultNotebook, null, null, false, false);
+            useNotebookStore
+              .getState()
+              .setNotebook(defaultNotebook, null, null, false, false);
             if (defaultNotebook.metadata?.title) {
-              setFilePath("raag_khamaj_demo.imnb");
+              setFilePath('raag_khamaj_demo.imnb');
             }
           });
         })
@@ -163,9 +176,11 @@ function App() {
       // Load default notebook on mount if no fileId
       loadDefaultNotebook().then((defaultNotebook) => {
         setNotebook(defaultNotebook);
-        useNotebookStore.getState().setNotebook(defaultNotebook, null, null, false, false);
+        useNotebookStore
+          .getState()
+          .setNotebook(defaultNotebook, null, null, false, false);
         if (defaultNotebook.metadata?.title) {
-          setFilePath("raag_khamaj_demo.imnb");
+          setFilePath('raag_khamaj_demo.imnb');
         }
       });
     }
@@ -173,23 +188,23 @@ function App() {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
+    if (theme === 'dark') {
+      root.classList.add('dark');
     } else {
-      root.classList.remove("dark");
+      root.classList.remove('dark');
     }
-    localStorage.setItem("sargam-theme", theme);
+    localStorage.setItem('sargam-theme', theme);
   }, [theme]);
 
   // Sync URL with driveFileId
   useEffect(() => {
     const url = new URL(window.location.href);
     if (driveFileId) {
-      url.searchParams.set("fileId", driveFileId);
+      url.searchParams.set('fileId', driveFileId);
     } else {
-      url.searchParams.delete("fileId");
+      url.searchParams.delete('fileId');
     }
-    window.history.replaceState({}, "", url.toString());
+    window.history.replaceState({}, '', url.toString());
   }, [driveFileId]);
 
   // Auto-save to Google Drive
@@ -197,8 +212,11 @@ function App() {
 
   useEffect(() => {
     // If content has changed, mark as unsaved
-    if (lastSavedContent && JSON.stringify(notebook, null, 2) !== lastSavedContent) {
-      setSaveStatus("unsaved");
+    if (
+      lastSavedContent &&
+      JSON.stringify(notebook, null, 2) !== lastSavedContent
+    ) {
+      setSaveStatus('unsaved');
     }
 
     // Only auto-save if:
@@ -207,7 +225,12 @@ function App() {
     // 3. Content has changed since last save
     // 4. File is not read-only
     // 5. Auto-save is enabled by user
-    if (!googleDriveConnected || !driveFileId || isReadOnly || !autoSaveEnabled) {
+    if (
+      !googleDriveConnected ||
+      !driveFileId ||
+      isReadOnly ||
+      !autoSaveEnabled
+    ) {
       return;
     }
 
@@ -215,21 +238,21 @@ function App() {
 
     // Skip if content hasn't changed
     if (currentContent === lastSavedContent) {
-      setSaveStatus("saved");
+      setSaveStatus('saved');
       return;
     }
 
     // Debounce: wait 2 seconds after last change before auto-saving
     const autoSaveTimer = setTimeout(async () => {
       try {
-        setSaveStatus("saving");
+        setSaveStatus('saving');
         await updateFileById(driveFileId, currentContent);
         setLastSavedContent(currentContent);
-        setSaveStatus("saved");
+        setSaveStatus('saved');
         // Silently save - don't show toast to avoid spam
       } catch (error) {
-        console.error("Auto-save failed:", error);
-        setSaveStatus("unsaved"); // Revert to unsaved on failure
+        console.error('Auto-save failed:', error);
+        setSaveStatus('unsaved'); // Revert to unsaved on failure
         // Don't show error toast for auto-save failures to avoid spam
         // User can manually save if needed
       }
@@ -238,16 +261,23 @@ function App() {
     return () => {
       clearTimeout(autoSaveTimer);
     };
-  }, [notebook, googleDriveConnected, driveFileId, lastSavedContent, isReadOnly, autoSaveEnabled]);
+  }, [
+    notebook,
+    googleDriveConnected,
+    driveFileId,
+    lastSavedContent,
+    isReadOnly,
+    autoSaveEnabled,
+  ]);
 
   const handleNew = () => {
-    if (window.confirm("Start a new notebook? Unsaved changes will be lost.")) {
+    if (window.confirm('Start a new notebook? Unsaved changes will be lost.')) {
       setNotebook({
         imnb_version: 1,
-        metadata: { title: "New Notebook" },
+        metadata: { title: 'New Notebook' },
         cells: [],
       });
-      setFilePath("untitled.imnb");
+      setFilePath('untitled.imnb');
       setDriveFileId(null);
       setIsReadOnly(false);
       setLastSavedContent(null);
@@ -272,8 +302,8 @@ function App() {
         setIsPublished(false);
         toast.success(`Loaded ${file.name}`);
       } catch (err) {
-        console.error("Malformed IMNB file", err);
-        toast.error("Invalid .imnb file format");
+        console.error('Malformed IMNB file', err);
+        toast.error('Invalid .imnb file format');
       }
     };
     reader.readAsText(file);
@@ -282,24 +312,24 @@ function App() {
   const handleDownload = () => {
     if (!notebook) return;
     const blob = new Blob([JSON.stringify(notebook, null, 2)], {
-      type: "application/json",
+      type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.href = url;
-    link.download = filePath.endsWith(".imnb") ? filePath : `${filePath}.imnb`;
+    link.download = filePath.endsWith('.imnb') ? filePath : `${filePath}.imnb`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    toast.success("Notebook downloaded");
+    toast.success('Notebook downloaded');
   };
 
   // Google Drive handlers
   const handleGoogleDriveConnect = async () => {
     if (!GOOGLE_CLIENT_ID) {
       toast.error(
-        "Google Client ID not configured. Please set VITE_GOOGLE_CLIENT_ID environment variable."
+        'Google Client ID not configured. Please set VITE_GOOGLE_CLIENT_ID environment variable.'
       );
       return;
     }
@@ -308,13 +338,15 @@ function App() {
       await initializeGoogleAPI(GOOGLE_CLIENT_ID);
       const user = await authenticate();
       // Store updates automatically via googleDrive.ts
-      toast.success(`Connected to Google Drive as ${user?.email || "Connected"}`);
+      toast.success(
+        `Connected to Google Drive as ${user?.email || 'Connected'}`
+      );
     } catch (error: any) {
-      console.error("Error connecting to Google Drive:", error);
-      if (error.message === "Sign-in cancelled") {
-        toast.info("Sign-in cancelled");
+      console.error('Error connecting to Google Drive:', error);
+      if (error.message === 'Sign-in cancelled') {
+        toast.info('Sign-in cancelled');
       } else {
-        toast.error(error.message || "Failed to connect to Google Drive");
+        toast.error(error.message || 'Failed to connect to Google Drive');
       }
     }
   };
@@ -322,11 +354,11 @@ function App() {
   const handleGoogleDriveDisconnect = async () => {
     try {
       await disconnect();
-      // Store updates automatically via googleDrive.ts 
-      toast.success("Disconnected from Google Drive");
+      // Store updates automatically via googleDrive.ts
+      toast.success('Disconnected from Google Drive');
     } catch (error) {
-      console.error("Error disconnecting from Google Drive:", error);
-      toast.error("Failed to disconnect from Google Drive");
+      console.error('Error disconnecting from Google Drive:', error);
+      toast.error('Failed to disconnect from Google Drive');
     }
   };
 
@@ -340,17 +372,17 @@ function App() {
     // If we have a driveFileId AND it is writeable (not read-only), overwrite it directly.
     // Otherwise (new file or read-only), open the save dialog (Save As).
     if (driveFileId && !isReadOnly) {
-      const loadingToast = toast.loading("Saving changes...");
+      const loadingToast = toast.loading('Saving changes...');
       try {
         const content = JSON.stringify(notebook, null, 2);
         await updateFileById(driveFileId, content);
         setLastSavedContent(content);
         toast.dismiss(loadingToast);
-        toast.success("Notebook saved");
+        toast.success('Notebook saved');
       } catch (error: any) {
-        console.error("Save failed:", error);
+        console.error('Save failed:', error);
         toast.dismiss(loadingToast);
-        toast.error(error.message || "Failed to save changes");
+        toast.error(error.message || 'Failed to save changes');
       }
     } else {
       setSaveDialogOpen(true);
@@ -359,7 +391,7 @@ function App() {
 
   const handleLoadFromDrive = () => {
     if (!googleDriveConnected) {
-      toast.error("Please connect to Google Drive first");
+      toast.error('Please connect to Google Drive first');
       return;
     }
     setLoadDialogOpen(true);
@@ -372,14 +404,14 @@ function App() {
     }
 
     // Prepend "Copy of " to the title
-    const currentTitle = notebook.metadata?.title || "Untitled Notebook";
+    const currentTitle = notebook.metadata?.title || 'Untitled Notebook';
     const newTitle = `Copy of ${currentTitle}`;
     updateTitle(newTitle);
 
     setDriveFileId(null);
     setIsReadOnly(false);
     setSaveDialogOpen(true);
-    toast.info("Saving a copy to your Drive...");
+    toast.info('Saving a copy to your Drive...');
   };
 
   /*
@@ -395,17 +427,19 @@ function App() {
     setNotebook(loadedNotebook);
 
     // Update global store
-    useNotebookStore.getState().setNotebook(
-      loadedNotebook,
-      fileId || null,
-      loadedNotebook.metadata || null,
-      readOnlyStatus || false,
-      publishedStatus || false
-    );
+    useNotebookStore
+      .getState()
+      .setNotebook(
+        loadedNotebook,
+        fileId || null,
+        loadedNotebook.metadata || null,
+        readOnlyStatus || false,
+        publishedStatus || false
+      );
 
     const fileName = loadedNotebook.metadata?.title
       ? `${loadedNotebook.metadata.title}.imnb`
-      : "untitled.imnb";
+      : 'untitled.imnb';
     setFilePath(fileName);
 
     if (fileId) {
@@ -416,7 +450,7 @@ function App() {
       if (typeof readOnlyStatus === 'boolean') {
         setIsReadOnly(readOnlyStatus);
         if (readOnlyStatus && useAuthStore.getState().isAuthenticated) {
-          toast.info("This notebook is read-only. Save a copy to edit.");
+          toast.info('This notebook is read-only. Save a copy to edit.');
         }
       } else {
         // Fallback behavior if not passed (though it should be now)
@@ -428,56 +462,59 @@ function App() {
       } else {
         setIsPublished(false);
       }
-
     } else {
       setDriveFileId(null);
       setIsReadOnly(false);
       setIsPublished(false);
     }
-    toast.success("Notebook loaded from Google Drive");
+    toast.success('Notebook loaded from Google Drive');
   };
 
   const handlePublish = async () => {
     if (!driveFileId || !googleDriveConnected) {
-      toast.error("Please save to Google Drive first");
+      toast.error('Please save to Google Drive first');
       return;
     }
 
     // Optional: Ask for description? For now, simle confirm.
-    const confirm = window.confirm("This will make your notebook public to the community. Proceed?");
+    const confirm = window.confirm(
+      'This will make your notebook public to the community. Proceed?'
+    );
     if (!confirm) return;
 
     try {
-      const loadingToast = toast.loading("Publishing to community...");
+      const loadingToast = toast.loading('Publishing to community...');
       // For now, we use current user name if available, else Anonymous
-      const authorName = googleDriveUser?.name || "Anonymous";
-      const title = notebook.metadata?.title || "Untitled Notebook";
+      const authorName = googleDriveUser?.name || 'Anonymous';
+      const title = notebook.metadata?.title || 'Untitled Notebook';
 
-      await publishToRegistry(driveFileId, title, "", authorName);
+      await publishToRegistry(driveFileId, title, '', authorName);
       setIsPublished(true);
       toast.dismiss(loadingToast);
-      toast.success("Successfully published to community!");
+      toast.success('Successfully published to community!');
     } catch (error) {
-      console.error("Publishing failed:", error);
-      toast.error("Failed to publish notebook");
+      console.error('Publishing failed:', error);
+      toast.error('Failed to publish notebook');
     }
   };
 
   const handleUnpublish = async () => {
     if (!driveFileId || !googleDriveConnected) return;
 
-    const confirm = window.confirm("Remove this notebook from the community registry?");
+    const confirm = window.confirm(
+      'Remove this notebook from the community registry?'
+    );
     if (!confirm) return;
 
     try {
-      const loadingToast = toast.loading("Unpublishing...");
+      const loadingToast = toast.loading('Unpublishing...');
       await unpublishFromRegistry(driveFileId);
       setIsPublished(false);
       toast.dismiss(loadingToast);
-      toast.success("Removed from community");
+      toast.success('Removed from community');
     } catch (error) {
-      console.error("Unpublishing failed:", error);
-      toast.error("Failed to remove from community");
+      console.error('Unpublishing failed:', error);
+      toast.error('Failed to remove from community');
     }
   };
 
@@ -504,13 +541,15 @@ function App() {
             <SidebarInset className="flex-1 flex flex-col items-center justify-center bg-muted/5">
               <div className="flex flex-col items-center gap-4">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                <p className="text-muted-foreground animate-pulse">Loading notebook...</p>
+                <p className="text-muted-foreground animate-pulse">
+                  Loading notebook...
+                </p>
               </div>
             </SidebarInset>
           ) : (
             <SidebarInset className="flex-1 flex flex-col min-w-0 bg-muted/5 overflow-hidden">
               <Header
-                title={notebook.metadata?.title || ""}
+                title={notebook.metadata?.title || ''}
                 onTitleUpdate={updateTitle}
                 filePath={filePath}
                 googleDriveConnected={googleDriveConnected}
@@ -537,8 +576,8 @@ function App() {
                   canRedo={canRedo}
                   onUndo={undo}
                   onRedo={redo}
-                  onAddMusic={() => addCell("music", -1)}
-                  onAddMarkdown={() => addCell("markdown", -1)}
+                  onAddMusic={() => addCell('music', -1)}
+                  onAddMarkdown={() => addCell('markdown', -1)}
                   theme={theme}
                   setTheme={setTheme}
                   googleDriveConnected={googleDriveConnected}
@@ -570,11 +609,19 @@ function App() {
                 setLastSavedContent(JSON.stringify(notebook, null, 2));
 
                 // Update filePath to reflect the new saved name
-                const title = notebook.metadata?.title || "Untitled Notebook";
+                const title = notebook.metadata?.title || 'Untitled Notebook';
                 setFilePath(`${title}.imnb`);
 
                 // Update global store (new file is not published)
-                useNotebookStore.getState().setNotebook(notebook, fileId, notebook.metadata || null, false, false);
+                useNotebookStore
+                  .getState()
+                  .setNotebook(
+                    notebook,
+                    fileId,
+                    notebook.metadata || null,
+                    false,
+                    false
+                  );
                 setIsPublished(false); // Ensure local state is also reset if needed
               }
             }}

@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from '@/components/ui/sidebar';
 
 interface GoogleDriveUser {
   email?: string;
@@ -21,8 +21,8 @@ interface GoogleDriveUser {
 interface SidebarProps {
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onNew: () => void;
-  theme: "light" | "dark" | "system";
-  setTheme: (theme: "light" | "dark" | "system") => void;
+  theme: 'light' | 'dark' | 'system';
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
   isOpen?: boolean; // Kept for compatibility but controlled by SidebarProvider
   onClose?: () => void;
   googleDriveConnected: boolean;
@@ -30,7 +30,12 @@ interface SidebarProps {
   onGoogleDriveConnect: () => void;
   onGoogleDriveDisconnect: () => void;
   onLoadFromDrive: () => void;
-  onLoadDriveFile: (notebook: any, fileId?: string, isReadOnly?: boolean, isPublished?: boolean) => void;
+  onLoadDriveFile: (
+    notebook: any,
+    fileId?: string,
+    isReadOnly?: boolean,
+    isPublished?: boolean
+  ) => void;
   currentFileId: string | null;
 }
 
@@ -46,7 +51,7 @@ export function Sidebar({
   onGoogleDriveDisconnect,
   onLoadFromDrive,
   onLoadDriveFile,
-  currentFileId
+  currentFileId,
 }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setOpenMobile } = useSidebar();
@@ -67,7 +72,9 @@ export function Sidebar({
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <img src="/logo.png" alt="" />
           </div>
-          <span className="font-bold text-xl tracking-tight truncate">Sargam Notebook</span>
+          <span className="font-bold text-xl tracking-tight truncate">
+            Sargam Notebook
+          </span>
         </div>
       </SidebarHeader>
 
@@ -128,4 +135,3 @@ export function Sidebar({
     </SidebarComponent>
   );
 }
-
