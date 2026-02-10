@@ -30,7 +30,13 @@ interface VoiceData {
   beatCount: number;
 }
 
-export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0, onSeek }: MusicVisualizerProps) {
+export function MusicVisualizer({
+  parsedData,
+  isPlaying,
+  onPlay,
+  initialTime = 0,
+  onSeek,
+}: MusicVisualizerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -56,23 +62,24 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
     mainVoice.events.forEach((event) => {
       // Include duration-based events, comments, and bars
       const e = event as any;
-      if (e.duration === undefined && e.type !== 'comment' && e.type !== 'bar') return;
+      if (e.duration === undefined && e.type !== "comment" && e.type !== "bar")
+        return;
 
       const lineIdx = event.line_index || 0;
       if (!lines[lineIdx])
         lines[lineIdx] = {
           events: [],
           duration: 0,
-          startTime: currentVisualTime // This is visual start time
+          startTime: currentVisualTime, // This is visual start time
         };
 
       // Calculate durations
       let visualDuration = 0;
       let audioDuration = 0;
 
-      if (e.type === 'comment' || e.type === 'bar') {
+      if (e.type === "comment" || e.type === "bar") {
         // No duration for these
-      } else if (e.type === 'skip') {
+      } else if (e.type === "skip") {
         visualDuration = (e.duration || 0) * beatDur;
         audioDuration = 0; // Skip consumes 0 audio time
       } else {
@@ -88,11 +95,11 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
         audioDuration: audioDuration,
       });
 
-      console.log(lines)
+      console.log(lines);
 
       lines[lineIdx].duration += visualDuration;
 
-      if (event.type !== 'comment') {
+      if (event.type !== "comment") {
         currentVisualTime += visualDuration;
         currentAudioTime += audioDuration;
       }
@@ -123,7 +130,6 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
     activeLineIndexRef.current = activeLineIndex;
   }, [activeLineIndex]);
 
-
   const [containerWidth, setContainerWidth] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
 
@@ -144,133 +150,157 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
     : 120;
   const PIXELS_PER_SECOND = (BEAT_WIDTH * bpm) / 60;
 
-  const updateVisuals = useCallback((overrideTime?: number) => {
-    if (!voiceData) return;
+  const updateVisuals = useCallback(
+    (overrideTime?: number) => {
+      if (!voiceData) return;
 
-    const now = typeof overrideTime === 'number' ? overrideTime : Tone.getTransport().seconds;
-    currentTimeRef.current = now;
+      const now =
+        typeof overrideTime === "number"
+          ? overrideTime
+          : Tone.getTransport().seconds;
+      currentTimeRef.current = now;
 
-    // 1. Calculate active line
-    let newActiveLineIdx = -1;
+      // 1. Calculate active line
+      let newActiveLineIdx = -1;
 
-    // Find line that contains the audio time
-    // We need to check audio time ranges of lines
-    // Since lines are sequential in time, we can look at the events in them?
-    // Actually, voiceData.lines now has 'startTime' as VISUAL start time.
-    // We need to infer audio start time range for the line from its events.
+      // Find line that contains the audio time
+      // We need to check audio time ranges of lines
+      // Since lines are sequential in time, we can look at the events in them?
+      // Actually, voiceData.lines now has 'startTime' as VISUAL start time.
+      // We need to infer audio start time range for the line from its events.
 
-    // Optimization: Pre-calculate line audio ranges in useMemo? 
-    // For now, let's iterate to find the line where:
-    // line.firstEvent.audioStartTime <= now <= line.lastEvent.audioEndTime
+      // Optimization: Pre-calculate line audio ranges in useMemo?
+      // For now, let's iterate to find the line where:
+      // line.firstEvent.audioStartTime <= now <= line.lastEvent.audioEndTime
 
-    // However, voiceData.lines structure only has 'startTime' which is now VISUAL.
-    // The events inside have 'audioStartTime'.
+      // However, voiceData.lines structure only has 'startTime' which is now VISUAL.
+      // The events inside have 'audioStartTime'.
 
-    const lines = voiceData.lines;
-    for (let idx = 0; idx < lines.length; idx++) {
-      const line = lines[idx];
-      if (line.events.length > 0) {
-        const firstEvent = line.events[0];
-        const lastEvent = line.events[line.events.length - 1];
-        // We need safely cast or check properties
-        const startAudio = firstEvent.audioStartTime || 0;
-        const endAudio = (lastEvent.audioStartTime || 0) + (lastEvent.audioDuration || 0);
+      const lines = voiceData.lines;
+      for (let idx = 0; idx < lines.length; idx++) {
+        const line = lines[idx];
+        if (line.events.length > 0) {
+          const firstEvent = line.events[0];
+          const lastEvent = line.events[line.events.length - 1];
+          // We need safely cast or check properties
+          const startAudio = firstEvent.audioStartTime || 0;
+          const endAudio =
+            (lastEvent.audioStartTime || 0) + (lastEvent.audioDuration || 0);
 
-        if (now >= startAudio && now <= endAudio) {
-          newActiveLineIdx = idx;
-          break;
-        }
-      }
-    }
-
-    // Only update state if line changed
-    if (newActiveLineIdx !== activeLineIndexRef.current) {
-      setActiveLineIndex(newActiveLineIdx);
-      // Reset scroll when line changes
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollLeft = 0;
-      }
-      return;
-    }
-
-    // 2. Update Playhead Position directly
-    if (playheadRef.current && newActiveLineIdx !== -1) {
-      const line = voiceData.lines[newActiveLineIdx];
-
-      // Calculate visual progress based on audio time "now"
-      // We iterate events in the line to find where "now" falls
-      let visualProgressOffset = 0;
-      let found = false;
-
-      for (const event of line.events) {
-        const eStart = event.audioStartTime || 0;
-        const eDur = event.audioDuration || 0;
-        const eEnd = eStart + eDur;
-
-        if (now >= eStart && now < eEnd) {
-          // In this event
-          const percent = (now - eStart) / (eDur || 0.001); // avoid div by zero
-          visualProgressOffset = (event.startTime - line.startTime) + (percent * event.durationSeconds);
-          found = true;
-          break;
-        } else if (now >= eEnd) {
-          // Past this event
-          // visualProgressOffset = (event.startTime - line.startTime) + event.durationSeconds;
-          // Actually, just taking the end of this event relative to line start
-          visualProgressOffset = (event.startTime - line.startTime) + event.durationSeconds;
-        }
-      }
-
-      // If we finished the line (or are at the exact end), ensure we are at the end visually
-      if (!found && line.events.length > 0) {
-        // If "now" is exactly the end time, or slightly past due to frame timing
-        const last = line.events[line.events.length - 1];
-        // Check if we are really past
-        if (now >= (last.audioStartTime || 0) + (last.audioDuration || 0)) {
-          visualProgressOffset = line.duration;
-        }
-      }
-
-      // Use transform for smooth GPU animation
-      playheadRef.current.style.transform = `translateX(${visualProgressOffset * PIXELS_PER_SECOND}px)`;
-
-      // 3. Handle Auto-scroll inside the loop
-      if (scrollContainerRef.current) {
-        const scrollContainer = scrollContainerRef.current;
-        const playhead = playheadRef.current;
-        const lineContainer = playhead.closest('[style*="height"]'); // VisualizerLine container
-
-        if (lineContainer) {
-          const playheadRect = playhead.getBoundingClientRect();
-          const containerRect = scrollContainer.getBoundingClientRect();
-          // Simple check: is playhead near right edge?
-          const relativeX = playheadRect.left - containerRect.left;
-
-          // If playhead > 95% of view width
-          if (relativeX > containerRect.width * 0.95) {
-            // Scroll forward
-            // Calculate target: current scroll + relativeX - 10% buffering
-            const currentScroll = scrollContainer.scrollLeft;
-            const targetScroll = currentScroll + relativeX - (containerRect.width * 0.1);
-            scrollContainer.scrollLeft = targetScroll;
+          if (now >= startAudio && now <= endAudio) {
+            newActiveLineIdx = idx;
+            break;
           }
         }
       }
+
+      // Only update state if line changed
+      if (newActiveLineIdx !== activeLineIndexRef.current) {
+        setActiveLineIndex(newActiveLineIdx);
+        return;
+      }
+
+      // 2. Update Playhead Position directly
+      if (playheadRef.current && newActiveLineIdx !== -1) {
+        const line = voiceData.lines[newActiveLineIdx];
+
+        // Calculate visual progress based on audio time "now"
+        // We iterate events in the line to find where "now" falls
+        let visualProgressOffset = 0;
+        let found = false;
+
+        for (const event of line.events) {
+          const eStart = event.audioStartTime || 0;
+          const eDur = event.audioDuration || 0;
+          const eEnd = eStart + eDur;
+
+          if (now >= eStart && now < eEnd) {
+            // In this event
+            const percent = (now - eStart) / (eDur || 0.001); // avoid div by zero
+            visualProgressOffset =
+              event.startTime -
+              line.startTime +
+              percent * event.durationSeconds;
+            found = true;
+            break;
+          } else if (now >= eEnd) {
+            // Past this event
+            // visualProgressOffset = (event.startTime - line.startTime) + event.durationSeconds;
+            // Actually, just taking the end of this event relative to line start
+            visualProgressOffset =
+              event.startTime - line.startTime + event.durationSeconds;
+          }
+        }
+
+        // If we finished the line (or are at the exact end), ensure we are at the end visually
+        if (!found && line.events.length > 0) {
+          // If "now" is exactly the end time, or slightly past due to frame timing
+          const last = line.events[line.events.length - 1];
+          // Check if we are really past
+          if (now >= (last.audioStartTime || 0) + (last.audioDuration || 0)) {
+            visualProgressOffset = line.duration;
+          }
+        }
+
+        // Use transform for smooth GPU animation
+        playheadRef.current.style.transform = `translateX(${visualProgressOffset * PIXELS_PER_SECOND}px)`;
+
+        // 3. Handle Auto-scroll inside the loop
+        if (scrollContainerRef.current) {
+          const scrollContainer = scrollContainerRef.current;
+          const playhead = playheadRef.current;
+          const lineContainer = playhead.closest('[style*="height"]'); // VisualizerLine container
+
+          if (lineContainer) {
+            const playheadRect = playhead.getBoundingClientRect();
+            const containerRect = scrollContainer.getBoundingClientRect();
+            // Check: where is the playhead relative to the scroll container's view?
+            const relativeX = playheadRect.left - containerRect.left;
+
+            // If playhead > 90% of view width (scrolling forward)
+            if (relativeX > containerRect.width * 0.9) {
+              const currentScroll = scrollContainer.scrollLeft;
+              const targetScroll =
+                currentScroll + relativeX - containerRect.width * 0.1;
+              scrollContainer.scrollLeft = targetScroll;
+            }
+            // If playhead < 5% of view width (scrolling backward or just jumped to a new line)
+            else if (relativeX < containerRect.width * 0.05) {
+              const currentScroll = scrollContainer.scrollLeft;
+              // Scroll back so playhead is at 10% from the left
+              const targetScroll =
+                currentScroll + relativeX - containerRect.width * 0.1;
+              scrollContainer.scrollLeft = Math.max(0, targetScroll);
+            }
+          }
+        }
+      }
+    },
+    [voiceData, PIXELS_PER_SECOND],
+  );
+
+  // Handle seek-on-pause visual update AFTER line change has mounted
+  useEffect(() => {
+    if (!isPlaying && activeLineIndex !== -1) {
+      // Small delay to ensure the playhead Ref is available in the new line
+      const timeout = setTimeout(() => {
+        updateVisuals(currentTimeRef.current);
+      }, 0);
+      return () => clearTimeout(timeout);
     }
-  }, [voiceData, PIXELS_PER_SECOND]);
+  }, [activeLineIndex, isPlaying, updateVisuals]);
 
   // Initialize active line on load/seek
   useEffect(() => {
     if (!voiceData) return;
-    const idx = voiceData.lines.findIndex(
-      (line) => {
-        if (line.events.length === 0) return false;
-        const startAudio = line.events[0].audioStartTime || 0;
-        const lastEvent = line.events[line.events.length - 1];
-        const endAudio = (lastEvent.audioStartTime || 0) + (lastEvent.audioDuration || 0);
-        return initialTime >= startAudio && initialTime <= endAudio;
-      }
-    );
+    const idx = voiceData.lines.findIndex((line) => {
+      if (line.events.length === 0) return false;
+      const startAudio = line.events[0].audioStartTime || 0;
+      const lastEvent = line.events[line.events.length - 1];
+      const endAudio =
+        (lastEvent.audioStartTime || 0) + (lastEvent.audioDuration || 0);
+      return initialTime >= startAudio && initialTime <= endAudio;
+    });
     setActiveLineIndex(idx);
     currentTimeRef.current = initialTime;
 
@@ -335,7 +365,6 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
             zoomLevel={zoomLevel}
             setZoomLevel={setZoomLevel}
           />
-
         </div>
       </div>
 
@@ -361,7 +390,7 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
                   line={line}
                   isActive={isActive}
                   // We pass a rough currentTime prop if needed, but for the running line
-                  // the Playhead is handled via Ref. 
+                  // the Playhead is handled via Ref.
                   // If we don't pass reliable currentTime, the static background lines might be ok.
                   // But 'isActive' is what triggers the playhead mount.
                   currentTime={isActive ? currentTimeRef.current : 0}

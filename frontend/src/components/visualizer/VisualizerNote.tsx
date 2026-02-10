@@ -127,7 +127,7 @@ export function VisualizerNote({
       label += " (Tivra)";
 
     if (octave && octave !== 0) {
-      label += ` ${octave > 0 ? "+" : ""}${octave} Octave`;
+      label += ` ${octave > 0 ? "+" : ""}${octave}`;
     }
     return label;
   };
