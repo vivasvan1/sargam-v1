@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { VisualizerBeatNumbers, VisualizerGrid } from "./VisualizerGrid";
 import { VisualizerNote } from "./VisualizerNote";
@@ -23,9 +24,10 @@ interface VisualizerLineProps {
     pixelsPerSecond: number;
     onSeek?: (time: number) => void;
     playheadRef?: React.RefObject<HTMLDivElement | null>;
+    zoomLevel: number;
 }
 
-export function VisualizerLine({
+export const VisualizerLine = memo(function VisualizerLine({
     line,
     previousLine,
     isActive,
@@ -35,7 +37,8 @@ export function VisualizerLine({
     beatWidth,
     pixelsPerSecond,
     onSeek,
-    playheadRef
+    playheadRef,
+    zoomLevel
 }: VisualizerLineProps) {
     const isCommentLine = line.events.some(e => e.type === 'comment');
     const isPreviousCommentLine = previousLine?.events.some(e => e.type === 'comment');
@@ -58,19 +61,16 @@ export function VisualizerLine({
     const lineProgress = isActive ? currentTime - line.startTime : 0;
     const totalBeatsInLine = Math.ceil(line.duration / beatDur);
     const lineWidth = (beatCount || totalBeatsInLine || 4) * beatWidth;
-
     return (
         <>
             {isPreviousCommentLine && <VisualizerBeatNumbers
                 beatCount={beatCount}
                 beatWidth={beatWidth}
+                zoomLevel={zoomLevel}
             />}
             <div
                 className={cn(
                     "relative group transition-all duration-500",
-                    isActive
-                        ? "opacity-100"
-                        : "opacity-70 blur-[0.3px] hover:opacity-100"
                 )}
                 style={{
                     height: "4rem",
@@ -81,7 +81,6 @@ export function VisualizerLine({
                 <VisualizerGrid
                     beatCount={beatCount}
                     beatWidth={beatWidth}
-                    totalBeatsInLine={totalBeatsInLine}
                 />
 
                 <div className="absolute inset-0 z-10 pointer-events-none">
@@ -125,4 +124,4 @@ export function VisualizerLine({
             </div>
         </>
     );
-}
+});

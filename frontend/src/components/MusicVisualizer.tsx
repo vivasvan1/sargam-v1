@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import * as Tone from "tone";
 import type { MusicCell as ParsedMusicCell } from "../utils/sargam_parser";
 import { VisualizerHeader } from "./visualizer/VisualizerHeader";
@@ -34,7 +34,8 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
-  const [currentTime, setCurrentTime] = useState(initialTime);
+  // We keep a ref for the current time to avoid closure staleness in the loop without re-renders
+  const currentTimeRef = useRef(initialTime);
   const requestRef = useRef<number>(null);
 
   // Group events by line_index for the first voice (primary visual)
@@ -60,11 +61,6 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
         lines[lineIdx] = { events: [], duration: 0, startTime: absTime };
 
       const durationSeconds = (e.type === 'comment' || e.type === 'bar') ? 0 : (e.duration || 0) * beatDur;
-      // We attribute 0 or small duration to comment? 
-      // Actually comments shouldn't advance music time usually if they are blocks associated with a line. 
-      // But here we're grouping strictly by line_index from parser.
-      // Parser increments line index for new lines.
-      // So a comment line is its own line_index.
 
       lines[lineIdx].events.push({
         ...event,
@@ -73,9 +69,6 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
       });
       lines[lineIdx].duration += durationSeconds;
 
-      // If it's a music event, it advances time. If comment, it might not?
-      // For now, let's treat comments as having 0 duration in playback time, 
-      // but they exist in the sequence.
       if (event.type !== 'comment') {
         absTime += durationSeconds;
       }
@@ -97,14 +90,148 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
     };
   }, [parsedData]);
 
-  const animate = () => {
-    if (isPlaying) {
-      setCurrentTime(Tone.getTransport().seconds);
-      requestRef.current = requestAnimationFrame(animate);
-    }
-  };
+  // Explicit state for active line index to trigger re-renders only when line changes
+  const [activeLineIndex, setActiveLineIndex] = useState(-1);
+  const activeLineIndexRef = useRef(activeLineIndex);
+
+  // Update ref when state changes
+  useEffect(() => {
+    activeLineIndexRef.current = activeLineIndex;
+  }, [activeLineIndex]);
+
 
   const [containerWidth, setContainerWidth] = useState(0);
+  const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
+
+  // BEAT_WIDTH calculation needed for pixelsPerSecond
+  // Dynamic BEAT_WIDTH calculation:
+  const PADDING = 48;
+  const rawBeatWidth =
+    (voiceData?.beatCount ?? 0) > 0
+      ? Math.abs((containerWidth - PADDING) / (voiceData?.beatCount ?? 1))
+      : 60;
+
+  // Calculate base width (fit to screen logic), then apply zoom
+  const baseBeatWidth = Math.max(46, Math.min(120, rawBeatWidth));
+  const BEAT_WIDTH = baseBeatWidth * zoomLevel;
+
+  const bpm = parsedData?.directives.tempo
+    ? parseFloat(parsedData.directives.tempo)
+    : 120;
+  const PIXELS_PER_SECOND = (BEAT_WIDTH * bpm) / 60;
+
+  const updateVisuals = useCallback((overrideTime?: number) => {
+    if (!voiceData) return;
+
+    const now = typeof overrideTime === 'number' ? overrideTime : Tone.getTransport().seconds;
+    currentTimeRef.current = now;
+
+    // 1. Calculate active line
+    // Optimization: Start searching from current or next line instead of finding from scratch
+    // But findIndex is fast enough for < 1000 lines usually.
+    let newActiveLineIdx = -1;
+    // Fast path: check current line first
+    const currentIdx = activeLineIndexRef.current;
+    if (currentIdx !== -1 && voiceData.lines[currentIdx]) {
+      const line = voiceData.lines[currentIdx];
+      if (now >= line.startTime && now <= line.startTime + line.duration) {
+        newActiveLineIdx = currentIdx;
+      }
+    }
+
+    if (newActiveLineIdx === -1) {
+      newActiveLineIdx = voiceData.lines.findIndex(
+        (line) =>
+          now >= line.startTime &&
+          now <= line.startTime + line.duration
+      );
+    }
+
+    // Only update state if line changed
+    if (newActiveLineIdx !== activeLineIndexRef.current) {
+      setActiveLineIndex(newActiveLineIdx);
+      // Reset scroll when line changes
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollLeft = 0;
+      }
+      return;
+    }
+
+    // 2. Update Playhead Position directly
+    if (playheadRef.current && newActiveLineIdx !== -1) {
+      const line = voiceData.lines[newActiveLineIdx];
+      const lineProgress = now - line.startTime;
+      // Use transform for smooth GPU animation
+      playheadRef.current.style.transform = `translateX(${lineProgress * PIXELS_PER_SECOND}px)`;
+
+      // 3. Handle Auto-scroll inside the loop
+      if (scrollContainerRef.current) {
+        const scrollContainer = scrollContainerRef.current;
+        const playhead = playheadRef.current;
+        const lineContainer = playhead.closest('[style*="height"]'); // VisualizerLine container
+
+        if (lineContainer) {
+          const playheadRect = playhead.getBoundingClientRect();
+          const containerRect = scrollContainer.getBoundingClientRect();
+          // Simple check: is playhead near right edge?
+          const relativeX = playheadRect.left - containerRect.left;
+
+          // If playhead > 95% of view width
+          if (relativeX > containerRect.width * 0.95) {
+            // Scroll forward
+            // Calculate target: current scroll + relativeX - 10% buffering
+            const currentScroll = scrollContainer.scrollLeft;
+            const targetScroll = currentScroll + relativeX - (containerRect.width * 0.1);
+            scrollContainer.scrollLeft = targetScroll;
+          }
+        }
+      }
+    }
+  }, [voiceData, PIXELS_PER_SECOND]);
+
+  // Initialize active line on load/seek
+  useEffect(() => {
+    if (!voiceData) return;
+    const idx = voiceData.lines.findIndex(
+      (line) =>
+        initialTime >= line.startTime &&
+        initialTime <= line.startTime + line.duration
+    );
+    setActiveLineIndex(idx);
+    currentTimeRef.current = initialTime;
+
+    // Force direct visual update if paused, so seek updates immediately
+    if (!isPlaying) {
+      updateVisuals(initialTime);
+    }
+  }, [initialTime, voiceData, isPlaying, updateVisuals]);
+
+  // Animation Loop
+  useEffect(() => {
+    const loop = () => {
+      if (isPlaying) {
+        updateVisuals();
+        requestRef.current = requestAnimationFrame(loop);
+      }
+    };
+
+    if (isPlaying) {
+      requestRef.current = requestAnimationFrame(loop);
+      // Focus view on start
+      if (containerRef.current) {
+        containerRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+      }
+    } else {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    }
+
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, [isPlaying, updateVisuals]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -117,151 +244,26 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (isPlaying) {
-      requestRef.current = requestAnimationFrame(animate);
-      // Focus and scroll into view when visualizer appears
-      if (containerRef.current) {
-        containerRef.current.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-        });
-      }
-    } else {
-      if (requestRef.current) {
-        cancelAnimationFrame(requestRef.current);
-      }
-      setCurrentTime(initialTime);
-    }
-    return () => {
-      if (requestRef.current) {
-        cancelAnimationFrame(requestRef.current);
-      }
-    };
-  }, [isPlaying, initialTime]);
-
-  // Find current active line based on currentTime
-  const activeLineIndex = useMemo(() => {
-    if (!voiceData || !voiceData.lines) return -1;
-    return voiceData.lines.findIndex(
-      (line) =>
-        currentTime >= line.startTime &&
-        currentTime <= line.startTime + line.duration
-    );
-  }, [voiceData, currentTime]);
-
-  // Track previous active line index to detect line changes
-  const prevActiveLineIndexRef = useRef(-1);
-
-  // Reset scroll when moving to a new line
-  useEffect(() => {
-    if (!isPlaying || !scrollContainerRef.current || activeLineIndex === -1)
-      return;
-
-    // If we've moved to a new line, reset scroll to beginning
-    if (
-      prevActiveLineIndexRef.current !== -1 &&
-      prevActiveLineIndexRef.current !== activeLineIndex
-    ) {
-      scrollContainerRef.current.scrollLeft = 0;
-    }
-
-    // Update previous index
-    prevActiveLineIndexRef.current = activeLineIndex;
-  }, [activeLineIndex, isPlaying]);
-
-  // Check if current line has ended
-  useEffect(() => {
-    if (
-      !isPlaying ||
-      !scrollContainerRef.current ||
-      !voiceData ||
-      activeLineIndex === -1
-    )
-      return;
-
-    const activeLine = voiceData.lines[activeLineIndex];
-    if (!activeLine) return;
-
-    // Check if we've reached the end of the current line
-    const lineEndTime = activeLine.startTime + activeLine.duration;
-    const isAtLineEnd = currentTime >= lineEndTime - 0.1; // Small threshold to account for timing
-
-    if (isAtLineEnd) {
-      // Reset scroll to beginning
-      scrollContainerRef.current.scrollLeft = 0;
-    }
-  }, [currentTime, isPlaying, activeLineIndex, voiceData]);
-
-
-  // Auto-scroll to keep playhead in view - jump scroll when about to overflow
-  useEffect(() => {
-    if (
-      !isPlaying ||
-      !scrollContainerRef.current ||
-      !playheadRef.current ||
-      activeLineIndex === -1
-    )
-      return;
-
-    const scrollContainer = scrollContainerRef.current;
-    const playhead = playheadRef.current;
-    if (!scrollContainer || !playhead) return;
-
-    // Get the line container that holds the playhead
-    const lineContainer = playhead.closest('[style*="height"]');
-    if (!lineContainer) return;
-
-    // Get bounding rectangles
-    const playheadRect = playhead.getBoundingClientRect();
-    const containerRect = scrollContainer.getBoundingClientRect();
-    const lineRect = lineContainer.getBoundingClientRect();
-
-    // Calculate playhead's position within the scrollable content
-    const playheadLeftInContent =
-      lineRect.left -
-      containerRect.left +
-      (playheadRect.left - lineRect.left) +
-      scrollContainer.scrollLeft;
-
-    // Check if playhead is about to overflow (within 5% of right edge)
-    const overflowThreshold = containerRect.width * 0.95;
-    const playheadPositionInView = playheadRect.left - containerRect.left;
-
-    // If playhead is about to move out of view (past 95% of container width)
-    if (playheadPositionInView > overflowThreshold) {
-      // Scroll so playhead is at 10% from left
-      const targetPosition = playheadLeftInContent - containerRect.width * 0.1;
-      scrollContainer.scrollLeft = Math.max(0, targetPosition);
-    }
-  }, [currentTime, isPlaying, activeLineIndex]);
-
   if (!voiceData) return null;
-
-  // Dynamic BEAT_WIDTH calculation:
-  const PADDING = 48;
-  const rawBeatWidth =
-    voiceData.beatCount > 0
-      ? (containerWidth - PADDING) / voiceData.beatCount
-      : 60;
-  const BEAT_WIDTH = Math.max(46, Math.min(80, rawBeatWidth));
-
-  const bpm = parsedData?.directives.tempo
-    ? parseFloat(parsedData.directives.tempo)
-    : 120;
-  const PIXELS_PER_SECOND = (BEAT_WIDTH * bpm) / 60;
 
   return (
     <div
       ref={containerRef}
-      className="mt-4 md:mt-6 p-4 md:p-6 bg-card/60 backdrop-blur-xl border border-border/40 rounded-xl md:rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-full"
+      className="mt-4 md:mt-6 p-4 md:p-6 bg-card/60 backdrop-blur-xl border border-border/40 rounded-xl md:rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-full relative group/viz"
     >
-      <VisualizerHeader
-        parsedData={parsedData}
-        isPlaying={isPlaying}
-        onPlay={onPlay}
-        bpm={bpm}
-      />
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <VisualizerHeader
+            parsedData={parsedData}
+            isPlaying={isPlaying}
+            onPlay={onPlay}
+            bpm={bpm}
+            zoomLevel={zoomLevel}
+            setZoomLevel={setZoomLevel}
+          />
+
+        </div>
+      </div>
 
       <div
         ref={scrollContainerRef}
@@ -269,12 +271,13 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
       >
         <div className="min-w-max flex flex-col">
           <VisualizerBeatNumbers
-            beatCount={voiceData.beatCount}
+            beatCount={voiceData?.beatCount ?? 16}
             beatWidth={BEAT_WIDTH}
+            zoomLevel={zoomLevel}
           />
 
           <div className="pt-6">
-            {voiceData.lines.map((line, idx) => {
+            {voiceData?.lines?.map((line, idx) => {
               const isActive = idx === activeLineIndex;
 
               return (
@@ -283,13 +286,18 @@ export function MusicVisualizer({ parsedData, isPlaying, onPlay, initialTime = 0
                   previousLine={idx !== 0 ? voiceData.lines.at(idx - 1) : null}
                   line={line}
                   isActive={isActive}
-                  currentTime={currentTime}
+                  // We pass a rough currentTime prop if needed, but for the running line
+                  // the Playhead is handled via Ref. 
+                  // If we don't pass reliable currentTime, the static background lines might be ok.
+                  // But 'isActive' is what triggers the playhead mount.
+                  currentTime={isActive ? currentTimeRef.current : 0}
                   beatDur={voiceData.beatDur}
                   beatCount={voiceData.beatCount}
                   beatWidth={BEAT_WIDTH}
                   pixelsPerSecond={PIXELS_PER_SECOND}
                   onSeek={onSeek}
                   playheadRef={isActive ? playheadRef : undefined}
+                  zoomLevel={zoomLevel}
                 />
               );
             })}

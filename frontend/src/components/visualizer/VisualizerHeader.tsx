@@ -9,11 +9,13 @@ interface VisualizerHeaderProps {
     isPlaying: boolean;
     onPlay: () => void;
     bpm: number;
+    zoomLevel: number;
+    setZoomLevel: React.Dispatch<React.SetStateAction<number>>;
 }
 
-export function VisualizerHeader({ parsedData, isPlaying, onPlay, bpm }: VisualizerHeaderProps) {
+export function VisualizerHeader({ parsedData, isPlaying, onPlay, bpm, zoomLevel, setZoomLevel }: VisualizerHeaderProps) {
     return (
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between w-full">
             <div className="space-y-1">
                 <div className="flex items-center gap-1">
                     <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary/80">
@@ -25,19 +27,25 @@ export function VisualizerHeader({ parsedData, isPlaying, onPlay, bpm }: Visuali
                     {parsedData?.directives.tala || "Free Rhythm"} • {bpm} BPM
                 </p>
             </div>
-            <div className="flex gap-2">
-                <div className="flex items-center gap-3 bg-muted/20 px-3 py-1.5 rounded-full border border-border/50">
-                    <div
-                        className={cn(
-                            "w-2 h-2 rounded-full",
-                            isPlaying
-                                ? "bg-green-500 animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.8)]"
-                                : "bg-primary"
-                        )}
-                    />
-                    <span className="text-[9px] font-bold tracking-tight text-foreground/70">
-                        {isPlaying ? "PLAYING" : "IDLE"}
-                    </span>
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 bg-muted/50 p-1.5 rounded-lg">
+                    <button
+                        className="p-1 hover:bg-background rounded-md disabled:opacity-50"
+                        onClick={() => setZoomLevel(z => Math.max(0.5, z - 0.25))}
+                        disabled={zoomLevel <= 0.5}
+                        title="Zoom Out"
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
+                    </button>
+                    <span className="text-xs font-mono w-12 text-center">{Math.round(zoomLevel * 100)}%</span>
+                    <button
+                        className="p-1 hover:bg-background rounded-md disabled:opacity-50"
+                        onClick={() => setZoomLevel(z => Math.min(3, z + 0.25))}
+                        disabled={zoomLevel >= 3}
+                        title="Zoom In"
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
+                    </button>
                 </div>
                 <Button
                     onClick={onPlay}
@@ -48,15 +56,16 @@ export function VisualizerHeader({ parsedData, isPlaying, onPlay, bpm }: Visuali
                     {isPlaying ? (
                         <>
                             <Pause className="w-3 h-3 fill-current shrink-0" />{" "}
-                            <span className="hidden sm:inline">Stop</span>
+                            <span className="inline">Stop</span>
                         </>
                     ) : (
                         <>
                             <Play className="w-3 h-3 fill-current shrink-0" />{" "}
-                            <span className="hidden sm:inline">Listen</span>
+                            <span className="inline">Play</span>
                         </>
                     )}
                 </Button>
+
             </div>
         </div>
     );

@@ -10,9 +10,10 @@ export const VisualizerPlayhead = forwardRef<HTMLDivElement, VisualizerPlayheadP
         return (
             <div
                 ref={ref}
-                className="absolute top-[-4px] bottom-[-4px] w-[2px] bg-primary z-20 pointer-events-none transition-transform duration-75 ease-linear"
+                className="absolute top-[-4px] bottom-[-4px] w-[2px] bg-primary z-20 pointer-events-none"
                 style={{
-                    left: `${lineProgress * pixelsPerSecond}px`,
+                    transform: `translateX(${lineProgress * pixelsPerSecond}px)`,
+                    willChange: "transform",
                     boxShadow: "0 0 12px 2px rgba(var(--primary), 0.4)",
                 }}
             >

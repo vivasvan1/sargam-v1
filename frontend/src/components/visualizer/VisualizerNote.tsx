@@ -158,7 +158,7 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
             <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
                 <TooltipTrigger asChild>
                     <div
-                        className="absolute top-[15%] bottom-[15%] rounded-md overflow-hidden transition-all duration-500 shadow-lg bg-linear-to-r from-primary/30 via-primary/15 to-primary/30 border-[1.5px] border-primary/40 cursor-pointer pointer-events-auto hover:border-primary/60 select-none"
+                        className="absolute top-[5%] bottom-[5%] rounded-md overflow-hidden transition-all duration-500 shadow-lg bg-linear-to-r from-primary/50 via-primary/25 to-primary/50 border-[1.5px] border-primary/60 cursor-pointer pointer-events-auto hover:border-primary/80 select-none"
                         onClick={handleClick}
                         onTouchStart={handleTouchStart}
                         onTouchEnd={handleTouchEnd}
@@ -169,7 +169,7 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
                         }}
                     >
                         <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                            <span className={cn("text-[10px] font-black text-primary drop-shadow-sm", isHindi && isKomalStart && "underline decoration-2 underline-offset-2")}>
+                            <span className={cn("text-xs font-black text-primary drop-shadow-sm", isHindi && isKomalStart && "underline decoration-2 underline-offset-2")}>
                                 {displaySwaraStart}
                                 {!isHindi && event.variant || ""}
                             </span>
@@ -186,7 +186,7 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
                             </svg>
                         </div>
                         <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                            <span className={cn("text-[10px] font-black text-primary drop-shadow-sm", isHindi && isKomalEnd && "underline decoration-2 underline-offset-2")}>
+                            <span className={cn("text-xs font-black text-primary drop-shadow-sm", isHindi && isKomalEnd && "underline decoration-2 underline-offset-2")}>
                                 {displaySwaraEnd}
                                 {!isHindi && targetVariant}
                             </span>
@@ -218,7 +218,7 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
                 <TooltipTrigger asChild>
                     <div
                         className={cn(
-                            "absolute top-[10%] bottom-[10%] w-[4px] rounded-full transition-all duration-500 cursor-help pointer-events-auto select-none",
+                            "absolute top-[5%] bottom-[5%] w-[4px] rounded-full transition-all duration-500 cursor-help pointer-events-auto select-none",
                             "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
                         )}
                         onClick={handleClick}
@@ -249,9 +249,9 @@ export function VisualizerNote({ event, lineStartTime, pixelsPerSecond, onSeek }
             <TooltipTrigger asChild>
                 <div
                     className={cn(
-                        "absolute top-[15%] bottom-[15%] rounded-md flex items-center justify-center text-[10px] font-black tracking-tight transition-all duration-500 shadow-sm cursor-pointer pointer-events-auto hover:border-primary/50 select-none",
+                        "absolute top-[5%] bottom-[5%] rounded-md flex items-center justify-center text-xs font-black tracking-tight transition-all duration-500 shadow-sm cursor-pointer pointer-events-auto hover:border-primary/70 select-none",
                         event.swara
-                            ? "bg-linear-to-br from-primary/25 to-primary/5 text-primary border border-primary/20"
+                            ? "bg-linear-to-br from-primary/40 to-primary/10 text-primary border border-primary/40"
                             : "bg-muted/10 border border-transparent opacity-40 hover:opacity-60"
                     )}
                     onClick={handleClick}
