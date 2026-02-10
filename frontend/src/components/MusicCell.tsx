@@ -16,6 +16,7 @@ import type { Instrument } from '../lib/instruments';
 import { Mixer, type VoiceControl } from './music-cell/Mixer';
 import { Controls } from './music-cell/Controls';
 import { useNotebookSettings } from '../context/NotebookSettingsContext';
+import { usePlaybackStore } from '../store/usePlaybackStore';
 
 interface MusicCellProps {
   cell: {
@@ -53,6 +54,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   >({});
   const [showMixer, setShowMixer] = useState(false);
   const activeNodesRef = useRef<Record<string, ActiveNode>>({});
+  const { setActiveCell, clearActiveCell } = usePlaybackStore();
   const {
     defaultInstruments,
     updateDefaultInstrument,
@@ -206,6 +208,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       // Re-parse to get the latest exact structure for playback
       const data = parseMusicCell(content.split('\n'));
       setLastParsedData(data);
+      setActiveCell(cell.id, stopPlayback);
       await playMusic(data, voiceControls, initialStartTime);
       setIsPlaying(true);
     } catch (e) {
@@ -261,6 +264,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       }
     );
     activeNodesRef.current = {};
+    clearActiveCell(cell.id);
     setIsPlaying(false);
   };
 

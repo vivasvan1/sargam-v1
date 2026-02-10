@@ -17,7 +17,7 @@ interface VisualizerLineProps {
     startTime: number;
   } | null;
   isActive: boolean;
-  currentTime: number;
+  visualProgressOffset: number;
   beatDur: number;
   beatCount: number;
   beatWidth: number;
@@ -31,7 +31,7 @@ export const VisualizerLine = memo(function VisualizerLine({
   line,
   previousLine,
   isActive,
-  currentTime,
+  visualProgressOffset,
   beatDur,
   beatCount,
   beatWidth,
@@ -65,7 +65,6 @@ export const VisualizerLine = memo(function VisualizerLine({
     );
   }
 
-  const lineProgress = isActive ? currentTime - line.startTime : 0;
   const totalBeatsInLine = Math.ceil(line.duration / beatDur);
   const lineWidth = (beatCount || totalBeatsInLine || 4) * beatWidth;
   return (
@@ -121,7 +120,7 @@ export const VisualizerLine = memo(function VisualizerLine({
         {isActive && (
           <VisualizerPlayhead
             ref={playheadRef}
-            lineProgress={lineProgress}
+            lineProgress={visualProgressOffset}
             pixelsPerSecond={pixelsPerSecond}
           />
         )}

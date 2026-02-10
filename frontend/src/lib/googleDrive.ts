@@ -72,7 +72,6 @@ interface SaveFileResult {
 
 // Helper to check if a file is public
 export function checkIfPublic(file: GoogleFile): boolean {
-  console.log(file, file.permissions);
   if (!file.permissions) return false;
   return file.permissions.some(
     (p) => p.type === 'anyone' || p.type === 'domain'
@@ -884,8 +883,8 @@ export async function deleteFile(fileId: string): Promise<void> {
     console.error('Error deleting file:', error);
     throw new Error(
       error.result?.error?.message ||
-        error.message ||
-        'Failed to delete file from Google Drive'
+      error.message ||
+      'Failed to delete file from Google Drive'
     );
   }
 }
@@ -972,7 +971,7 @@ export async function setFilePublic(fileId: string): Promise<void> {
     console.error('Error setting file public:', error);
     throw new Error(
       'Failed to make file public: ' +
-        (error.result?.error?.message || error.message)
+      (error.result?.error?.message || error.message)
     );
   }
 }

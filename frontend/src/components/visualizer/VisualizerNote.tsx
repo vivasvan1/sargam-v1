@@ -163,8 +163,9 @@ export function VisualizerNote({
       isLongPress.current = false;
       return;
     }
-    onSeek?.(event.startTime);
-  }, [event.startTime, onSeek]);
+    // Seeking must use audioStartTime, not visual startTime
+    onSeek?.(event.audioStartTime + 0.001);
+  }, [event.audioStartTime, event.startTime, onSeek]);
 
   if (hasMeend && targetSwara) {
     const displaySwaraStart =
@@ -269,12 +270,13 @@ export function VisualizerNote({
   }
 
   if (event.swara === '^') {
+    console.log(event);
     return (
       <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
         <TooltipTrigger asChild>
           <div
             className={cn(
-              'absolute top-[5%] bottom-[5%] w-[4px] rounded-full transition-all duration-500 cursor-help pointer-events-auto select-none',
+              `absolute top-[5%] bottom-[5%] rounded-full transition-all duration-500 cursor-pointer pointer-events-auto select-none`,
               'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
             )}
             onClick={handleClick}
@@ -283,6 +285,8 @@ export function VisualizerNote({
             onTouchMove={handleTouchMove}
             style={{
               left: `${leftPosition}px`,
+              width: `4px`,
+              // width: `${width}px`,
             }}
           >
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[8px] h-[8px] bg-amber-400/30 rounded-full animate-ping" />
@@ -296,12 +300,17 @@ export function VisualizerNote({
   if (event.type === 'skip') {
     return (
       <div
-        className="absolute top-[10%] bottom-[10%] flex items-center justify-center select-none"
+        className="absolute top-[10%] bottom-[10%] border-2 border-dashed border-muted-foreground/20 rounded bg-muted/5 flex items-center justify-center cursor-pointer pointer-events-auto select-none group"
+        onClick={handleClick}
         style={{
           left: `${leftPosition}px`,
           width: `${width}px`,
         }}
-      />
+      >
+        <span className="text-xs text-muted-foreground/40 font-mono group-hover:text-primary transition-colors">
+          /
+        </span>
+      </div>
     );
   }
 
@@ -314,16 +323,6 @@ export function VisualizerNote({
   const isHindi = language === 'hi';
   const showUnderline = isKomal;
   const showOverline = isTivra;
-
-  console.log(
-    isMobile
-      ? 'text-sm'
-      : zoomLevel <= 1
-        ? 'text-xxs'
-        : zoomLevel <= 1.25
-          ? 'text-xs'
-          : 'text-sm'
-  );
   return (
     <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
       <TooltipTrigger asChild>
@@ -356,12 +355,32 @@ export function VisualizerNote({
                   ? 'text-xxs'
                   : zoomLevel <= 1.25
                     ? 'text-xs'
-                    : 'text-sm'
+                    : zoomLevel <= 1.5
+                      ? (event.duration ?? 1) < 0.5
+                        ? 'text-xxs'
+                        : 'text-sm'
+                      : zoomLevel <= 1.75
+                        ? (event.duration ?? 1) < 0.5
+                          ? 'text-xxs'
+                          : 'text-sm'
+                        : (event.duration ?? 1) < 0.5
+                          ? 'text-sm'
+                          : 'text-base'
                 : zoomLevel <= 1
-                  ? 'text-xxs'
+                  ? (event.duration ?? 1) < 0.5
+                    ? 'text-xxxs'
+                    : 'text-xs'
                   : zoomLevel <= 1.25
-                    ? 'text-xs'
-                    : 'text-sm',
+                    ? (event.duration ?? 1) < 0.5
+                      ? 'text-xxs'
+                      : 'text-xs'
+                    : zoomLevel <= 1.5
+                      ? (event.duration ?? 1) < 0.5
+                        ? 'text-xs'
+                        : 'text-base'
+                      : (event.duration ?? 1) < 0.5
+                        ? 'text-sm'
+                        : 'text-base',
               showUnderline && 'underline decoration-2 underline-offset-2',
               showOverline && 'overline decoration-2 overline-offset-2'
             )}

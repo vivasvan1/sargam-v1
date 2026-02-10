@@ -95,8 +95,6 @@ export function MusicVisualizer({
         audioDuration: audioDuration,
       });
 
-      console.log(lines);
-
       lines[lineIdx].duration += visualDuration;
 
       if (event.type !== 'comment') {
@@ -133,8 +131,6 @@ export function MusicVisualizer({
   const [containerWidth, setContainerWidth] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
 
-  // BEAT_WIDTH calculation needed for pixelsPerSecond
-  // Dynamic BEAT_WIDTH calculation:
   const PADDING = 48;
   const rawBeatWidth =
     (voiceData?.beatCount ?? 0) > 0
@@ -149,6 +145,43 @@ export function MusicVisualizer({
     ? parseFloat(parsedData.directives.tempo)
     : 120;
   const PIXELS_PER_SECOND = (BEAT_WIDTH * bpm) / 60;
+
+  const calculateVisualProgressOffset = useCallback(
+    (line: LineData, now: number) => {
+      let visualProgressOffset = 0;
+      let found = false;
+
+      for (const event of line.events) {
+        const eStart = event.audioStartTime || 0;
+        const eDur = event.audioDuration || 0;
+        const eEnd = eStart + eDur;
+
+        if (now >= eStart && now < eEnd) {
+          // In this event
+          const percent = (now - eStart) / (eDur || 0.001); // avoid div by zero
+          visualProgressOffset =
+            event.startTime - line.startTime + percent * event.durationSeconds;
+          found = true;
+          break;
+        } else if (now >= eEnd) {
+          // Past this event
+          visualProgressOffset =
+            event.startTime - line.startTime + event.durationSeconds;
+        }
+      }
+
+      // If we finished the line (or are at the exact end), ensure we are at the end visually
+      if (!found && line.events.length > 0) {
+        const last = line.events[line.events.length - 1];
+        if (now >= (last.audioStartTime || 0) + (last.audioDuration || 0)) {
+          visualProgressOffset = line.duration;
+        }
+      }
+
+      return visualProgressOffset;
+    },
+    []
+  );
 
   const updateVisuals = useCallback(
     (overrideTime?: number) => {
@@ -179,6 +212,10 @@ export function MusicVisualizer({
       const lines = voiceData.lines;
       for (let idx = 0; idx < lines.length; idx++) {
         const line = lines[idx];
+
+        // Skip comment lines for playhead (VisualizerLine treats them as text-only)
+        if (line.events.some((e) => e.type === 'comment')) continue;
+
         if (line.events.length > 0) {
           const firstEvent = line.events[0];
           const lastEvent = line.events[line.events.length - 1];
@@ -203,44 +240,7 @@ export function MusicVisualizer({
       // 2. Update Playhead Position directly
       if (playheadRef.current && newActiveLineIdx !== -1) {
         const line = voiceData.lines[newActiveLineIdx];
-
-        // Calculate visual progress based on audio time "now"
-        // We iterate events in the line to find where "now" falls
-        let visualProgressOffset = 0;
-        let found = false;
-
-        for (const event of line.events) {
-          const eStart = event.audioStartTime || 0;
-          const eDur = event.audioDuration || 0;
-          const eEnd = eStart + eDur;
-
-          if (now >= eStart && now < eEnd) {
-            // In this event
-            const percent = (now - eStart) / (eDur || 0.001); // avoid div by zero
-            visualProgressOffset =
-              event.startTime -
-              line.startTime +
-              percent * event.durationSeconds;
-            found = true;
-            break;
-          } else if (now >= eEnd) {
-            // Past this event
-            // visualProgressOffset = (event.startTime - line.startTime) + event.durationSeconds;
-            // Actually, just taking the end of this event relative to line start
-            visualProgressOffset =
-              event.startTime - line.startTime + event.durationSeconds;
-          }
-        }
-
-        // If we finished the line (or are at the exact end), ensure we are at the end visually
-        if (!found && line.events.length > 0) {
-          // If "now" is exactly the end time, or slightly past due to frame timing
-          const last = line.events[line.events.length - 1];
-          // Check if we are really past
-          if (now >= (last.audioStartTime || 0) + (last.audioDuration || 0)) {
-            visualProgressOffset = line.duration;
-          }
-        }
+        const visualProgressOffset = calculateVisualProgressOffset(line, now);
 
         // Use transform for smooth GPU animation
         playheadRef.current.style.transform = `translateX(${visualProgressOffset * PIXELS_PER_SECOND}px)`;
@@ -276,30 +276,23 @@ export function MusicVisualizer({
         }
       }
     },
-    [voiceData, PIXELS_PER_SECOND]
+    [voiceData, PIXELS_PER_SECOND, calculateVisualProgressOffset]
   );
-
-  // Handle seek-on-pause visual update AFTER line change has mounted
-  useEffect(() => {
-    if (!isPlaying && activeLineIndex !== -1) {
-      // Small delay to ensure the playhead Ref is available in the new line
-      const timeout = setTimeout(() => {
-        updateVisuals(currentTimeRef.current);
-      }, 0);
-      return () => clearTimeout(timeout);
-    }
-  }, [activeLineIndex, isPlaying, updateVisuals]);
 
   // Initialize active line on load/seek
   useEffect(() => {
     if (!voiceData) return;
     const idx = voiceData.lines.findIndex((line) => {
+      // VisualizerLine treats any line with a comment as a pure text line, so we skip it for active playback tracking
+      const isCommentLine = line.events.some((e) => e.type === 'comment');
+      if (isCommentLine) return false;
+
       if (line.events.length === 0) return false;
       const startAudio = line.events[0].audioStartTime || 0;
       const lastEvent = line.events[line.events.length - 1];
       const endAudio =
         (lastEvent.audioStartTime || 0) + (lastEvent.audioDuration || 0);
-      return initialTime >= startAudio && initialTime <= endAudio;
+      return initialTime > startAudio && initialTime <= endAudio;
     });
     setActiveLineIndex(idx);
     currentTimeRef.current = initialTime;
@@ -389,11 +382,14 @@ export function MusicVisualizer({
                   previousLine={idx !== 0 ? voiceData.lines.at(idx - 1) : null}
                   line={line}
                   isActive={isActive}
-                  // We pass a rough currentTime prop if needed, but for the running line
-                  // the Playhead is handled via Ref.
-                  // If we don't pass reliable currentTime, the static background lines might be ok.
-                  // But 'isActive' is what triggers the playhead mount.
-                  currentTime={isActive ? currentTimeRef.current : 0}
+                  visualProgressOffset={
+                    isActive
+                      ? calculateVisualProgressOffset(
+                          line,
+                          currentTimeRef.current
+                        )
+                      : 0
+                  }
                   beatDur={voiceData.beatDur}
                   beatCount={voiceData.beatCount}
                   beatWidth={BEAT_WIDTH}
