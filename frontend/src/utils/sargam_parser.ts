@@ -43,7 +43,13 @@ export interface CommentEvent {
   line_index?: number;
 }
 
-export type Event = NoteEvent | RestEvent | HoldEvent | BarEvent | CommentEvent;
+export interface SkipEvent {
+  type: 'skip';
+  duration: number;
+  line_index?: number;
+}
+
+export type Event = NoteEvent | RestEvent | HoldEvent | BarEvent | CommentEvent | SkipEvent;
 
 export interface Voice {
   name: string;
@@ -203,6 +209,13 @@ export function parseToken(token: string, defaultDuration: number): Event | null
     if (durStr.startsWith(':')) durStr = durStr.slice(1);
     const duration = durStr ? parseFloat(durStr) : defaultDuration;
     return { type: 'hold', duration };
+  }
+
+  if (token.startsWith('/')) {
+    let durStr = token.slice(1);
+    if (durStr.startsWith(':')) durStr = durStr.slice(1);
+    const duration = durStr ? parseFloat(durStr) : defaultDuration;
+    return { type: 'skip', duration };
   }
 
   // 1. Split Lyric (=)

@@ -6,6 +6,7 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
+  --text-xxs: 0.625rem;
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -85,7 +86,9 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
   }
 
   button {
@@ -105,6 +108,7 @@
 }
 
 @theme inline {
+  --text-xxs: 0.625rem;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

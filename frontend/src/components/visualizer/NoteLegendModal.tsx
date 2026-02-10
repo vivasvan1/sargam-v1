@@ -66,6 +66,12 @@ const LEGEND_ITEMS: LegendItem[] = [
         symbol: "Mt",
         description: "'t' after Ma indicates Tivra (sharp) Madhyam.",
         event: { swara: "M", variant: "t", startTime: 0, durationSeconds: 0.8 }
+    },
+    {
+        label: "Skip",
+        symbol: "/",
+        description: "Visually skips time in the grid, but plays instantly (teleport).",
+        event: { type: 'skip', startTime: 0, durationSeconds: 0.8 } as any
     }
 ];
 
@@ -94,6 +100,7 @@ export function NoteLegendModal() {
         setTimeout(() => synth.dispose(), 1000);
     }, []);
 
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -115,6 +122,7 @@ export function NoteLegendModal() {
                                     event={item.event}
                                     lineStartTime={0}
                                     pixelsPerSecond={60}
+                                    zoomLevel={1}
                                 />
                             </div>
                             <div className="flex-1 space-y-1">

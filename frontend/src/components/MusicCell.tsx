@@ -495,6 +495,13 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       voice.events.forEach((event) => {
         if ('duration' in event && event.duration) {
           const durSeconds = event.duration * beatDur;
+
+          if (event.type === 'skip') {
+            // Skip events consume NO audio time, so we do NOT increment `time`.
+            // We just continue.
+            return;
+          }
+
           if (event.type === "note" && 'swara' in event && event.swara) {
             const isChingari = event.swara === '^';
 

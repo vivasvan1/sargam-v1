@@ -109,6 +109,7 @@ export const VisualizerLine = memo(function VisualizerLine({
                                 lineStartTime={line.startTime}
                                 pixelsPerSecond={pixelsPerSecond}
                                 onSeek={onSeek}
+                                zoomLevel={zoomLevel}
                             />
                         );
                     })}

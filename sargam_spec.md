@@ -85,11 +85,13 @@ Each token is one of the following:
    * `"|"` – a vibhag divider within a tala cycle.
    * `"||"` – end of an avartan (complete cycle).
 
-2. **Rest** – `_` optionally followed by a duration specifier (see below).  A rest consumes time without producing a sound.
+2. **Rest** – `_` optionally followed by a duration specifier (see below). A rest consumes time without producing a sound.
 
-3. **Hold** – `.` optionally followed by a duration.  It extends the previous note for the specified duration.
+3. **Hold** – `.` optionally followed by a duration. It extends the previous note for the specified duration.
 
-4. **Note** – a swara with optional modifiers, duration, ornaments and lyrics.  It has the structure:
+4. **Skip** – `/` optionally followed by a duration. It creates a visual gap of the specified duration but consumes no audio time (playhead teleports). Ideal for aligning notes visually without playing silence.
+
+5. **Note** – a swara with optional modifiers, duration, ornaments and lyrics. It has the structure:
 
 ```
 NoteToken ::= Swara Octave? Variant? Duration? Ornaments? Lyric?

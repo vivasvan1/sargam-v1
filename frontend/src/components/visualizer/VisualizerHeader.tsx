@@ -1,6 +1,5 @@
 import { Play, Pause } from "lucide-react";
 import { Button } from "../ui/button";
-import { cn } from "../../lib/utils";
 import type { MusicCell as ParsedMusicCell } from "../../utils/sargam_parser";
 import { NoteLegendModal } from "./NoteLegendModal";
 
