@@ -41,6 +41,13 @@ interface ActiveNode {
   chikariVolumeNode?: Tone.Volume;
 }
 
+const beatsToTime = (beats: number) => {
+  const bars = Math.floor(beats / 4);
+  const quarters = Math.floor(beats % 4);
+  const sixteenths = (beats % 1) * 4;
+  return `${bars}:${quarters}:${sixteenths.toFixed(2)}`;
+};
+
 export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   const content = Array.isArray(cell.source)
     ? cell.source.join('\n')
@@ -64,6 +71,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   const [localShowVisualizer, setLocalShowVisualizer] = useState(true);
   const [localShowCode, setLocalShowCode] = useState(true);
   const [initialStartTime, setInitialStartTime] = useState(0);
+  const [bpm, setBpm] = useState<number | null>(null);
 
   // Sync with global setting when it changes
   useEffect(() => {
@@ -82,6 +90,13 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   useEffect(() => {
     try {
       const data = parseMusicCell(content.split('\n'));
+
+      if (!bpm && !data.directives.tempo) setBpm(80);
+      if (!bpm && data.directives.tempo)
+        setBpm(parseFloat(data.directives.tempo));
+      if (bpm) data.directives.tempo = bpm.toString();
+      Tone.getTransport().bpm.value = bpm ?? 80;
+
       setLastParsedData(data);
 
       setVoiceControls((prev) => {
@@ -160,7 +175,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     } catch (e) {
       // silent fail on type; waiting for valid input
     }
-  }, [content, defaultInstruments]); // Add defaultInstruments to dependency to likely trigger re-init if needed?
+  }, [content, defaultInstruments, bpm]); // Add defaultInstruments to dependency to likely trigger re-init if needed?
   // Actually, we want a separate effect for reactive updates to avoid re-parsing content.
 
   // Effect to sync local state with global default changes
@@ -202,14 +217,16 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       return;
     }
 
+    if (!lastParsedData) {
+      toast.error('Could not parse musical notation');
+      return;
+    }
+
     await Tone.start();
 
     try {
-      // Re-parse to get the latest exact structure for playback
-      const data = parseMusicCell(content.split('\n'));
-      setLastParsedData(data);
       setActiveCell(cell.id, stopPlayback);
-      await playMusic(data, voiceControls, initialStartTime);
+      await playMusic(lastParsedData, voiceControls, initialStartTime);
       setIsPlaying(true);
     } catch (e) {
       console.error(e);
@@ -365,7 +382,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     // Clean up previous
     Object.entries(activeNodesRef.current).forEach(
       ([
-        vName,
+        _vName,
         { synth, volumeNode, part, chikariSynth, chikariVolumeNode },
       ]) => {
         try {
@@ -390,13 +407,12 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     );
     activeNodesRef.current = {};
 
-    const bpmRaw =
-      parsedData.directives.tempo || parsedData.directives.bpm || '120';
-    const bpm = parseFloat(bpmRaw) || 120;
-    Tone.getTransport().bpm.value = bpm;
-    const beatDur = 60 / bpm; // Duration of one beat in seconds
+    const bpmRaw = bpm || 80;
+    Tone.getTransport().bpm.value = bpmRaw;
+    // We do NOT use beatDur for scheduling time anymore, only for duration calculation inside callbacks
+    // const beatDur = 60 / bpm;
 
-    let maxDuration = 0;
+    let maxDuration = 0; // in beats
 
     // Setup Tala
     if (parsedData.directives.tala) {
@@ -422,17 +438,13 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           );
 
           // Parse pattern
-          const parseTalaPattern = (
-            patternStr: string,
-            defaultDur: number,
-            beatDurSeconds: number
-          ) => {
+          const parseTalaPattern = (patternStr: string, defaultDur: number) => {
             const events: { bol: string; duration: number; time: number }[] =
               [];
             const cleanPattern = patternStr.split('#')[0].trim();
             const tokens = cleanPattern.split(/\s+/).filter((t) => t);
 
-            let time = 0;
+            let time = 0; // in beats
             for (const token of tokens) {
               if (token === '|' || token === '||') continue;
 
@@ -452,7 +464,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               if (bol) {
                 const eventTime = time;
                 events.push({ bol, duration, time: eventTime });
-                time += duration * beatDurSeconds;
+                time += duration; // increment by beats
               }
             }
             return events;
@@ -461,12 +473,12 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           const defaultTalaDur = parseFloat(
             parsedData.directives.default_duration || '1.0'
           );
-          const talaEvents = parseTalaPattern(pattern, defaultTalaDur, beatDur);
-          const cycleDuration =
+          const talaEvents = parseTalaPattern(pattern, defaultTalaDur);
+          const cycleDurationBeats =
             talaEvents.length > 0
               ? talaEvents[talaEvents.length - 1].time +
-                talaEvents[talaEvents.length - 1].duration * beatDur
-              : 4 * beatDur;
+                talaEvents[talaEvents.length - 1].duration
+              : 4;
 
           const talaPart = new Tone.Part(
             (time, event) => {
@@ -475,11 +487,14 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
                 player.start(time);
               }
             },
-            talaEvents.map((e) => ({ time: e.time, bol: e.bol }))
+            talaEvents.map((e) => ({
+              time: beatsToTime(e.time),
+              bol: e.bol,
+            }))
           );
 
           talaPart.loop = true;
-          talaPart.loopEnd = cycleDuration;
+          talaPart.loopEnd = beatsToTime(cycleDurationBeats);
           talaPart.start(0);
 
           activeNodesRef.current['__tala'] = {
@@ -548,7 +563,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       volumeNode.mute = volControl.muted;
 
       const synth = await createInstrument(volControl.instrument || 'synth');
-      // Voices MUST be tonal for now (unless we support rhythmic voices which is rare in this context)
+      // Voices MUST be tonal for now
       if (isTonalInstrument(synth)) {
         synth.connect(volumeNode);
       }
@@ -583,15 +598,15 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
         continue;
       }
 
-      let time = 0;
+      let currentTimeBeats = 0;
 
       voice.events.forEach((event) => {
         if ('duration' in event && event.duration) {
-          const durSeconds = event.duration * beatDur;
+          // Event duration in beats
+          const durBeats = event.duration;
 
           if (event.type === 'skip') {
-            // Skip events consume NO audio time, so we do NOT increment `time`.
-            // We just continue.
+            // Skip events consume NO audio time
             return;
           }
 
@@ -670,32 +685,38 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               const isPolySynth = synth instanceof Tone.PolySynth;
               const needsTempSynth = isSampler || isPolySynth;
 
-              let startDur = 0;
-              let slideDur = durSeconds;
-              let endDur = 0;
-              let isThreePhase = false;
+              Tone.getTransport().schedule((t) => {
+                // Calculate dynamic seconds based on current BPM at trigger time
+                const currentBeatDur = 60 / Tone.Transport.bpm.value;
+                const totalDurSeconds = durBeats * currentBeatDur;
 
-              if (meendOrnament.params.length === 4) {
-                const parsedStart = parseFloat(meendOrnament.params[1]);
-                const parsedSlide = parseFloat(meendOrnament.params[2]);
-                const parsedEnd = parseFloat(meendOrnament.params[3]);
-                if (
-                  !isNaN(parsedStart) &&
-                  !isNaN(parsedSlide) &&
-                  !isNaN(parsedEnd)
-                ) {
-                  const totalSpecified = parsedStart + parsedSlide + parsedEnd;
-                  if (totalSpecified > 0) {
-                    const scale = event.duration / totalSpecified;
-                    startDur = parsedStart * scale * beatDur;
-                    slideDur = parsedSlide * scale * beatDur;
-                    endDur = parsedEnd * scale * beatDur;
-                    isThreePhase = true;
+                // Scale for meend parts
+                let startDur = 0;
+                let slideDur = totalDurSeconds;
+                let endDur = 0;
+                let isThreePhase = false;
+
+                if (meendOrnament.params.length === 4) {
+                  const parsedStart = parseFloat(meendOrnament.params[1]);
+                  const parsedSlide = parseFloat(meendOrnament.params[2]);
+                  const parsedEnd = parseFloat(meendOrnament.params[3]);
+                  if (
+                    !isNaN(parsedStart) &&
+                    !isNaN(parsedSlide) &&
+                    !isNaN(parsedEnd)
+                  ) {
+                    const totalSpecified =
+                      parsedStart + parsedSlide + parsedEnd;
+                    if (totalSpecified > 0) {
+                      const scale = durBeats / totalSpecified;
+                      startDur = parsedStart * scale * currentBeatDur;
+                      slideDur = parsedSlide * scale * currentBeatDur;
+                      endDur = parsedEnd * scale * currentBeatDur;
+                      isThreePhase = true;
+                    }
                   }
                 }
-              }
 
-              Tone.getTransport().schedule((t) => {
                 // If it needs a temp synth, create one. It will be a standard Synth (monophonic, tonal)
                 const meendSynth = needsTempSynth
                   ? new Tone.Synth().connect(volumeNode)
@@ -751,7 +772,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
                     mSynth.triggerRelease(t + slideDur);
                   }
                 }
-              }, time);
+              }, beatsToTime(currentTimeBeats));
             } else {
               // Normal Note Playback
               const instrument =
@@ -760,6 +781,9 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
                   : synth;
 
               Tone.getTransport().schedule((t) => {
+                const currentBeatDur = 60 / Tone.Transport.bpm.value;
+                const durSeconds = durBeats * currentBeatDur;
+
                 if (
                   instrument instanceof Tone.PolySynth ||
                   instrument instanceof Tone.Sampler ||
@@ -778,19 +802,22 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
                     );
                   });
                 }
-              }, time);
+              }, beatsToTime(currentTimeBeats));
             }
           }
-          time += durSeconds;
+          currentTimeBeats += durBeats;
         }
       });
-      if (time > maxDuration) maxDuration = time;
+      if (currentTimeBeats > maxDuration) maxDuration = currentTimeBeats;
     }
 
     Tone.getTransport().start(undefined, startOffset);
-    Tone.getTransport().schedule(() => {
-      stopPlayback();
-    }, maxDuration + 0.1);
+    Tone.getTransport().schedule(
+      () => {
+        stopPlayback();
+      },
+      beatsToTime(maxDuration + 0.5)
+    );
   };
 
   return (
@@ -846,7 +873,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
           </div>
         </div>
       </div>
-      {(localShowVisualizer || (isPlaying && lastParsedData)) && (
+      {(localShowVisualizer || (isPlaying && lastParsedData)) && bpm && (
         <div className="px-3 md:px-4 pb-4 overflow-x-auto max-w-full">
           <div className="min-w-0">
             <MusicVisualizer
@@ -855,6 +882,8 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               onPlay={handlePlay}
               initialTime={initialStartTime}
               onSeek={handleSeek}
+              bpm={bpm}
+              setBpm={setBpm}
             />
           </div>
         </div>

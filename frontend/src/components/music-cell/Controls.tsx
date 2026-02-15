@@ -45,7 +45,7 @@ export function Controls({
         >
           {isPlaying ? (
             <>
-              <Pause className="w-3 h-3 fill-current shrink-0" />{' '}
+              <Square className="w-3 h-3 fill-current shrink-0" />{' '}
               <span className="hidden sm:inline">Stop</span>
             </>
           ) : (

@@ -11,6 +11,8 @@ interface MusicVisualizerProps {
   onPlay: () => void;
   initialTime?: number;
   onSeek?: (time: number) => void;
+  bpm: number;
+  setBpm: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
 interface LineData {
@@ -36,6 +38,8 @@ export function MusicVisualizer({
   onPlay,
   initialTime = 0,
   onSeek,
+  bpm,
+  setBpm,
 }: MusicVisualizerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -54,10 +58,8 @@ export function MusicVisualizer({
     let currentAudioTime = 0;
     let currentVisualTime = 0;
 
-    const bpm = parsedData.directives.tempo
-      ? parseFloat(parsedData.directives.tempo)
-      : 120;
-    const beatDur = 60 / bpm;
+    const currentBpm = bpm;
+    const beatDur = 60 / currentBpm;
 
     mainVoice.events.forEach((event) => {
       // Include duration-based events, comments, and bars
@@ -117,7 +119,7 @@ export function MusicVisualizer({
       beatDur,
       beatCount,
     };
-  }, [parsedData]);
+  }, [parsedData, bpm]);
 
   // Explicit state for active line index to trigger re-renders only when line changes
   const [activeLineIndex, setActiveLineIndex] = useState(-1);
@@ -141,9 +143,6 @@ export function MusicVisualizer({
   const baseBeatWidth = Math.max(46, Math.min(120, rawBeatWidth));
   const BEAT_WIDTH = baseBeatWidth * zoomLevel;
 
-  const bpm = parsedData?.directives.tempo
-    ? parseFloat(parsedData.directives.tempo)
-    : 120;
   const PIXELS_PER_SECOND = (BEAT_WIDTH * bpm) / 60;
 
   const calculateVisualProgressOffset = useCallback(
@@ -355,6 +354,7 @@ export function MusicVisualizer({
             isPlaying={isPlaying}
             onPlay={onPlay}
             bpm={bpm}
+            setBpm={setBpm}
             zoomLevel={zoomLevel}
             setZoomLevel={setZoomLevel}
           />
