@@ -270,7 +270,6 @@ export function VisualizerNote({
   }
 
   if (event.swara === '^') {
-    console.log(event);
     return (
       <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
         <TooltipTrigger asChild>
