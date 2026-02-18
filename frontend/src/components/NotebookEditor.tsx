@@ -87,6 +87,31 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
             />
           )}
         </div>
+
+        {/* Footer */}
+        <footer className="mt-12 py-6 border-t border-muted-foreground/20 text-center text-sm text-muted-foreground">
+          <div className="flex flex-col items-center gap-2">
+            <p>
+              made with <span className="inline-block animate-pulse">❤️</span>{' '}
+              in India
+            </p>
+            <div className="flex gap-4">
+              <a
+                href="/privacy-policy"
+                className="hover:text-primary transition-colors"
+              >
+                Privacy Policy
+              </a>
+              <a
+                href="/terms-and-conditions"
+                className="hover:text-primary transition-colors"
+              >
+                Terms and Conditions
+              </a>
+            </div>
+          </div>
+        </footer>
+
         {/* <GoogleAd slot="bottom-banner" /> */}
       </div>
     </ScrollArea>
