@@ -92,18 +92,18 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
         <footer className="mt-12 py-6 border-t border-muted-foreground/20 text-center text-sm text-muted-foreground">
           <div className="flex flex-col items-center gap-2">
             <p>
-              made with <span className="inline-block animate-pulse">❤️</span>{' '}
+              made with <span className="inline-block">❤️</span>{' '}
               in India
             </p>
             <div className="flex gap-4">
               <a
-                href="/privacy-policy"
+                href="https://experts.speede.site/licenses/privacy"
                 className="hover:text-primary transition-colors"
               >
                 Privacy Policy
               </a>
               <a
-                href="/terms-and-conditions"
+                href="https://experts.speede.site/licenses/terms"
                 className="hover:text-primary transition-colors"
               >
                 Terms and Conditions
