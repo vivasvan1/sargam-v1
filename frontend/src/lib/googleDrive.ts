@@ -229,7 +229,7 @@ export async function initializeGoogleAPI(
     });
 
     // Check if we have a stored token
-    const storedToken = sessionStorage.getItem('google_drive_token');
+    const storedToken = localStorage.getItem('google_drive_token');
     if (storedToken) {
       accessToken = storedToken;
       gapi.client.setToken({ access_token: accessToken });
@@ -239,7 +239,7 @@ export async function initializeGoogleAPI(
       } else {
         // Token might be expired
         accessToken = null;
-        sessionStorage.removeItem('google_drive_token');
+        localStorage.removeItem('google_drive_token');
         gapi.client.setToken(null);
         isSignedIn = false;
         useAuthStore.getState().setAuthenticated(false);
@@ -328,7 +328,7 @@ export async function authenticate(): Promise<GoogleUser> {
           }
 
           accessToken = tokenResponse.access_token!;
-          sessionStorage.setItem('google_drive_token', accessToken);
+          localStorage.setItem('google_drive_token', accessToken);
 
           // Set the token for gapi client
           gapi.client.setToken({ access_token: accessToken });
@@ -391,7 +391,7 @@ export async function disconnect(): Promise<void> {
     currentUser = null;
     rootFolderId = null;
     accessToken = null;
-    sessionStorage.removeItem('google_drive_token');
+    localStorage.removeItem('google_drive_token');
 
     // Update global store
     useAuthStore.getState().setAuthenticated(false);
