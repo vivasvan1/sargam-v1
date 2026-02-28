@@ -250,11 +250,20 @@ function App() {
         setLastSavedContent(currentContent);
         setSaveStatus('saved');
         // Silently save - don't show toast to avoid spam
-      } catch (error) {
+      } catch (error: any) {
         console.error('Auto-save failed:', error);
         setSaveStatus('unsaved'); // Revert to unsaved on failure
         // Don't show error toast for auto-save failures to avoid spam
         // User can manually save if needed
+        if (error.message?.includes('session expired')) {
+          toast.error('Drive session expired.', {
+            action: {
+              label: 'Reconnect',
+              onClick: () => handleGoogleDriveConnect(),
+            },
+            duration: 10000,
+          });
+        }
       }
     }, 2000); // 2 second debounce
 
@@ -382,7 +391,17 @@ function App() {
       } catch (error: any) {
         console.error('Save failed:', error);
         toast.dismiss(loadingToast);
-        toast.error(error.message || 'Failed to save changes');
+        if (error.message?.includes('session expired')) {
+          toast.error('Session expired.', {
+            action: {
+              label: 'Reconnect',
+              onClick: () => handleGoogleDriveConnect(),
+            },
+            duration: 10000,
+          });
+        } else {
+          toast.error(error.message || 'Failed to save changes');
+        }
       }
     } else {
       setSaveDialogOpen(true);

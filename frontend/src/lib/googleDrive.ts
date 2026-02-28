@@ -228,22 +228,38 @@ export async function initializeGoogleAPI(
       },
     });
 
-    // Check if we have a stored token
+    // Check if we have a stored token and user
     const storedToken = localStorage.getItem('google_drive_token');
+    const storedUserStr = localStorage.getItem('google_drive_user');
+
     if (storedToken) {
       accessToken = storedToken;
       gapi.client.setToken({ access_token: accessToken });
-      const success = await getUserInfo();
-      if (success) {
-        isSignedIn = true;
+
+      if (storedUserStr) {
+        try {
+          currentUser = JSON.parse(storedUserStr);
+          isSignedIn = true;
+          // Optimistically show as authenticated
+          useAuthStore.getState().setAuthenticated(true);
+          useAuthStore.getState().setUser(currentUser);
+        } catch (e) {
+          // Ignore parsing error
+        }
       } else {
-        // Token might be expired
-        accessToken = null;
-        localStorage.removeItem('google_drive_token');
-        gapi.client.setToken(null);
-        isSignedIn = false;
-        useAuthStore.getState().setAuthenticated(false);
-        useAuthStore.getState().setUser(null);
+        // Legacy fallback
+        const success = await getUserInfo();
+        if (success) {
+          isSignedIn = true;
+        } else {
+          // Token might be expired
+          accessToken = null;
+          localStorage.removeItem('google_drive_token');
+          gapi.client.setToken(null);
+          isSignedIn = false;
+          useAuthStore.getState().setAuthenticated(false);
+          useAuthStore.getState().setUser(null);
+        }
       }
     }
 
@@ -339,6 +355,7 @@ export async function authenticate(): Promise<GoogleUser> {
           tokenReceived = true;
           if (success && currentUser) {
             isSignedIn = true;
+            localStorage.setItem('google_drive_user', JSON.stringify(currentUser));
             resolve(currentUser);
           } else {
             // Even if user info fails, we have the token, but for this app's UX
@@ -347,6 +364,7 @@ export async function authenticate(): Promise<GoogleUser> {
             isSignedIn = true;
             const fallbackUser = { email: 'Connected', name: 'User' };
             currentUser = fallbackUser;
+            localStorage.setItem('google_drive_user', JSON.stringify(fallbackUser));
             // Update global store
             useAuthStore.getState().setAuthenticated(true);
             useAuthStore.getState().setUser(fallbackUser);
@@ -356,7 +374,7 @@ export async function authenticate(): Promise<GoogleUser> {
       });
 
       // Request access token
-      authTokenClient.requestAccessToken({ prompt: 'consent' });
+      authTokenClient.requestAccessToken();
 
       // Timeout after 60 seconds
       setTimeout(() => {
@@ -392,6 +410,7 @@ export async function disconnect(): Promise<void> {
     rootFolderId = null;
     accessToken = null;
     localStorage.removeItem('google_drive_token');
+    localStorage.removeItem('google_drive_user');
 
     // Update global store
     useAuthStore.getState().setAuthenticated(false);
@@ -661,6 +680,9 @@ export async function saveFile(
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Google Drive session expired. Please reconnect.');
+      }
       const error = await response.json();
       throw new Error(error.error?.message || 'Failed to save file');
     }
@@ -727,6 +749,9 @@ export async function updateFileById(
     );
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Google Drive session expired. Please reconnect.');
+      }
       const error = await response.json();
       throw new Error(error.error?.message || 'Failed to update file');
     }
