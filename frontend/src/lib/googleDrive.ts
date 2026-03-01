@@ -252,13 +252,11 @@ export async function initializeGoogleAPI(
         if (success) {
           isSignedIn = true;
         } else {
-          // Token might be expired
+          // Token might be expired, but we DON'T remove the local user. 
+          // We'll let `withRetry` handle renewing it silently when needed.
           accessToken = null;
           localStorage.removeItem('google_drive_token');
           gapi.client.setToken(null);
-          isSignedIn = false;
-          useAuthStore.getState().setAuthenticated(false);
-          useAuthStore.getState().setUser(null);
         }
       }
     }
@@ -270,6 +268,87 @@ export async function initializeGoogleAPI(
   } catch (error: any) {
     console.error('Error initializing Google API:', error);
     throw new Error('Failed to initialize Google API: ' + error.message);
+  }
+}
+
+// Silently refresh the Google Drive token using user consent we already have
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+export async function refreshTokenSilently(): Promise<boolean> {
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  if (!clientId || !window.google) {
+    console.error('Cannot refresh token silently: Google API not initialized');
+    return false;
+  }
+
+  isRefreshing = true;
+  refreshPromise = new Promise((resolve) => {
+    try {
+      const silentTokenClient = window.google!.accounts.oauth2.initTokenClient({
+        client_id: clientId!,
+        scope: SCOPES,
+        callback: async (tokenResponse: TokenResponse) => {
+          if (tokenResponse.error) {
+            console.error('Silent refresh failed:', tokenResponse.error);
+            // If silent refresh completely fails, user needs explicit connect
+            localStorage.removeItem('google_drive_token');
+            useAuthStore.getState().setAuthenticated(false);
+            isSignedIn = false;
+            resolve(false);
+            return;
+          }
+
+          accessToken = tokenResponse.access_token!;
+          localStorage.setItem('google_drive_token', accessToken);
+          gapi.client.setToken({ access_token: accessToken });
+
+          const success = await getUserInfo();
+          if (success) {
+            isSignedIn = true;
+          }
+          resolve(true);
+        },
+      });
+
+      // Request token without consent prompt for silent refresh
+      silentTokenClient.requestAccessToken({ prompt: '' });
+    } catch (error) {
+      console.error('Silent refresh error:', error);
+      resolve(false);
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  });
+
+  return refreshPromise;
+}
+
+// Helper wrapper to catch 401s and automatically trigger silent refresh
+export async function withRetry<T>(apiCall: () => Promise<T>): Promise<T> {
+  try {
+    return await apiCall();
+  } catch (error: any) {
+    // Check if error is 401 Unauthorized via fetch response status or gapi client error
+    const isUnauthorized =
+      error.status === 401 ||
+      (error.result && error.result.error && error.result.error.code === 401);
+
+    if (isUnauthorized) {
+      console.log('Token expired or invalid, attempting silent refresh...');
+      const refreshed = await refreshTokenSilently();
+      if (refreshed) {
+        console.log('Token refreshed successfully, retrying request...');
+        return await apiCall(); // Retry the original call with new token!
+      } else {
+        throw new Error('Google Drive session expired. Please reconnect.');
+      }
+    }
+    throw error;
   }
 }
 
@@ -442,11 +521,11 @@ export async function ensureRootFolder(): Promise<string | null> {
 
   // First, try to find existing folder
   try {
-    const response = await gapi.client.drive.files.list({
+    const response: any = await withRetry(() => gapi.client.drive.files.list({
       q: `name='${ROOT_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false`,
       fields: 'files(id, name)',
       spaces: 'drive',
-    });
+    }));
 
     if (response.result.files && response.result.files.length > 0) {
       rootFolderId = response.result.files[0].id;
@@ -463,10 +542,10 @@ export async function ensureRootFolder(): Promise<string | null> {
       mimeType: 'application/vnd.google-apps.folder',
     };
 
-    const response = await gapi.client.drive.files.create({
+    const response: any = await withRetry(() => gapi.client.drive.files.create({
       resource: fileMetadata,
       fields: 'id, name',
-    });
+    }));
 
     rootFolderId = response.result.id;
     return rootFolderId;
@@ -489,11 +568,11 @@ export async function getOrCreateSubfolder(
 
   // Search for existing subfolder
   try {
-    const response = await gapi.client.drive.files.list({
+    const response: any = await withRetry(() => gapi.client.drive.files.list({
       q: `name='${sanitized}' and mimeType='application/vnd.google-apps.folder' and '${rootId}' in parents and trashed=false`,
       fields: 'files(id, name)',
       spaces: 'drive',
-    });
+    }));
 
     if (response.result.files && response.result.files.length > 0) {
       return response.result.files[0].id;
@@ -510,10 +589,10 @@ export async function getOrCreateSubfolder(
       parents: [rootId],
     };
 
-    const response = await gapi.client.drive.files.create({
+    const response: any = await withRetry(() => gapi.client.drive.files.create({
       resource: fileMetadata,
       fields: 'id, name',
-    });
+    }));
 
     return response.result.id;
   } catch (error) {
@@ -535,12 +614,12 @@ export async function getSubfolders(
   }
 
   try {
-    const response = await gapi.client.drive.files.list({
+    const response: any = await withRetry(() => gapi.client.drive.files.list({
       q: `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
       fields: 'files(id, name, modifiedTime)',
       spaces: 'drive',
       orderBy: 'name',
-    });
+    }));
 
     return response.result.files || [];
   } catch (error) {
@@ -565,12 +644,12 @@ export async function listFiles(
   }
 
   try {
-    const response = await gapi.client.drive.files.list({
+    const response: any = await withRetry(() => gapi.client.drive.files.list({
       q: `'${parentId}' in parents and name contains '.imnb' and trashed=false`,
       fields: 'files(id, name, modifiedTime, mimeType, permissions)',
       spaces: 'drive',
       orderBy: 'modifiedTime desc',
-    });
+    }));
 
     return response.result.files || [];
   } catch (error) {
@@ -604,11 +683,11 @@ export async function saveFile(
   // Check if file already exists
   let existingFileId: string | null = null;
   try {
-    const listResponse = await gapi.client.drive.files.list({
+    const listResponse: any = await withRetry(() => gapi.client.drive.files.list({
       q: `name='${fileName}' and '${parentId}' in parents and trashed=false`,
       fields: 'files(id)',
       spaces: 'drive',
-    });
+    }));
 
     if (listResponse.result.files && listResponse.result.files.length > 0) {
       existingFileId = listResponse.result.files[0].id;
@@ -643,16 +722,17 @@ export async function saveFile(
       );
       form.append('file', file);
 
-      response = await fetch(
+      const doFetch = async () => fetch(
         `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`,
         {
           method: 'PATCH',
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken || gapi.client.getToken()?.access_token}`,
           },
           body: form,
         }
       );
+      response = await withRetry(doFetch);
     } else {
       // Create new file - include parents for new files
       const metadata = {
@@ -667,16 +747,17 @@ export async function saveFile(
       );
       form.append('file', file);
 
-      response = await fetch(
+      const doFetch = async () => fetch(
         'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
         {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken || gapi.client.getToken()?.access_token}`,
           },
           body: form,
         }
       );
+      response = await withRetry(doFetch);
     }
 
     if (!response.ok) {
@@ -715,10 +796,10 @@ export async function updateFileById(
 
   try {
     // Get current file metadata to preserve name
-    const metadataResponse = await gapi.client.drive.files.get({
+    const metadataResponse: any = await withRetry(() => gapi.client.drive.files.get({
       fileId: fileId,
       fields: 'name',
-    });
+    }));
     const fileName = metadataResponse.result.name;
 
     // Convert content to Blob
@@ -737,16 +818,17 @@ export async function updateFileById(
     );
     form.append('file', file);
 
-    const response = await fetch(
+    const doFetch = async () => fetch(
       `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
       {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken || gapi.client.getToken()?.access_token}`,
         },
         body: form,
       }
     );
+    const response = await withRetry(doFetch);
 
     if (!response.ok) {
       if (response.status === 401) {
