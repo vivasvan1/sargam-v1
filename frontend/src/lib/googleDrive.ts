@@ -295,7 +295,7 @@ export async function refreshTokenSilently(): Promise<boolean> {
   isRefreshing = true;
   refreshPromise = new Promise((resolve) => {
     try {
-      const silentTokenClient = window.google!.accounts.oauth2.initTokenClient({
+      const config: any = {
         client_id: clientId!,
         scope: SCOPES,
         callback: async (tokenResponse: TokenResponse) => {
@@ -319,10 +319,16 @@ export async function refreshTokenSilently(): Promise<boolean> {
           }
           resolve(true);
         },
-      });
+      };
+
+      if (currentUser?.email) {
+        config.login_hint = currentUser.email;
+      }
+
+      const silentTokenClient = window.google!.accounts.oauth2.initTokenClient(config);
 
       // Request token without consent prompt for silent refresh
-      silentTokenClient.requestAccessToken({ prompt: '' });
+      silentTokenClient.requestAccessToken({ prompt: 'none' });
     } catch (error) {
       console.error('Silent refresh error:', error);
       resolve(false);
