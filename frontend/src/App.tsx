@@ -343,8 +343,12 @@ function App() {
       return;
     }
 
+    if (!isInitialized) {
+      toast.error('Google Drive is still initializing. Please wait a moment and try again.');
+      return;
+    }
+
     try {
-      await initializeGoogleAPI(GOOGLE_CLIENT_ID);
       const user = await authenticate();
       // Store updates automatically via googleDrive.ts
       toast.success(

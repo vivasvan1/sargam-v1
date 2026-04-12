@@ -91,6 +91,7 @@ export function getShareableLink(fileId: string): string {
 
 let gapi: any = null;
 let isInitialized = false;
+let initializationPromise: Promise<any> | null = null;
 let isSignedIn = false;
 let currentUser: GoogleUser | null = null;
 let rootFolderId: string | null = null;
@@ -145,10 +146,7 @@ export function waitForAuthReady(): Promise<boolean> {
       }
     }, 100);
 
-    // Timeout after 10 seconds? No, maybe app takes time.
-    // But we don't want to hang forever if initialize isn't called.
-    // However, App.tsx calls initialize.
-    // Let's set a 30s timeout just in case.
+    // Timeout after 30 seconds
     setTimeout(() => {
       if (!isInitialized) {
         clearInterval(interval);
@@ -167,14 +165,19 @@ export async function initializeGoogleAPI(
     return gapi;
   }
 
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
   if (!providedClientId) {
     throw new Error('Google Client ID is required');
   }
 
   clientId = providedClientId;
 
-  try {
-    // First, ensure gapi is available
+  initializationPromise = (async () => {
+    try {
+      // First, ensure gapi is available
     if (typeof window === 'undefined') {
       throw new Error('Window is undefined');
     }
@@ -267,8 +270,12 @@ export async function initializeGoogleAPI(
     return gapi;
   } catch (error: any) {
     console.error('Error initializing Google API:', error);
+    initializationPromise = null; // Clear promise on failure to allow retry
     throw new Error('Failed to initialize Google API: ' + error.message);
   }
+  })();
+  
+  return initializationPromise;
 }
 
 // Silently refresh the Google Drive token using user consent we already have
