@@ -11,6 +11,7 @@ import { NotebookEditor } from './components/NotebookEditor';
 // Libs
 import { toast, Toaster } from 'sonner';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
 import {
   initializeGoogleAPI,
   authenticate,
@@ -28,6 +29,7 @@ import { useNotebookSettings } from './context/NotebookSettingsContext';
 import { useNotebookStore } from './store/useNotebookStore';
 import { useAuthStore } from './store/useAuthStore';
 import { Analytics } from '@vercel/analytics/react';
+import { Cloud, Loader2 } from 'lucide-react';
 
 // Notebook interfaces imported from types/notebook
 
@@ -55,6 +57,96 @@ const loadDefaultNotebook = async (): Promise<Notebook> => {
 // Google Client ID - should be set via environment variable or config
 // For development, you can set this in a .env file as VITE_GOOGLE_CLIENT_ID
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+interface AuthGateProps {
+  isInitializing: boolean;
+  isSigningIn: boolean;
+  errorMessage: string | null;
+  onSignIn: () => void;
+}
+
+function AuthGate({
+  isInitializing,
+  isSigningIn,
+  errorMessage,
+  onSignIn,
+}: AuthGateProps) {
+  const isBusy = isInitializing || isSigningIn;
+
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_40%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)/0.35))] text-foreground">
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-6 py-16">
+        <div className="w-full max-w-5xl">
+          <div className="grid overflow-hidden rounded-3xl border border-border/60 bg-card/95 shadow-2xl shadow-primary/10 backdrop-blur md:grid-cols-[1.1fr_0.9fr]">
+            <div className="border-b border-border/60 bg-[linear-gradient(180deg,_rgba(255,255,255,0.22),_transparent)] p-4 md:border-b-0 md:border-r md:p-6">
+              <div className="overflow-hidden rounded-[1.75rem] border border-border/60 bg-background/70 shadow-xl">
+                <img
+                  src="/screenshot.png"
+                  alt="Sargam notebook preview"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-center gap-6 p-8 md:p-12">
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Authentication
+                </p>
+                <h2 className="text-2xl font-semibold tracking-tight">
+                  Continue with Google Drive
+                </h2>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Sargam uses your Google session to load notebooks, save
+                  changes, and open shared files.
+                </p>
+              </div>
+
+              <Button
+                onClick={onSignIn}
+                disabled={isBusy || !!errorMessage}
+                size="lg"
+                className="h-12 justify-center gap-2 rounded-xl text-sm font-medium"
+              >
+                {isBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Cloud className="h-4 w-4" />
+                )}
+                {isInitializing
+                  ? 'Initializing Google...'
+                  : isSigningIn
+                    ? 'Waiting for Google...'
+                    : 'Sign in with Google'}
+              </Button>
+
+              {errorMessage ? (
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                  {errorMessage}
+                </div>
+              ) : (
+                <p className="text-xs leading-5 text-muted-foreground">
+                  The first sign-in requests Google Drive access up front so the
+                  editor is ready immediately after authentication.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-4 px-4 pt-4 text-xs text-muted-foreground">
+            <a href="/terms" className="transition-colors hover:text-foreground">
+              Terms & Conditions
+            </a>
+            <span className="text-border">•</span>
+            <a href="/privacy" className="transition-colors hover:text-foreground">
+              Privacy
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const {
@@ -98,93 +190,130 @@ function App() {
     'saved'
   );
   const [isPublished, setIsPublished] = useState(false);
-  const [isLoading, setIsLoading] = useState(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    return !!urlParams.get('fileId');
-  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authInitError, setAuthInitError] = useState<string | null>(null);
+  const [hasLoadedInitialNotebook, setHasLoadedInitialNotebook] =
+    useState(false);
 
   // Initialize Google API on mount
   useEffect(() => {
-    if (GOOGLE_CLIENT_ID) {
-      initializeGoogleAPI(GOOGLE_CLIENT_ID).catch((error) => {
-        console.error('Failed to initialize Google API:', error);
-      });
+    if (!GOOGLE_CLIENT_ID) {
+      setAuthInitError(
+        'Google Client ID not configured. Set VITE_GOOGLE_CLIENT_ID before starting the frontend.'
+      );
+      return;
     }
+
+    initializeGoogleAPI(GOOGLE_CLIENT_ID)
+      .then(() => {
+        setAuthInitError(null);
+      })
+      .catch((error) => {
+        console.error('Failed to initialize Google API:', error);
+        setAuthInitError(
+          error.message || 'Failed to initialize Google authentication.'
+        );
+      });
   }, []);
 
-  // Load default notebook on mount
+  // Load content only after Google authentication is established.
   useEffect(() => {
-    // Check for fileId in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const fileId = urlParams.get('fileId');
+    if (!isInitialized || !googleDriveConnected || hasLoadedInitialNotebook) {
+      return;
+    }
 
-    if (fileId) {
-      // If fileId is present, try to load it (public file)
-      toast.info('Loading shared notebook...');
-      loadNotebookAndMetadata(fileId)
-        .then(({ notebook, isReadOnly, isPublished }) => {
-          // Update local state hook (for editing)
-          setNotebook(notebook);
+    let isCancelled = false;
 
-          // Update global store (for Header/other components)
-          useNotebookStore
-            .getState()
-            .setNotebook(
-              notebook,
-              fileId,
-              notebook.metadata || null,
-              isReadOnly,
-              isPublished
-            );
+    const applyLoadedNotebook = (
+      nextNotebook: Notebook,
+      fileId: string | null,
+      readOnly: boolean,
+      published: boolean
+    ) => {
+      setNotebook(nextNotebook);
+      useNotebookStore
+        .getState()
+        .setNotebook(
+          nextNotebook,
+          fileId,
+          nextNotebook.metadata || null,
+          readOnly,
+          published
+        );
 
-          const title = notebook.metadata?.title || 'Shared Notebook';
-          setFilePath(`${title}.imnb`);
-          setDriveFileId(fileId);
-          setLastSavedContent(JSON.stringify(notebook, null, 2));
-          setSaveStatus('saved');
+      const title = nextNotebook.metadata?.title || 'Untitled Notebook';
+      setFilePath(fileId ? `${title}.imnb` : 'raag_khamaj_demo.imnb');
+      setDriveFileId(fileId);
+      setLastSavedContent(fileId ? JSON.stringify(nextNotebook, null, 2) : null);
+      setSaveStatus('saved');
+      setIsReadOnly(readOnly);
+      setIsPublished(published);
+      setActiveCellId(null);
+    };
 
-          // Set derived states immediately
-          setIsReadOnly(isReadOnly);
+    const bootstrapNotebook = async () => {
+      setIsLoading(true);
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const fileId = urlParams.get('fileId');
+
+      try {
+        if (fileId) {
+          toast.info('Loading shared notebook...');
+          const { notebook, isReadOnly, isPublished } =
+            await loadNotebookAndMetadata(fileId);
+
+          if (isCancelled) return;
+
+          applyLoadedNotebook(notebook, fileId, isReadOnly, isPublished);
+
           if (isReadOnly) {
             toast.info('Notebook loaded in read-only mode.');
           }
-
-          setIsPublished(isPublished);
-
           toast.success('Loaded shared notebook');
-        })
-        .catch((error) => {
-          console.error('Failed to load shared notebook:', error);
-          toast.error(
-            'Failed to load shared notebook. It might not be public.'
-          );
-          // Fallback to default if loading fails
-          loadDefaultNotebook().then((defaultNotebook) => {
-            setNotebook(defaultNotebook);
-            useNotebookStore
-              .getState()
-              .setNotebook(defaultNotebook, null, null, false, false);
-            if (defaultNotebook.metadata?.title) {
-              setFilePath('raag_khamaj_demo.imnb');
-            }
-          });
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
-      // Load default notebook on mount if no fileId
-      loadDefaultNotebook().then((defaultNotebook) => {
-        setNotebook(defaultNotebook);
-        useNotebookStore
-          .getState()
-          .setNotebook(defaultNotebook, null, null, false, false);
-        if (defaultNotebook.metadata?.title) {
-          setFilePath('raag_khamaj_demo.imnb');
+          return;
         }
-      });
+
+        const defaultNotebook = await loadDefaultNotebook();
+        if (isCancelled) return;
+
+        applyLoadedNotebook(defaultNotebook, null, false, false);
+      } catch (error) {
+        console.error('Failed to load initial notebook:', error);
+        toast.error('Failed to load notebook. Opening the default notebook.');
+
+        const defaultNotebook = await loadDefaultNotebook();
+        if (isCancelled) return;
+
+        applyLoadedNotebook(defaultNotebook, null, false, false);
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+          setHasLoadedInitialNotebook(true);
+        }
+      }
+    };
+
+    bootstrapNotebook();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    googleDriveConnected,
+    hasLoadedInitialNotebook,
+    isInitialized,
+    setNotebook,
+  ]);
+
+  useEffect(() => {
+    if (!googleDriveConnected) {
+      setHasLoadedInitialNotebook(false);
+      setIsLoading(false);
+      useNotebookStore.getState().reset();
     }
-  }, []);
+  }, [googleDriveConnected]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -349,6 +478,7 @@ function App() {
     }
 
     try {
+      setIsAuthenticating(true);
       const user = await authenticate();
       // Store updates automatically via googleDrive.ts
       toast.success(
@@ -361,12 +491,20 @@ function App() {
       } else {
         toast.error(error.message || 'Failed to connect to Google Drive');
       }
+    } finally {
+      setIsAuthenticating(false);
     }
   };
 
   const handleGoogleDriveDisconnect = async () => {
     try {
       await disconnect();
+      setHasLoadedInitialNotebook(false);
+      setDriveFileId(null);
+      setLastSavedContent(null);
+      setIsPublished(false);
+      setIsReadOnly(false);
+      useNotebookStore.getState().reset();
       // Store updates automatically via googleDrive.ts
       toast.success('Disconnected from Google Drive');
     } catch (error) {
@@ -541,131 +679,142 @@ function App() {
     }
   };
 
+  const showAuthGate = !googleDriveConnected;
+
   return (
     <>
-      <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <div className="flex h-screen w-full bg-background text-foreground overflow-hidden selection:bg-primary/10">
-          <Sidebar
-            onFileUpload={handleFileUpload}
-            onNew={handleNew}
-            theme={theme}
-            setTheme={setTheme}
-            isOpen={sidebarOpen}
-            googleDriveConnected={googleDriveConnected}
-            googleDriveUser={googleDriveUser}
-            onGoogleDriveConnect={handleGoogleDriveConnect}
-            onGoogleDriveDisconnect={handleGoogleDriveDisconnect}
-            onLoadFromDrive={handleLoadFromDrive}
-            onLoadDriveFile={handleDriveLoad}
-            currentFileId={driveFileId}
-          />
+      {showAuthGate ? (
+        <AuthGate
+          isInitializing={!authInitError && !isInitialized}
+          isSigningIn={isAuthenticating}
+          errorMessage={authInitError}
+          onSignIn={handleGoogleDriveConnect}
+        />
+      ) : (
+        <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <div className="flex h-screen w-full bg-background text-foreground overflow-hidden selection:bg-primary/10">
+            <Sidebar
+              onFileUpload={handleFileUpload}
+              onNew={handleNew}
+              theme={theme}
+              setTheme={setTheme}
+              isOpen={sidebarOpen}
+              googleDriveConnected={googleDriveConnected}
+              googleDriveUser={googleDriveUser}
+              onGoogleDriveConnect={handleGoogleDriveConnect}
+              onGoogleDriveDisconnect={handleGoogleDriveDisconnect}
+              onLoadFromDrive={handleLoadFromDrive}
+              onLoadDriveFile={handleDriveLoad}
+              currentFileId={driveFileId}
+            />
 
-          {isLoading ? (
-            <SidebarInset className="flex-1 flex flex-col items-center justify-center bg-muted/5">
-              <div className="flex flex-col items-center gap-4">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                <p className="text-muted-foreground animate-pulse">
-                  Loading notebook...
-                </p>
-              </div>
-            </SidebarInset>
-          ) : (
-            <SidebarInset className="flex-1 flex flex-col min-w-0 bg-muted/5 overflow-hidden">
-              <Header
-                title={notebook.metadata?.title || ''}
-                onTitleUpdate={updateTitle}
-                filePath={filePath}
-                googleDriveConnected={googleDriveConnected}
-                onSaveToDrive={handleSaveToDrive}
-                onDownload={handleDownload}
-                currentFileId={driveFileId}
-                saveStatus={saveStatus}
-                isReadOnly={isReadOnly}
-                onCreateCopy={handleCreateCopy}
-              />
-
-              <div className="border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-0.5">
-                <MenuBar
-                  onNew={handleNew}
-                  onOpen={() => fileInputRef.current?.click()}
-                  onSaveDrive={handleSaveToDrive}
-                  onLoadDrive={handleLoadFromDrive}
-                  onPublish={handlePublish}
-                  onUnpublish={handleUnpublish}
-                  isPublished={isPublished}
-                  isReadOnly={isReadOnly}
-                  onDownload={handleDownload}
-                  canUndo={canUndo}
-                  canRedo={canRedo}
-                  onUndo={undo}
-                  onRedo={redo}
-                  onAddMusic={() => addCell('music', -1)}
-                  onAddMarkdown={() => addCell('markdown', -1)}
-                  theme={theme}
-                  setTheme={setTheme}
+            {isLoading ? (
+              <SidebarInset className="flex-1 flex flex-col items-center justify-center bg-muted/5">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                  <p className="text-muted-foreground animate-pulse">
+                    Loading notebook...
+                  </p>
+                </div>
+              </SidebarInset>
+            ) : (
+              <SidebarInset className="flex-1 flex flex-col min-w-0 bg-muted/5 overflow-hidden">
+                <Header
+                  title={notebook.metadata?.title || ''}
+                  onTitleUpdate={updateTitle}
+                  filePath={filePath}
                   googleDriveConnected={googleDriveConnected}
+                  onSaveToDrive={handleSaveToDrive}
+                  onDownload={handleDownload}
                   currentFileId={driveFileId}
+                  saveStatus={saveStatus}
+                  isReadOnly={isReadOnly}
+                  onCreateCopy={handleCreateCopy}
                 />
-              </div>
 
-              <NotebookEditor
-                notebook={notebook}
-                activeCellId={activeCellId}
-                setActiveCellId={setActiveCellId}
-                updateCell={updateCell}
-                deleteCell={deleteCell}
-                addCell={addCell}
-                theme={theme}
-              />
-            </SidebarInset>
-          )}
+                <div className="border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-0.5">
+                  <MenuBar
+                    onNew={handleNew}
+                    onOpen={() => fileInputRef.current?.click()}
+                    onSaveDrive={handleSaveToDrive}
+                    onLoadDrive={handleLoadFromDrive}
+                    onPublish={handlePublish}
+                    onUnpublish={handleUnpublish}
+                    isPublished={isPublished}
+                    isReadOnly={isReadOnly}
+                    onDownload={handleDownload}
+                    canUndo={canUndo}
+                    canRedo={canRedo}
+                    onUndo={undo}
+                    onRedo={redo}
+                    onAddMusic={() => addCell('music', -1)}
+                    onAddMarkdown={() => addCell('markdown', -1)}
+                    theme={theme}
+                    setTheme={setTheme}
+                    googleDriveConnected={googleDriveConnected}
+                    currentFileId={driveFileId}
+                  />
+                </div>
 
-          <GoogleDriveSaveDialog
-            open={saveDialogOpen}
-            onOpenChange={setSaveDialogOpen}
-            notebook={notebook}
-            onSave={(fileId: string | null) => {
-              // Track that this notebook is saved to Drive
-              if (fileId) {
-                setDriveFileId(fileId);
-                setIsReadOnly(false); // Just saved, so we own it
-                setLastSavedContent(JSON.stringify(notebook, null, 2));
+                <NotebookEditor
+                  notebook={notebook}
+                  activeCellId={activeCellId}
+                  setActiveCellId={setActiveCellId}
+                  updateCell={updateCell}
+                  deleteCell={deleteCell}
+                  addCell={addCell}
+                  theme={theme}
+                />
+              </SidebarInset>
+            )}
 
-                // Update filePath to reflect the new saved name
-                const title = notebook.metadata?.title || 'Untitled Notebook';
-                setFilePath(`${title}.imnb`);
+            <GoogleDriveSaveDialog
+              open={saveDialogOpen}
+              onOpenChange={setSaveDialogOpen}
+              notebook={notebook}
+              onSave={(fileId: string | null) => {
+                // Track that this notebook is saved to Drive
+                if (fileId) {
+                  setDriveFileId(fileId);
+                  setIsReadOnly(false); // Just saved, so we own it
+                  setLastSavedContent(JSON.stringify(notebook, null, 2));
 
-                // Update global store (new file is not published)
-                useNotebookStore
-                  .getState()
-                  .setNotebook(
-                    notebook,
-                    fileId,
-                    notebook.metadata || null,
-                    false,
-                    false
-                  );
-                setIsPublished(false); // Ensure local state is also reset if needed
-              }
-            }}
-          />
+                  // Update filePath to reflect the new saved name
+                  const title = notebook.metadata?.title || 'Untitled Notebook';
+                  setFilePath(`${title}.imnb`);
 
-          <GoogleDriveLoadDialog
-            open={loadDialogOpen}
-            onOpenChange={setLoadDialogOpen}
-            onLoad={handleDriveLoad}
-          />
+                  // Update global store (new file is not published)
+                  useNotebookStore
+                    .getState()
+                    .setNotebook(
+                      notebook,
+                      fileId,
+                      notebook.metadata || null,
+                      false,
+                      false
+                    );
+                  setIsPublished(false); // Ensure local state is also reset if needed
+                }
+              }}
+            />
 
-          <Toaster position="bottom-right" theme={theme} closeButton />
-          <input
-            type="file"
-            accept=".imnb,.json"
-            className="hidden"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-          />
-        </div>
-      </SidebarProvider>
+            <GoogleDriveLoadDialog
+              open={loadDialogOpen}
+              onOpenChange={setLoadDialogOpen}
+              onLoad={handleDriveLoad}
+            />
+
+            <input
+              type="file"
+              accept=".imnb,.json"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+            />
+          </div>
+        </SidebarProvider>
+      )}
+      <Toaster position="bottom-right" theme={theme} closeButton />
       <Analytics />
     </>
   );

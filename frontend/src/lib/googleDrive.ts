@@ -865,68 +865,35 @@ export async function updateFileById(
 
 // Load file from Google Drive
 async function loadFile(fileId: string): Promise<any> {
-  // Try to get an authenticated token first
   const token =
     accessToken || (isInitialized && gapi?.client?.getToken()?.access_token);
 
-  // If we have a token, use the standard authenticated request
-  if (token) {
-    try {
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response
-          .json()
-          .catch(() => ({ error: { message: 'Failed to load file' } }));
-        throw new Error(error.error?.message || 'Failed to load file');
-      }
-
-      const content = await response.text();
-      return JSON.parse(content);
-    } catch (error: any) {
-      console.error('Error loading file with auth:', error);
-      // If auth fails for a potentially public file, we might want to fall back
-      // but usually if you have a token it should work or the file is private.
-      // throw new Error(error.message || "Failed to load file from Google Drive");
-    }
-  }
-
-  // No token available Fallback to public access. Try to load using API Key (for public files)
-  if (!API_KEY) {
-    throw new Error(
-      'Sign in to Google Drive or provide an API Key to load this file.'
-    );
+  if (!token) {
+    throw new Error('No access token available. Please sign in with Google.');
   }
 
   try {
-    // Access public file via API Key
     const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
     );
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      // 403 usually means the file is not public or key is invalid
-      if (response.status === 403 || response.status === 401) {
-        throw new Error(
-          'File is not public or invalid API Key. Please sign in.'
-        );
-      }
-      throw new Error(error.error?.message || 'Failed to load public file');
+      const error = await response
+        .json()
+        .catch(() => ({ error: { message: 'Failed to load file' } }));
+      throw new Error(error.error?.message || 'Failed to load file');
     }
 
     const content = await response.text();
     return JSON.parse(content);
   } catch (error: any) {
-    console.error('Error loading public file:', error);
-    throw new Error(error.message || 'Failed to load public file');
+    console.error('Error loading file with auth:', error);
+    throw new Error(error.message || 'Failed to load file from Google Drive');
   }
 }
 
@@ -937,51 +904,25 @@ export async function loadNotebookAndMetadata(fileId: string): Promise<{
   isPublished: boolean;
   isReadOnly: boolean;
 }> {
-  // Wait for auth to resolve so we know if we can use a token
   await waitForAuthReady();
 
   try {
-    // 1. Start all fetches in parallel
     const notebookPromise = loadFile(fileId);
-
-    // For metadata, we need to be careful. if loadFile falls back to public key,
-    // getFileMetadata might fail if we are not authenticated.
-    // However, if we are authenticated, we should fetch it.
-    // If not authenticated, we can assume read-only and check published status via registry.
-
-    let metadataPromise: Promise<GoogleFile> | Promise<null>;
-    if (isAuthenticated()) {
-      metadataPromise = getFileMetadata(fileId);
-    } else {
-      // If not authenticated, we can't fetch full Drive metadata usually,
-      // unless it's public and we use API key (which getFileMetadata doesn't currently support explicitly with key)
-      // But let's try to stick to existing logic: if auth, get metadata.
-      metadataPromise = Promise.resolve(null);
-    }
-
+    const metadataPromise = isAuthenticated()
+      ? getFileMetadata(fileId)
+      : Promise.resolve(null);
     const publishedPromise = checkIsPublished(fileId);
-
-    // 2. Wait for all
     const [notebook, metadata, isPublished] = await Promise.all([
       notebookPromise,
       metadataPromise,
       publishedPromise,
     ]);
 
-    // 3. Determine read-only status
-    let isReadOnly = true; // Default to read-only
-    if (metadata) {
-      isReadOnly = !checkIfEditable(metadata);
-    } else {
-      // If we didn't get metadata (e.g. not logged in), it's read-only
-      isReadOnly = true;
-    }
-
     return {
       notebook,
       metadata,
       isPublished,
-      isReadOnly,
+      isReadOnly: metadata ? !checkIfEditable(metadata) : true,
     };
   } catch (error) {
     console.error('Error in loadNotebookAndMetadata:', error);

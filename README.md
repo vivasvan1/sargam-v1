@@ -59,7 +59,17 @@
     bun install
     ```
 
-3.  **Run Development Server**
+3.  **Configure Google Login**
+
+    ```bash
+    cp .env.example .env.local
+    ```
+
+    Set `VITE_GOOGLE_CLIENT_ID` in `frontend/.env.local`. The app now requires
+    Google sign-in before it loads notebooks, community content, or shared
+    links.
+
+4.  **Run Development Server**
 
     ```bash
     npm run dev
