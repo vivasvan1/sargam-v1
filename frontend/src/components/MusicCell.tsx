@@ -61,7 +61,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   >({});
   const [showMixer, setShowMixer] = useState(false);
   const activeNodesRef = useRef<Record<string, ActiveNode>>({});
-  const { setActiveCell, clearActiveCell } = usePlaybackStore();
+  const { setActiveCell, clearActiveCell, registerCellController, unregisterCellController } = usePlaybackStore();
   const {
     defaultInstruments,
     updateDefaultInstrument,
@@ -72,6 +72,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
   const [localShowCode, setLocalShowCode] = useState(true);
   const [initialStartTime, setInitialStartTime] = useState(0);
   const [bpm, setBpm] = useState<number | null>(null);
+  const [isLooping, setIsLooping] = useState(false);
 
   // Sync with global setting when it changes
   useEffect(() => {
@@ -211,28 +212,43 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     }
   };
 
-  const handlePlay = async () => {
+  const playPromiseResolveRef = useRef<(() => void) | null>(null);
+
+  const handlePlay = async (): Promise<void> => {
     if (isPlaying) {
       stopPlayback();
-      return;
+      return Promise.resolve();
     }
 
     if (!lastParsedData) {
       toast.error('Could not parse musical notation');
-      return;
+      return Promise.resolve();
     }
 
     await Tone.start();
 
-    try {
-      setActiveCell(cell.id, stopPlayback);
-      await playMusic(lastParsedData, voiceControls, initialStartTime);
-      setIsPlaying(true);
-    } catch (e) {
-      console.error(e);
-      toast.error('Could not parse musical notation');
-    }
+    return new Promise<void>(async (resolve) => {
+      playPromiseResolveRef.current = resolve;
+      try {
+        setActiveCell(cell.id, stopPlayback);
+        await playMusic(lastParsedData, voiceControls, initialStartTime);
+        setIsPlaying(true);
+      } catch (e) {
+        console.error(e);
+        toast.error('Could not parse musical notation');
+        resolve();
+      }
+    });
   };
+
+  const handlePlayRef = useRef(handlePlay);
+  handlePlayRef.current = handlePlay;
+
+  useEffect(() => {
+    const playFn = () => handlePlayRef.current();
+    registerCellController(cell.id, playFn);
+    return () => unregisterCellController(cell.id);
+  }, [cell.id, registerCellController, unregisterCellController]);
 
   const stopPlayback = () => {
     Tone.getTransport().stop();
@@ -283,6 +299,11 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     activeNodesRef.current = {};
     clearActiveCell(cell.id);
     setIsPlaying(false);
+    
+    if (playPromiseResolveRef.current) {
+        playPromiseResolveRef.current();
+        playPromiseResolveRef.current = null;
+    }
   };
 
   useEffect(() => {
@@ -301,6 +322,12 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       }
     });
   }, [voiceControls]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      Tone.getTransport().loop = isLooping;
+    }
+  }, [isLooping, isPlaying]);
 
   const updateVoiceControl = (
     voiceName: string,
@@ -824,10 +851,16 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       if (currentTimeBeats > maxDuration) maxDuration = currentTimeBeats;
     }
 
+    Tone.getTransport().loopStart = startOffset;
+    Tone.getTransport().loopEnd = beatsToTime(maxDuration + 0.5);
+    Tone.getTransport().loop = isLooping;
+
     Tone.getTransport().start(undefined, startOffset);
     Tone.getTransport().schedule(
       () => {
-        stopPlayback();
+        if (!Tone.getTransport().loop) {
+          stopPlayback();
+        }
       },
       beatsToTime(maxDuration + 0.5)
     );
@@ -897,6 +930,8 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
               onSeek={handleSeek}
               bpm={bpm}
               setBpm={setBpm}
+              isLooping={isLooping}
+              onToggleLoop={() => setIsLooping(!isLooping)}
             />
           </div>
         </div>

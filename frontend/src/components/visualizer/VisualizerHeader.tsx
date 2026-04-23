@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { Play, Minus, Plus, Square, Search, Activity } from 'lucide-react';
+import {
+  Play,
+  Minus,
+  Plus,
+  Square,
+  Search,
+  Activity,
+  Repeat,
+} from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -14,6 +22,8 @@ interface VisualizerHeaderProps {
   setBpm: React.Dispatch<React.SetStateAction<number | null>>;
   zoomLevel: number;
   setZoomLevel: React.Dispatch<React.SetStateAction<number>>;
+  isLooping: boolean;
+  onToggleLoop: () => void;
 }
 
 export function VisualizerHeader({
@@ -24,6 +34,8 @@ export function VisualizerHeader({
   setBpm,
   zoomLevel,
   setZoomLevel,
+  isLooping,
+  onToggleLoop,
 }: VisualizerHeaderProps) {
   const [isEditingBpm, setIsEditingBpm] = useState(false);
 
@@ -178,25 +190,39 @@ export function VisualizerHeader({
           </Popover>
         </div>
 
-        {/* Play/Stop Button */}
-        <Button
-          onClick={onPlay}
-          variant={'default'}
-          size="sm"
-          className="rounded-full shrink-0 md:w-auto w-full min-w-[80px]"
-        >
-          {isPlaying ? (
-            <>
-              <Square className="w-3 h-3 fill-current shrink-0 mr-2" />
-              <span className="inline">Stop</span>
-            </>
-          ) : (
-            <>
-              <Play className="w-3 h-3 fill-current shrink-0 mr-2" />
-              <span className="inline">Play</span>
-            </>
-          )}
-        </Button>
+        <div className='flex flex-col gap-2 justify-center items-end'>
+          {/* Loop Toggle Button */}
+          <Button
+            onClick={onToggleLoop}
+            variant={isLooping ? 'default' : 'outline'}
+            size="sm"
+            className={`rounded-full shrink-0 ${isLooping ? '' : 'border-border/50 bg-muted/30 text-muted-foreground'}`}
+            title={isLooping ? 'Looping enabled' : 'Looping disabled'}
+          >
+            <Repeat className="w-4 h-4" /> Loop {isLooping ? 'ON' : 'OFF'}
+          </Button>
+
+          {/* Play/Stop Button */}
+          <Button
+            onClick={onPlay}
+            variant={'default'}
+            size="sm"
+            className="rounded-full shrink-0 md:w-auto w-full min-w-[80px]"
+          >
+            {isPlaying ? (
+              <>
+                <Square className="w-3 h-3 fill-current shrink-0 mr-2" />
+                <span className="inline">Stop</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3 h-3 fill-current shrink-0 mr-2" />
+                <span className="inline">Play</span>
+              </>
+            )}
+          </Button>
+</div>
+
         {/* Desktop Controls - Hidden on Mobile */}
         <div className="hidden md:flex gap-5 bg-muted/30 p-2 rounded-xl border border-border/50 shrink-0">
           {/* Tempo Control */}

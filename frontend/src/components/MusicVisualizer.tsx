@@ -13,6 +13,8 @@ interface MusicVisualizerProps {
   onSeek?: (time: number) => void;
   bpm: number;
   setBpm: React.Dispatch<React.SetStateAction<number | null>>;
+  isLooping: boolean;
+  onToggleLoop: () => void;
 }
 
 interface LineData {
@@ -40,6 +42,8 @@ export function MusicVisualizer({
   onSeek,
   bpm,
   setBpm,
+  isLooping,
+  onToggleLoop,
 }: MusicVisualizerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -357,6 +361,8 @@ export function MusicVisualizer({
             setBpm={setBpm}
             zoomLevel={zoomLevel}
             setZoomLevel={setZoomLevel}
+            isLooping={isLooping}
+            onToggleLoop={onToggleLoop}
           />
         </div>
       </div>

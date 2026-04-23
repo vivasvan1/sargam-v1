@@ -28,6 +28,7 @@ import type { Notebook } from './types/notebook';
 import { useNotebookSettings } from './context/NotebookSettingsContext';
 import { useNotebookStore } from './store/useNotebookStore';
 import { useAuthStore } from './store/useAuthStore';
+import { usePlaybackStore } from './store/usePlaybackStore';
 import { Analytics } from '@vercel/analytics/react';
 import { Cloud, Loader2 } from 'lucide-react';
 
@@ -679,6 +680,37 @@ function App() {
     }
   };
 
+  const { cellControllers } = usePlaybackStore();
+
+  const handlePlayCell = () => {
+    if (activeCellId && cellControllers[activeCellId]) {
+      cellControllers[activeCellId]();
+    } else {
+      toast.error('No active music cell selected.');
+    }
+  };
+
+  const handlePlayAll = async () => {
+    const musicCells = notebook.cells.filter((c) => c.cell_type === 'music');
+    if (musicCells.length === 0) {
+      toast.info('No music cells to play.');
+      return;
+    }
+
+    for (const cell of musicCells) {
+      setActiveCellId(cell.id);
+      
+      const playFn = usePlaybackStore.getState().cellControllers[cell.id];
+      if (playFn) {
+        await playFn();
+        const currentActivePlayback = usePlaybackStore.getState().activeCellId;
+        if (!currentActivePlayback) {
+          break;
+        }
+      }
+    }
+  };
+
   const showAuthGate = !googleDriveConnected;
 
   return (
@@ -753,6 +785,8 @@ function App() {
                     setTheme={setTheme}
                     googleDriveConnected={googleDriveConnected}
                     currentFileId={driveFileId}
+                    onPlayCell={handlePlayCell}
+                    onPlayAll={handlePlayAll}
                   />
                 </div>
 

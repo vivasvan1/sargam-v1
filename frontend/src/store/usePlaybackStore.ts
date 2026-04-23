@@ -5,11 +5,16 @@ interface PlaybackState {
     stopPlayback: (() => void) | null;
     setActiveCell: (id: string, stopFn: () => void) => void;
     clearActiveCell: (id: string) => void;
+    
+    cellControllers: Record<string, () => Promise<void>>;
+    registerCellController: (id: string, playFn: () => Promise<void>) => void;
+    unregisterCellController: (id: string) => void;
 }
 
 export const usePlaybackStore = create<PlaybackState>((set, get) => ({
     activeCellId: null,
     stopPlayback: null,
+    cellControllers: {},
 
     setActiveCell: (id, stopFn) => {
         const currentState = get();
@@ -38,4 +43,21 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
             });
         }
     },
+
+    registerCellController: (id, playFn) => {
+        set((state) => ({
+            cellControllers: {
+                ...state.cellControllers,
+                [id]: playFn,
+            }
+        }));
+    },
+
+    unregisterCellController: (id) => {
+        set((state) => {
+            const next = { ...state.cellControllers };
+            delete next[id];
+            return { cellControllers: next };
+        });
+    }
 }));

@@ -34,6 +34,9 @@ interface MenuBarProps {
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
 
   googleDriveConnected: boolean;
+  
+  onPlayCell?: () => void;
+  onPlayAll?: () => void;
 }
 
 import { useNotebookSettings } from '../context/NotebookSettingsContext';
@@ -57,6 +60,8 @@ export function MenuBar({
   setTheme,
   googleDriveConnected,
   currentFileId,
+  onPlayCell,
+  onPlayAll,
 }: MenuBarProps) {
   const { open, toggleSidebar } = useSidebar();
   const {
@@ -148,6 +153,20 @@ export function MenuBar({
           </MenubarItem>
           <MenubarItem onClick={() => setTheme('system')}>
             System Theme
+          </MenubarItem>
+        </MenubarContent>
+      </MenubarMenu>
+
+      <MenubarMenu>
+        <MenubarTrigger className="cursor-pointer font-normal text-sm h-7 px-2 data-[state=open]:bg-muted">
+          Play
+        </MenubarTrigger>
+        <MenubarContent>
+          <MenubarItem onClick={onPlayCell} disabled={!onPlayCell}>
+            Play Cell
+          </MenubarItem>
+          <MenubarItem onClick={onPlayAll} disabled={!onPlayAll}>
+            Play All Cells
           </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
