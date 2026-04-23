@@ -412,6 +412,18 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     // We do NOT use beatDur for scheduling time anymore, only for duration calculation inside callbacks
     // const beatDur = 60 / bpm;
 
+    let initialSkipBeats = 0;
+    const mainVoice = parsedData.voices['default'] || Object.values(parsedData.voices)[0];
+    if (mainVoice) {
+      for (const event of mainVoice.events) {
+        if (event.type === 'skip') {
+          initialSkipBeats += event.duration;
+        } else if (event.type !== 'comment' && event.type !== 'bar') {
+          break;
+        }
+      }
+    }
+
     let maxDuration = 0; // in beats
 
     // Setup Tala
@@ -495,7 +507,8 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
 
           talaPart.loop = true;
           talaPart.loopEnd = beatsToTime(cycleDurationBeats);
-          talaPart.start(0);
+          const offsetBeats = cycleDurationBeats > 0 ? (initialSkipBeats % cycleDurationBeats) : 0;
+          talaPart.start(0, beatsToTime(offsetBeats));
 
           activeNodesRef.current['__tala'] = {
             synth: tablaInstrument,
