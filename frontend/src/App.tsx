@@ -96,7 +96,7 @@ function AuthGate({
                 </h2>
                 <p className="text-sm leading-6 text-muted-foreground">
                   <strong className="font-semibold text-foreground">
-                    Sargam notebook
+                    Sargam notebook{' '}
                   </strong>
                   uses your Google Drive to load notebooks, save changes, and
                   open shared files.
