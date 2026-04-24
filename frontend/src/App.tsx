@@ -91,15 +91,15 @@ function AuthGate({
 
             <div className="flex flex-col justify-center gap-6 p-8 md:p-12">
               <div className="space-y-3">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Authentication
-                </p>
                 <h2 className="text-2xl font-semibold tracking-tight">
-                  Continue with Google Drive
+                  Speede - Sargam Notebooks
                 </h2>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Speede Sargam uses your Google session to load notebooks,
-                  save changes, and open shared files.
+                  <strong className="font-semibold text-foreground">
+                    Sargam notebook
+                  </strong>
+                  uses your Google Drive to load notebooks, save changes, and
+                  open shared files.
                 </p>
               </div>
 
