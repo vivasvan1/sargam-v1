@@ -346,24 +346,31 @@ export async function withRetry<T>(apiCall: () => Promise<T>): Promise<T> {
   try {
     return await apiCall();
   } catch (error: any) {
-    // Check if error is 401 Unauthorized via fetch response status or gapi client error
+    // Check if error is 401 Unauthorized via fetch response status, gapi client error, 
+    // or specific error messages that indicate we need a token refresh
     const isUnauthorized =
       error.status === 401 ||
-      (error.result && error.result.error && error.result.error.code === 401);
+      (error.result && error.result.error && error.result.error.code === 401) ||
+      error.message?.includes('No access token available') ||
+      error.message?.includes('sign in with Google') ||
+      error.message?.includes('session expired') ||
+      error.message?.includes('Please reconnect');
 
     if (isUnauthorized) {
-      console.log('Token expired or invalid, attempting silent refresh...');
+      console.log('Authorization required or token expired, attempting silent refresh...');
       const refreshed = await refreshTokenSilently();
       if (refreshed) {
         console.log('Token refreshed successfully, retrying request...');
         return await apiCall(); // Retry the original call with new token!
       } else {
+        // If silent refresh fails, we must finally throw to let the user know
         throw new Error('Google Drive session expired. Please reconnect.');
       }
     }
     throw error;
   }
 }
+
 
 // Get user info from token
 async function getUserInfo(): Promise<boolean> {
@@ -735,16 +742,27 @@ export async function saveFile(
       );
       form.append('file', file);
 
-      const doFetch = async () => fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${accessToken || gapi.client.getToken()?.access_token}`,
-          },
-          body: form,
+      const doFetch = async () => {
+        const res = await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${accessToken || gapi.client.getToken()?.access_token}`,
+            },
+            body: form,
+          }
+        );
+        if (!res.ok) {
+          const err: any = new Error('Failed to update file');
+          err.status = res.status;
+          try {
+            err.result = await res.json();
+          } catch (e) {}
+          throw err;
         }
-      );
+        return res;
+      };
       response = await withRetry(doFetch);
     } else {
       // Create new file - include parents for new files
@@ -760,18 +778,30 @@ export async function saveFile(
       );
       form.append('file', file);
 
-      const doFetch = async () => fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken || gapi.client.getToken()?.access_token}`,
-          },
-          body: form,
+      const doFetch = async () => {
+        const res = await fetch(
+          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken || gapi.client.getToken()?.access_token}`,
+            },
+            body: form,
+          }
+        );
+        if (!res.ok) {
+          const err: any = new Error('Failed to create file');
+          err.status = res.status;
+          try {
+            err.result = await res.json();
+          } catch (e) {}
+          throw err;
         }
-      );
+        return res;
+      };
       response = await withRetry(doFetch);
     }
+
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -831,17 +861,29 @@ export async function updateFileById(
     );
     form.append('file', file);
 
-    const doFetch = async () => fetch(
-      `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${accessToken || gapi.client.getToken()?.access_token}`,
-        },
-        body: form,
+    const doFetch = async () => {
+      const res = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${accessToken || gapi.client.getToken()?.access_token}`,
+          },
+          body: form,
+        }
+      );
+      if (!res.ok) {
+        const err: any = new Error('Failed to update file');
+        err.status = res.status;
+        try {
+          err.result = await res.json();
+        } catch (e) {}
+        throw err;
       }
-    );
+      return res;
+    };
     const response = await withRetry(doFetch);
+
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -865,14 +907,17 @@ export async function updateFileById(
 
 // Load file from Google Drive
 async function loadFile(fileId: string): Promise<any> {
-  const token =
-    accessToken || (isInitialized && gapi?.client?.getToken()?.access_token);
+  return withRetry(async () => {
+    const token =
+      accessToken || (isInitialized && gapi?.client?.getToken()?.access_token);
 
-  if (!token) {
-    throw new Error('No access token available. Please sign in with Google.');
-  }
+    if (!token) {
+      throw {
+        status: 401,
+        message: 'No access token available. Please sign in with Google.',
+      };
+    }
 
-  try {
     const response = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
       {
@@ -883,19 +928,26 @@ async function loadFile(fileId: string): Promise<any> {
     );
 
     if (!response.ok) {
-      const error = await response
+      const errorData = await response
         .json()
         .catch(() => ({ error: { message: 'Failed to load file' } }));
-      throw new Error(error.error?.message || 'Failed to load file');
+      const error: any = new Error(
+        errorData.error?.message || 'Failed to load file'
+      );
+      error.status = response.status;
+      throw error;
     }
 
     const content = await response.text();
-    return JSON.parse(content);
-  } catch (error: any) {
-    console.error('Error loading file:', error);
-    throw new Error(error.message || 'Failed to load file from Google Drive');
-  }
+    try {
+      return JSON.parse(content);
+    } catch (e) {
+      console.error('Error parsing file content:', content.substring(0, 100));
+      throw new Error('Failed to parse file content from Google Drive');
+    }
+  });
 }
+
 
 // Load notebook and its metadata (permissions, publish status) in parallel
 export async function loadNotebookAndMetadata(fileId: string): Promise<{
@@ -904,9 +956,9 @@ export async function loadNotebookAndMetadata(fileId: string): Promise<{
   isPublished: boolean;
   isReadOnly: boolean;
 }> {
-  await waitForAuthReady();
+  return withRetry(async () => {
+    await waitForAuthReady();
 
-  try {
     const notebookPromise = loadFile(fileId);
     const metadataPromise = isAuthenticated()
       ? getFileMetadata(fileId)
@@ -924,11 +976,9 @@ export async function loadNotebookAndMetadata(fileId: string): Promise<{
       isPublished,
       isReadOnly: metadata ? !checkIfEditable(metadata) : true,
     };
-  } catch (error) {
-    console.error('Error in loadNotebookAndMetadata:', error);
-    throw error;
-  }
+  });
 }
+
 
 // Delete file from Google Drive
 export async function deleteFile(fileId: string): Promise<void> {
@@ -937,18 +987,21 @@ export async function deleteFile(fileId: string): Promise<void> {
   }
 
   try {
-    await gapi.client.drive.files.delete({
-      fileId: fileId,
-    });
+    await withRetry(() =>
+      gapi.client.drive.files.delete({
+        fileId: fileId,
+      })
+    );
   } catch (error: any) {
     console.error('Error deleting file:', error);
     throw new Error(
       error.result?.error?.message ||
-      error.message ||
-      'Failed to delete file from Google Drive'
+        error.message ||
+        'Failed to delete file from Google Drive'
     );
   }
 }
+
 
 // Get file metadata
 export async function getFileMetadata(fileId: string): Promise<GoogleFile> {
@@ -957,11 +1010,13 @@ export async function getFileMetadata(fileId: string): Promise<GoogleFile> {
   }
 
   try {
-    const response = await gapi.client.drive.files.get({
-      fileId: fileId,
-      fields:
-        'id, name, modifiedTime, mimeType, parents, permissions, capabilities',
-    });
+    const response: any = await withRetry(() =>
+      gapi.client.drive.files.get({
+        fileId: fileId,
+        fields:
+          'id, name, modifiedTime, mimeType, parents, permissions, capabilities',
+      })
+    );
 
     return response.result;
   } catch (error: any) {
@@ -986,6 +1041,7 @@ export async function getFileMetadata(fileId: string): Promise<GoogleFile> {
     throw error;
   }
 }
+
 
 // Sanitize filename
 function sanitizeFileName(name: string): string {
@@ -1021,21 +1077,24 @@ export async function setFilePublic(fileId: string): Promise<void> {
   }
 
   try {
-    await gapi.client.drive.permissions.create({
-      fileId: fileId,
-      resource: {
-        role: 'reader',
-        type: 'anyone',
-      },
-    });
+    await withRetry(() =>
+      gapi.client.drive.permissions.create({
+        fileId: fileId,
+        resource: {
+          role: 'reader',
+          type: 'anyone',
+        },
+      })
+    );
   } catch (error: any) {
     console.error('Error setting file public:', error);
     throw new Error(
       'Failed to make file public: ' +
-      (error.result?.error?.message || error.message)
+        (error.result?.error?.message || error.message)
     );
   }
 }
+
 
 export interface RegistryEntry {
   id: string;

@@ -83,11 +83,9 @@ export function PublicBrowser({
       console.debug('Public notebook loaded');
     } catch (error: any) {
       console.error('Error loading file:', error);
-      toast.error(
-        error.message ||
-          'Failed to open file. You might need to sign in to Google Drive first.'
-      );
+      toast.error(error.message || 'Failed to open file');
     } finally {
+
       setOpeningId(null);
     }
   };
