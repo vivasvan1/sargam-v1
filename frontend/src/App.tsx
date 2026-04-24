@@ -137,7 +137,7 @@ function AuthGate({
                     />
                   </svg>
                 )}
-                <span className="font-medium text-zinc-700">
+                <span className="font-medium text-primary">
                   {isInitializing
                     ? 'Initializing...'
                     : isSigningIn
