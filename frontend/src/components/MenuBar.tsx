@@ -177,7 +177,7 @@ export function MenuBar({
         </MenubarTrigger>
         <MenubarContent>
           <MenubarItem disabled>
-            About Sargam{' '}
+            About Speede Sargam{' '}
             <span className="ml-2 text-xs text-muted-foreground">v1.0</span>
           </MenubarItem>
           <MenubarItem

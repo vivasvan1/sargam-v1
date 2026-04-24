@@ -83,7 +83,7 @@ function AuthGate({
               <div className="overflow-hidden rounded-[1.75rem] border border-border/60 bg-background/70 shadow-xl">
                 <img
                   src="/screenshot.png"
-                  alt="Sargam notebook preview"
+                  alt="Speede Sargam notebook preview"
                   className="h-full w-full object-cover"
                 />
               </div>
@@ -98,8 +98,8 @@ function AuthGate({
                   Continue with Google Drive
                 </h2>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Sargam uses your Google session to load notebooks, save
-                  changes, and open shared files.
+                  Speede Sargam uses your Google session to load notebooks,
+                  save changes, and open shared files.
                 </p>
               </div>
 
@@ -135,11 +135,17 @@ function AuthGate({
           </div>
 
           <div className="flex items-center justify-center gap-4 px-4 pt-4 text-xs text-muted-foreground">
-            <a href="/terms" className="transition-colors hover:text-foreground">
+            <a
+              href="/terms"
+              className="transition-colors hover:text-foreground"
+            >
               Terms & Conditions
             </a>
             <span className="text-border">•</span>
-            <a href="/privacy" className="transition-colors hover:text-foreground">
+            <a
+              href="/privacy"
+              className="transition-colors hover:text-foreground"
+            >
               Privacy
             </a>
           </div>
@@ -246,7 +252,9 @@ function App() {
       const title = nextNotebook.metadata?.title || 'Untitled Notebook';
       setFilePath(fileId ? `${title}.imnb` : 'raag_khamaj_demo.imnb');
       setDriveFileId(fileId);
-      setLastSavedContent(fileId ? JSON.stringify(nextNotebook, null, 2) : null);
+      setLastSavedContent(
+        fileId ? JSON.stringify(nextNotebook, null, 2) : null
+      );
       setSaveStatus('saved');
       setIsReadOnly(readOnly);
       setIsPublished(published);
@@ -476,7 +484,9 @@ function App() {
     }
 
     if (!isInitialized) {
-      toast.error('Google Drive is still initializing. Please wait a moment and try again.');
+      toast.error(
+        'Google Drive is still initializing. Please wait a moment and try again.'
+      );
       return;
     }
 
@@ -701,7 +711,7 @@ function App() {
 
     for (const cell of musicCells) {
       setActiveCellId(cell.id);
-      
+
       const playFn = usePlaybackStore.getState().cellControllers[cell.id];
       if (playFn) {
         const isNatural = await playFn();

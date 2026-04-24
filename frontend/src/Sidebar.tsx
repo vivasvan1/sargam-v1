@@ -73,7 +73,7 @@ export function Sidebar({
             <img src="/logo.png" alt="" />
           </div>
           <span className="font-bold text-xl tracking-tight truncate">
-            Sargam Notebook
+            Speede Sargam Notebook
           </span>
         </div>
       </SidebarHeader>
