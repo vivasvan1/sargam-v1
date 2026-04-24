@@ -136,14 +136,18 @@ function AuthGate({
 
           <div className="flex items-center justify-center gap-4 px-4 pt-4 text-xs text-muted-foreground">
             <a
-              href="/terms"
+              href="https://experts.speede.site/licenses/terms"
+              target="_blank"
+              rel="noopener noreferrer"
               className="transition-colors hover:text-foreground"
             >
               Terms & Conditions
             </a>
             <span className="text-border">•</span>
             <a
-              href="/privacy"
+              href="https://experts.speede.site/licenses/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
               className="transition-colors hover:text-foreground"
             >
               Privacy
