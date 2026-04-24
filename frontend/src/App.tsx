@@ -328,6 +328,8 @@ function App() {
 
   // Sync URL with driveFileId
   useEffect(() => {
+    if (!hasLoadedInitialNotebook) return;
+
     const url = new URL(window.location.href);
     if (driveFileId) {
       url.searchParams.set('fileId', driveFileId);
@@ -335,7 +337,7 @@ function App() {
       url.searchParams.delete('fileId');
     }
     window.history.replaceState({}, '', url.toString());
-  }, [driveFileId]);
+  }, [driveFileId, hasLoadedInitialNotebook]);
 
   // Auto-save to Google Drive
   const { autoSaveEnabled } = useNotebookSettings();
