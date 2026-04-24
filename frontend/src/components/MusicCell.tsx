@@ -212,31 +212,31 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     }
   };
 
-  const playPromiseResolveRef = useRef<(() => void) | null>(null);
+  const playPromiseResolveRef = useRef<((isNatural: boolean) => void) | null>(null);
 
-  const handlePlay = async (): Promise<void> => {
+  const handlePlay = async (): Promise<boolean> => {
     if (isPlaying) {
-      stopPlayback();
-      return Promise.resolve();
+      stopPlayback(false);
+      return Promise.resolve(false);
     }
 
     if (!lastParsedData) {
       toast.error('Could not parse musical notation');
-      return Promise.resolve();
+      return Promise.resolve(false);
     }
 
     await Tone.start();
 
-    return new Promise<void>(async (resolve) => {
+    return new Promise<boolean>(async (resolve) => {
       playPromiseResolveRef.current = resolve;
       try {
-        setActiveCell(cell.id, stopPlayback);
+        setActiveCell(cell.id, () => stopPlayback(false));
         await playMusic(lastParsedData, voiceControls, initialStartTime);
         setIsPlaying(true);
       } catch (e) {
         console.error(e);
         toast.error('Could not parse musical notation');
-        resolve();
+        resolve(false);
       }
     });
   };
@@ -250,7 +250,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     return () => unregisterCellController(cell.id);
   }, [cell.id, registerCellController, unregisterCellController]);
 
-  const stopPlayback = () => {
+  const stopPlayback = (isNatural: boolean = false) => {
     Tone.getTransport().stop();
     Tone.getTransport().cancel();
 
@@ -301,7 +301,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     setIsPlaying(false);
     
     if (playPromiseResolveRef.current) {
-        playPromiseResolveRef.current();
+        playPromiseResolveRef.current(isNatural);
         playPromiseResolveRef.current = null;
     }
   };
@@ -859,7 +859,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     Tone.getTransport().schedule(
       () => {
         if (!Tone.getTransport().loop) {
-          stopPlayback();
+          stopPlayback(true);
         }
       },
       beatsToTime(maxDuration + 0.5)

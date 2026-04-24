@@ -8,7 +8,7 @@ const DISCOVERY_DOCS = [
   'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
 ];
 const SCOPES =
-  'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+  'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
 // The URL of our deployed Google Apps Script Web App
 const REGISTRY_SCRIPT_URL =
@@ -892,7 +892,7 @@ async function loadFile(fileId: string): Promise<any> {
     const content = await response.text();
     return JSON.parse(content);
   } catch (error: any) {
-    console.error('Error loading file with auth:', error);
+    console.error('Error loading file:', error);
     throw new Error(error.message || 'Failed to load file from Google Drive');
   }
 }

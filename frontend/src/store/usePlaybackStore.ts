@@ -6,8 +6,8 @@ interface PlaybackState {
     setActiveCell: (id: string, stopFn: () => void) => void;
     clearActiveCell: (id: string) => void;
     
-    cellControllers: Record<string, () => Promise<void>>;
-    registerCellController: (id: string, playFn: () => Promise<void>) => void;
+    cellControllers: Record<string, () => Promise<boolean>>;
+    registerCellController: (id: string, playFn: () => Promise<boolean>) => void;
     unregisterCellController: (id: string) => void;
 }
 

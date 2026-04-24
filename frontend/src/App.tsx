@@ -702,10 +702,9 @@ function App() {
       
       const playFn = usePlaybackStore.getState().cellControllers[cell.id];
       if (playFn) {
-        await playFn();
-        const currentActivePlayback = usePlaybackStore.getState().activeCellId;
-        if (!currentActivePlayback) {
-          break;
+        const isNatural = await playFn();
+        if (!isNatural) {
+          break; // Stop sequential playback if user manually stopped it
         }
       }
     }
