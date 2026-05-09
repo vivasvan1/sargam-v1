@@ -36,14 +36,13 @@ const SWARA_NAMES: Record<string, string> = {
   D: 'Dha',
   N: 'Ni',
 };
-
 const SWARA_NAMES_HI: Record<string, string> = {
   S: 'सा',
   R: 'रे',
-  G: 'गा',
-  M: 'मा',
-  P: 'पा',
-  D: 'धा',
+  G: 'ग',
+  M: 'म',
+  P: 'प',
+  D: 'ध',
   N: 'नी',
 };
 
