@@ -274,10 +274,7 @@ export function VisualizerNote({
       <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
         <TooltipTrigger asChild>
           <div
-            className={cn(
-              `absolute top-[5%] bottom-[5%] rounded-full transition-all duration-500 cursor-pointer pointer-events-auto select-none`,
-              'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
-            )}
+            className="absolute top-[5%] bottom-[5%] rounded-full cursor-pointer pointer-events-auto select-none bg-primary/70"
             onClick={handleClick}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
@@ -287,9 +284,7 @@ export function VisualizerNote({
               width: `4px`,
               // width: `${width}px`,
             }}
-          >
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[8px] h-[8px] bg-amber-400/30 rounded-full animate-ping" />
-          </div>
+          />
         </TooltipTrigger>
         <TooltipContent side="top">Chikari</TooltipContent>
       </Tooltip>

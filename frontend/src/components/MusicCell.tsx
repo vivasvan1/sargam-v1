@@ -1,6 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import CodeMirror from '@uiw/react-codemirror';
-import { markdown } from '@codemirror/lang-markdown';
 import * as Tone from 'tone';
 import { toast } from 'sonner';
 import { parseMusicCell } from '../utils/sargam_parser';
@@ -48,10 +46,12 @@ const beatsToTime = (beats: number) => {
   return `${bars}:${quarters}:${sixteenths.toFixed(2)}`;
 };
 
-export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
+export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const content = Array.isArray(cell.source)
     ? cell.source.join('\n')
     : cell.source;
+  const [editorValue, setEditorValue] = useState(content);
+  const [debouncedContent, setDebouncedContent] = useState(content);
   const [isPlaying, setIsPlaying] = useState(false);
   const [lastParsedData, setLastParsedData] = useState<ParsedMusicCell | null>(
     null
@@ -83,14 +83,27 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     setLocalShowCode(showCode);
   }, [showCode]);
 
+  useEffect(() => {
+    setEditorValue(content);
+  }, [content]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedContent(editorValue);
+    }, 500);
+
+    return () => window.clearTimeout(timeout);
+  }, [editorValue]);
+
   const handleChange = (val: string) => {
+    setEditorValue(val);
     onChange({ ...cell, source: val.split('\n') });
   };
 
-  // Parse content whenever it changes to update controls
+  // Parse debounced content to update controls and visualizer without slowing editing
   useEffect(() => {
     try {
-      const data = parseMusicCell(content.split('\n'));
+      const data = parseMusicCell(debouncedContent.split('\n'));
 
       if (!bpm && !data.directives.tempo) setBpm(80);
       if (!bpm && data.directives.tempo)
@@ -176,7 +189,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
     } catch (e) {
       // silent fail on type; waiting for valid input
     }
-  }, [content, defaultInstruments, bpm]); // Add defaultInstruments to dependency to likely trigger re-init if needed?
+  }, [debouncedContent, defaultInstruments, bpm]); // Add defaultInstruments to dependency to likely trigger re-init if needed?
   // Actually, we want a separate effect for reactive updates to avoid re-parsing content.
 
   // Effect to sync local state with global default changes
@@ -220,7 +233,19 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       return Promise.resolve(false);
     }
 
-    if (!lastParsedData) {
+    let parsedForPlayback = lastParsedData;
+    if (debouncedContent !== editorValue) {
+      try {
+        parsedForPlayback = parseMusicCell(editorValue.split('\n'));
+        setLastParsedData(parsedForPlayback);
+        setDebouncedContent(editorValue);
+      } catch (e) {
+        toast.error('Could not parse musical notation');
+        return Promise.resolve(false);
+      }
+    }
+
+    if (!parsedForPlayback) {
       toast.error('Could not parse musical notation');
       return Promise.resolve(false);
     }
@@ -231,7 +256,7 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
       playPromiseResolveRef.current = resolve;
       try {
         setActiveCell(cell.id, () => stopPlayback(false));
-        await playMusic(lastParsedData, voiceControls, initialStartTime);
+        await playMusic(parsedForPlayback, voiceControls, initialStartTime);
         setIsPlaying(true);
       } catch (e) {
         console.error(e);
@@ -896,15 +921,13 @@ export function MusicCell({ cell, onChange, theme, onFocus }: MusicCellProps) {
                 : 'relative h-[50px] overflow-hidden select-none'
             }
           >
-            <CodeMirror
-              value={content}
-              height="auto"
-              extensions={[markdown()]}
-              onChange={handleChange}
+            <textarea
+              value={editorValue}
+              onChange={(e) => handleChange(e.target.value)}
               onFocus={onFocus}
-              theme={theme === 'dark' ? 'dark' : 'light'}
-              className="text-base md:text-sm font-mono focus-within:ring-0"
               readOnly={!localShowCode}
+              spellCheck={false}
+              className="w-full min-h-[160px] resize-y rounded-md border border-border bg-background px-3 py-2 text-base md:text-sm font-mono text-foreground outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
             {!localShowCode && (
               <div className="absolute inset-0 z-10 bg-background/50 backdrop-blur-md flex items-center justify-center border-b border-border/50">
