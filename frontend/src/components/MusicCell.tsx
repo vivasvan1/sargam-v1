@@ -22,7 +22,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Button } from './ui/button';
-import { Save } from 'lucide-react';
+import { CornerDownLeftIcon, DeleteIcon, Save } from 'lucide-react';
 
 interface MusicCellProps {
   cell: {
@@ -1064,12 +1064,13 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
             {!localShowCode && (
               <div className="absolute inset-0 z-10 bg-background flex items-center justify-center border-b border-border/50">
-                <button
+                <Button
+                  type="button"
                   onClick={() => setLocalShowCode(true)}
-                  className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md cursor-pointer z-50 pointer-events-auto"
+                  className="z-50 pointer-events-auto"
                 >
                   Show Music Code
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -1094,14 +1095,15 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 {notationKeys.map((key) => (
                   <Tooltip key={key.label} delayDuration={0}>
                     <TooltipTrigger asChild>
-                      <button
+                      <Button
+                        size="sm"
+                        variant="outline"
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => insertAtCursor(key.value)}
-                        className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
                       >
                         {key.label}
-                      </button>
+                      </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top">{key.tooltip}</TooltipContent>
                   </Tooltip>
@@ -1123,14 +1125,15 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 {octaveKeys.map((key) => (
                   <Tooltip key={key.label} delayDuration={0}>
                     <TooltipTrigger asChild>
-                      <button
+                      <Button
+                        size="sm"
+                        variant="outline"
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => insertAtCursor(key.value)}
-                        className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
                       >
                         {key.label}
-                      </button>
+                      </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top">{key.tooltip}</TooltipContent>
                   </Tooltip>
@@ -1138,26 +1141,39 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 {durationKeys.map((key) => (
                   <Tooltip key={key.label} delayDuration={0}>
                     <TooltipTrigger asChild>
-                      <button
+                      <Button
+                        size="sm"
+                        variant="outline"
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => insertAtCursor(key.value)}
-                        className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
                       >
                         {key.label}
-                      </button>
+                      </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top">{key.tooltip}</TooltipContent>
                   </Tooltip>
                 ))}
-                <button
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    insertAtCursor('\n');
+                  }}
+                >
+                  <CornerDownLeftIcon className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={deleteAtCursor}
-                  className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
                 >
-                  delete
-                </button>
+                  <DeleteIcon className="w-4 h-4" />
+                </Button>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -1171,17 +1187,18 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                   Save
                 </Button>
                 {isMobile && (
-                  <button
+                  <Button
+                    size="sm"
+                    variant="outline"
                     type="button"
                     onClick={() => {
                       setKeyboardMinimized(true);
                       setUseNormalKeyboard(true);
                       requestAnimationFrame(() => textareaRef.current?.focus());
                     }}
-                    className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
                   >
                     show normal keyboard
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
