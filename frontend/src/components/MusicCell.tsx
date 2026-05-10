@@ -119,13 +119,6 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const handleEditorFocus = () => {
     setIsEditorFocused(true);
     onFocus?.();
-    if (
-      isMobile &&
-      !useNormalKeyboard &&
-      document.activeElement === textareaRef.current
-    ) {
-      textareaRef.current?.blur();
-    }
   };
 
   const handleEditorBlur = () => {
