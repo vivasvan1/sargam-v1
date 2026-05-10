@@ -22,7 +22,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Button } from './ui/button';
-import { Separator } from './ui/separator';
 import { Save } from 'lucide-react';
 
 interface MusicCellProps {
@@ -93,6 +92,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const [initialStartTime, setInitialStartTime] = useState(0);
   const [bpm, setBpm] = useState<number | null>(null);
   const [isLooping, setIsLooping] = useState(false);
+  const [isEditorFocused, setIsEditorFocused] = useState(false);
+  const [keyboardMinimized, setKeyboardMinimized] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isMobile = useIsMobile();
 
@@ -112,6 +113,19 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
   const handleChange = (val: string) => {
     setEditorValue(val);
+  };
+
+  const handleEditorFocus = () => {
+    setIsEditorFocused(true);
+    onFocus?.();
+  };
+
+  const handleEditorBlur = () => {
+    window.setTimeout(() => {
+      if (document.activeElement !== textareaRef.current) {
+        setIsEditorFocused(false);
+      }
+    }, 0);
   };
 
   const handleSave = () => {
@@ -990,7 +1004,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 ref={textareaRef}
                 value={editorValue}
                 onChange={(e) => handleChange(e.target.value)}
-                onFocus={onFocus}
+                onFocus={handleEditorFocus}
+                onBlur={handleEditorBlur}
                 readOnly={!localShowCode}
                 spellCheck={false}
                 className="w-full resize-none overflow-hidden rounded-md border border-border bg-background/70 px-3 py-2 pb-12 text-base md:text-sm font-mono text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -1017,87 +1032,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 </Button>
               )}
             </div>
-            {localShowCode && (
-              <div className="mt-2 sticky top-0 flex flex-wrap gap-2 rounded-md border border-border/60 bg-muted/20 p-2">
-                <div className="flex flex-wrap gap-2 w-full justify-between">
-                  <div className="flex flex-wrap gap-2 w-full md:w-max justify-start">
-                    {notationKeys.map((key) => (
-                      <Tooltip key={key.label} delayDuration={0}>
-                        <TooltipTrigger asChild>
-                          <button
-                            key={key.label}
-                            type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => insertAtCursor(key.value)}
-                            className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
-                          >
-                            {key.label}
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          {key.tooltip}
-                        </TooltipContent>
-                      </Tooltip>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-2 w-full md:w-max justify-end">
-                    {octaveKeys.map((key) => (
-                      <Tooltip key={key.label} delayDuration={0}>
-                        <TooltipTrigger asChild>
-                          <button
-                            key={key.label}
-                            type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => insertAtCursor(key.value)}
-                            className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
-                          >
-                            {key.label}
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          {key.tooltip}
-                        </TooltipContent>
-                      </Tooltip>
-                    ))}
-                  </div>
-                </div>
-                <Separator />
-                <div className="flex flex-wrap justify-end w-full gap-2 items-center">
-                  {durationKeys.map((key) => (
-                    <Tooltip key={key.label} delayDuration={0}>
-                      <TooltipTrigger asChild>
-                        <button
-                          key={key.label}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => insertAtCursor(key.value)}
-                          className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
-                        >
-                          {key.label}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">{key.tooltip}</TooltipContent>
-                    </Tooltip>
-                  ))}
-                  <Button
-                    size={'sm'}
-                    onClick={handleSave}
-                    disabled={!hasUnsavedChanges}
-                  >
-                    Save
-                  </Button>
-                </div>
 
-                {isMobile && (
-                  <button
-                    type="button"
-                    className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
-                  >
-                    show normal keyboard
-                  </button>
-                )}
-              </div>
-            )}
             {!localShowCode && (
               <div className="absolute inset-0 z-10 bg-background flex items-center justify-center border-b border-border/50">
                 <button
@@ -1111,6 +1046,107 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
           </div>
         </div>
       </div>
+      {localShowCode && isEditorFocused && keyboardMinimized && (
+        <Button
+          size="sm"
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setKeyboardMinimized(false)}
+          className="fixed bottom-3 right-3 z-50"
+        >
+          Show keyboard
+        </Button>
+      )}
+      {localShowCode && isEditorFocused && !keyboardMinimized && (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background p-2">
+          <div className="mx-auto flex max-w-6xl flex-wrap gap-2">
+            <div className="flex w-full items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                {notationKeys.map((key) => (
+                  <Tooltip key={key.label} delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertAtCursor(key.value)}
+                        className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
+                      >
+                        {key.label}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{key.tooltip}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setKeyboardMinimized(true)}
+              >
+                Minimise
+              </Button>
+            </div>
+
+            <div className="flex w-full flex-wrap justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                {octaveKeys.map((key) => (
+                  <Tooltip key={key.label} delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertAtCursor(key.value)}
+                        className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
+                      >
+                        {key.label}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{key.tooltip}</TooltipContent>
+                  </Tooltip>
+                ))}
+                {durationKeys.map((key) => (
+                  <Tooltip key={key.label} delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertAtCursor(key.value)}
+                        className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
+                      >
+                        {key.label}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{key.tooltip}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={handleSave}
+                  disabled={!hasUnsavedChanges}
+                >
+                  Save
+                </Button>
+                {isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => textareaRef.current?.focus()}
+                    className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
+                  >
+                    show normal keyboard
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {(localShowVisualizer || (isPlaying && lastParsedData)) && bpm && (
         <div className="px-3 md:px-4 pb-4 overflow-x-auto max-w-full">
           <div className="min-w-0">

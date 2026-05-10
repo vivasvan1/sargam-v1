@@ -44,7 +44,7 @@ export function VisualizerHeader({
     <div className="flex items-start justify-between w-full gap-4 overflow-x-auto custom-scrollbar pb-1">
       <div className="space-y-1 shrink-0">
         <div className="flex items-center gap-1">
-          <h3 className="text-xss font-bold uppercase tracking-[0.25em] text-primary/80">
+          <h3 className="text-xss font-bold text-primary/80">
             {scoreTitle}
           </h3>
           <NoteLegendModal />

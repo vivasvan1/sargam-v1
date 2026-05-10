@@ -273,7 +273,7 @@ export function VisualizerNote({
       <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
         <TooltipTrigger asChild>
           <div
-            className="absolute top-[5%] bottom-[5%] rounded-full cursor-pointer pointer-events-auto select-none bg-primary/70"
+            className="absolute top-[5%] bottom-[5%] rounded-full cursor-pointer pointer-events-auto select-none bg-amber-400"
             onClick={handleClick}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
