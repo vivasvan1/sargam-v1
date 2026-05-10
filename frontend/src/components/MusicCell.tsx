@@ -94,6 +94,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const [isLooping, setIsLooping] = useState(false);
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [keyboardMinimized, setKeyboardMinimized] = useState(false);
+  const [useNormalKeyboard, setUseNormalKeyboard] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isMobile = useIsMobile();
 
@@ -118,12 +119,20 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const handleEditorFocus = () => {
     setIsEditorFocused(true);
     onFocus?.();
+    if (
+      isMobile &&
+      !useNormalKeyboard &&
+      document.activeElement === textareaRef.current
+    ) {
+      textareaRef.current?.blur();
+    }
   };
 
   const handleEditorBlur = () => {
     window.setTimeout(() => {
       if (document.activeElement !== textareaRef.current) {
         setIsEditorFocused(false);
+        setUseNormalKeyboard(false);
       }
     }, 0);
   };
@@ -148,9 +157,35 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
     setEditorValue(nextValue);
     requestAnimationFrame(() => {
-      textarea.focus();
+      if (!isMobile) textarea.focus();
       textarea.setSelectionRange(nextCursor, nextCursor);
     });
+  };
+
+  const deleteAtCursor = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setEditorValue((prev) => prev.slice(0, -1));
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    if (start !== end) {
+      const nextValue = editorValue.slice(0, start) + editorValue.slice(end);
+      setEditorValue(nextValue);
+      requestAnimationFrame(() => textarea.setSelectionRange(start, start));
+      return;
+    }
+
+    if (start === 0) return;
+
+    const nextCursor = start - 1;
+    const nextValue =
+      editorValue.slice(0, nextCursor) + editorValue.slice(start);
+    setEditorValue(nextValue);
+    requestAnimationFrame(() => textarea.setSelectionRange(nextCursor, nextCursor));
   };
 
   const notationKeys = [
@@ -159,7 +194,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     { tooltip: 're', label: 'R', value: 'R' },
     { tooltip: 'ga (komal)', label: 'g', value: 'g' },
     { tooltip: 'ga', label: 'G', value: 'G' },
-    { tooltip: 'ma', label: 'm', value: 'm' },
+    { tooltip: 'ma', label: 'M', value: 'M' },
     { tooltip: 'ma (tivra)', label: 'Mt', value: 'Mt' },
     { tooltip: 'pa', label: 'P', value: 'P' },
     { tooltip: 'dha (komal)', label: 'd', value: 'd' },
@@ -1007,6 +1042,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 onFocus={handleEditorFocus}
                 onBlur={handleEditorBlur}
                 readOnly={!localShowCode}
+                inputMode={isMobile && !useNormalKeyboard ? 'none' : undefined}
                 spellCheck={false}
                 className="w-full resize-none overflow-hidden rounded-md border border-border bg-background/70 px-3 py-2 pb-12 text-base md:text-sm font-mono text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 style={{
@@ -1121,6 +1157,14 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                     <TooltipContent side="top">{key.tooltip}</TooltipContent>
                   </Tooltip>
                 ))}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={deleteAtCursor}
+                  className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
+                >
+                  delete
+                </button>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -1136,7 +1180,11 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 {isMobile && (
                   <button
                     type="button"
-                    onClick={() => textareaRef.current?.focus()}
+                    onClick={() => {
+                      setKeyboardMinimized(true);
+                      setUseNormalKeyboard(true);
+                      requestAnimationFrame(() => textareaRef.current?.focus());
+                    }}
                     className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
                   >
                     show normal keyboard
