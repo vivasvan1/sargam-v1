@@ -1,10 +1,6 @@
-import { CornerDownLeftIcon, DeleteIcon } from 'lucide-react';
+import { CornerDownLeftIcon, DeleteIcon, Keyboard, Minimize, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export interface SargamKeyboardKey {
   tooltip: string;
@@ -46,7 +42,7 @@ function KeyboardKey({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onInsert(keyConfig.value)}
-          className={`h-10 min-w-10 px-3 ${className}`}
+          className={`min-w-10 px-3 ${className}`}
         >
           {keyConfig.label}
         </Button>
@@ -93,51 +89,41 @@ export function SargamKeyboard({
         <div className="flex w-full items-center gap-2">
           <div className="flex flex-1 flex-wrap gap-2">
             {notationKeys.map((key) => (
-              <KeyboardKey
-                key={key.label}
-                keyConfig={key}
-                onInsert={onInsert}
-              />
+              <KeyboardKey key={key.label} keyConfig={key} onInsert={onInsert} />
             ))}
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={onDelete}
-            className="h-10 min-w-24"
-          >
-            <DeleteIcon className="w-4 h-4" />
-            Delete
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={onMinimize}
-            className="h-10"
-          >
-            Minimise
-          </Button>
+          <div className="flex flex-0 flex-wrap justify-end flex-reverse gap-2">
+
+            <Button
+              size="sm"
+              variant="outline"
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={onMinimize}
+              className=""
+            >
+              <Minimize className="w-4 h-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={onDelete}
+              className="min-w-24"
+            >
+              <DeleteIcon className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="flex w-full items-center gap-2">
           <div className="flex flex-1 flex-wrap gap-2">
             {octaveKeys.map((key) => (
-              <KeyboardKey
-                key={key.label}
-                keyConfig={key}
-                onInsert={onInsert}
-              />
+              <KeyboardKey key={key.label} keyConfig={key} onInsert={onInsert} />
             ))}
             {durationKeys.map((key) => (
-              <KeyboardKey
-                key={key.label}
-                keyConfig={key}
-                onInsert={onInsert}
-              />
+              <KeyboardKey key={key.label} keyConfig={key} onInsert={onInsert} />
             ))}
           </div>
           <Button
@@ -146,7 +132,7 @@ export function SargamKeyboard({
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onInsert('\n')}
-            className="h-10 min-w-24"
+            className="min-w-24"
           >
             <CornerDownLeftIcon className="w-4 h-4" />
             Return
@@ -160,7 +146,7 @@ export function SargamKeyboard({
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onInsert(' ')}
-            className="h-11 flex-1 min-w-40"
+            className="flex-1 min-w-40"
           >
             Space
           </Button>
@@ -170,9 +156,9 @@ export function SargamKeyboard({
             onMouseDown={(e) => e.preventDefault()}
             onClick={onSave}
             disabled={!hasUnsavedChanges}
-            className="h-11 min-w-24"
+            className="min-w-10"
           >
-            Save
+            <Save className="w-4 h-4" />
           </Button>
           {isMobile && (
             <Button
@@ -180,9 +166,9 @@ export function SargamKeyboard({
               variant="outline"
               type="button"
               onClick={onShowNormalKeyboard}
-              className="h-11"
+              className=""
             >
-              Normal keyboard
+              <Keyboard className="w-4 h-4" />
             </Button>
           )}
         </div>
