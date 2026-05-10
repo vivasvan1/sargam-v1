@@ -15,6 +15,7 @@ import { Mixer, type VoiceControl } from './music-cell/Mixer';
 import { Controls } from './music-cell/Controls';
 import { useNotebookSettings } from '../context/NotebookSettingsContext';
 import { usePlaybackStore } from '../store/usePlaybackStore';
+import { useIsMobile } from '../hooks/use-mobile';
 
 interface MusicCellProps {
   cell: {
@@ -51,7 +52,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     ? cell.source.join('\n')
     : cell.source;
   const [editorValue, setEditorValue] = useState(content);
-  const [debouncedContent, setDebouncedContent] = useState(content);
+  const [savedContent, setSavedContent] = useState(content);
   const [isPlaying, setIsPlaying] = useState(false);
   const [lastParsedData, setLastParsedData] = useState<ParsedMusicCell | null>(
     null
@@ -73,6 +74,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const [initialStartTime, setInitialStartTime] = useState(0);
   const [bpm, setBpm] = useState<number | null>(null);
   const [isLooping, setIsLooping] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isMobile = useIsMobile();
 
   // Sync with global setting when it changes
   useEffect(() => {
@@ -85,25 +88,61 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
   useEffect(() => {
     setEditorValue(content);
+    setSavedContent(content);
   }, [content]);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      setDebouncedContent(editorValue);
-    }, 500);
-
-    return () => window.clearTimeout(timeout);
-  }, [editorValue]);
 
   const handleChange = (val: string) => {
     setEditorValue(val);
-    onChange({ ...cell, source: val.split('\n') });
   };
 
-  // Parse debounced content to update controls and visualizer without slowing editing
+  const handleSave = () => {
+    setSavedContent(editorValue);
+    onChange({ ...cell, source: editorValue.split('\n') });
+  };
+
+  const insertAtCursor = (text: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setEditorValue((prev) => prev + text);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const nextValue =
+      editorValue.slice(0, start) + text + editorValue.slice(end);
+    const nextCursor = start + text.length;
+
+    setEditorValue(nextValue);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextCursor, nextCursor);
+    });
+  };
+
+  const notationKeys = [
+    { label: 'sa', value: 'sa' },
+    { label: 're', value: 're' },
+    { label: 'ga', value: 'ga' },
+    { label: 'ma', value: 'ma' },
+    { label: 'pa', value: 'pa' },
+    { label: 'dha', value: 'dha' },
+    { label: 'ni', value: 'ni' },
+    { label: ':0.25', value: ':0.25' },
+    { label: ':0.5', value: ':0.5' },
+    { label: ':1', value: ':1' },
+    { label: '|', value: '| ' },
+    { label: '||', value: '|| ' },
+    { label: 'space', value: ' ' },
+  ];
+
+  const hasUnsavedChanges = editorValue !== savedContent;
+  const editorRows = Math.max(8, editorValue.split('\n').length + 1);
+
+  // Parse saved content only. The visualizer updates after pressing Save.
   useEffect(() => {
     try {
-      const data = parseMusicCell(debouncedContent.split('\n'));
+      const data = parseMusicCell(savedContent.split('\n'));
 
       if (!bpm && !data.directives.tempo) setBpm(80);
       if (!bpm && data.directives.tempo)
@@ -189,7 +228,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     } catch (e) {
       // silent fail on type; waiting for valid input
     }
-  }, [debouncedContent, defaultInstruments, bpm]); // Add defaultInstruments to dependency to likely trigger re-init if needed?
+  }, [savedContent, defaultInstruments, bpm]); // Add defaultInstruments to dependency to likely trigger re-init if needed?
   // Actually, we want a separate effect for reactive updates to avoid re-parsing content.
 
   // Effect to sync local state with global default changes
@@ -233,17 +272,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
       return Promise.resolve(false);
     }
 
-    let parsedForPlayback = lastParsedData;
-    if (debouncedContent !== editorValue) {
-      try {
-        parsedForPlayback = parseMusicCell(editorValue.split('\n'));
-        setLastParsedData(parsedForPlayback);
-        setDebouncedContent(editorValue);
-      } catch (e) {
-        toast.error('Could not parse musical notation');
-        return Promise.resolve(false);
-      }
-    }
+    const parsedForPlayback = lastParsedData;
 
     if (!parsedForPlayback) {
       toast.error('Could not parse musical notation');
@@ -921,14 +950,60 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 : 'relative h-[50px] overflow-hidden select-none'
             }
           >
-            <textarea
-              value={editorValue}
-              onChange={(e) => handleChange(e.target.value)}
-              onFocus={onFocus}
-              readOnly={!localShowCode}
-              spellCheck={false}
-              className="w-full min-h-[160px] resize-y rounded-md border border-border bg-background px-3 py-2 text-base md:text-sm font-mono text-foreground outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            />
+            <div className="relative">
+              <textarea
+                ref={textareaRef}
+                value={editorValue}
+                onChange={(e) => handleChange(e.target.value)}
+                onFocus={onFocus}
+                readOnly={!localShowCode}
+                spellCheck={false}
+                rows={editorRows}
+                className="w-full resize-none overflow-hidden rounded-md border border-border bg-background px-3 py-2 pb-12 text-base md:text-sm font-mono text-foreground outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              {localShowCode && hasUnsavedChanges && (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="absolute top-3 right-3 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow hover:bg-primary/90"
+                >
+                  Save
+                </button>
+              )}
+              {localShowCode && (
+                <div className="mt-2 flex flex-wrap gap-2 rounded-md border border-border/60 bg-muted/20 p-2">
+                  {notationKeys.map((key) => (
+                    <button
+                      key={key.label}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => insertAtCursor(key.value)}
+                      className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                    >
+                      {key.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={handleSave}
+                    disabled={!hasUnsavedChanges}
+                    className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow hover:bg-primary/90 disabled:opacity-50 disabled:hover:bg-primary"
+                  >
+                    save
+                  </button>
+                  {isMobile && (
+                    <button
+                      type="button"
+                      onClick={() => textareaRef.current?.focus()}
+                      className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                    >
+                      show normal keyboard
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             {!localShowCode && (
               <div className="absolute inset-0 z-10 bg-background/50 backdrop-blur-md flex items-center justify-center border-b border-border/50">
                 <button
