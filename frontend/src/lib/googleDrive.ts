@@ -37,6 +37,7 @@ declare global {
 interface TokenResponse {
   access_token?: string;
   error?: string;
+  expires_in?: number;
 }
 
 interface TokenClient {
@@ -231,8 +232,13 @@ export async function initializeGoogleAPI(
       },
     });
 
+    // If we returned from the fallback OAuth tab flow, consume the token first.
+    const consumedRedirectToken = await handleOAuthRedirectIfPresent();
+
     // Check if we have a stored token and user
-    const storedToken = localStorage.getItem('google_drive_token');
+    const storedToken = consumedRedirectToken
+      ? null
+      : localStorage.getItem('google_drive_token');
     const storedUserStr = localStorage.getItem('google_drive_user');
 
     if (storedToken) {
@@ -419,6 +425,83 @@ async function getUserInfo(): Promise<boolean> {
   }
 }
 
+function isPopupBlockedError(error: any): boolean {
+  const message = String(error?.message || error || '').toLowerCase();
+  return (
+    message.includes('popup') &&
+    (message.includes('block') ||
+      message.includes('failed') ||
+      message.includes('open'))
+  );
+}
+
+export function getGoogleOAuthUrl(): string {
+  if (!clientId) {
+    throw new Error('Google API not initialized');
+  }
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: window.location.origin + window.location.pathname,
+    response_type: 'token',
+    scope: SCOPES,
+    include_granted_scopes: 'true',
+    prompt: 'consent',
+  });
+
+  if (currentUser?.email) {
+    params.set('login_hint', currentUser.email);
+  }
+
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+export function openGoogleLoginInNewTab(): void {
+  const popup = window.open(getGoogleOAuthUrl(), '_blank', 'noopener,noreferrer');
+  if (!popup) {
+    throw new Error('Popup blocked. Please allow popups or open login manually.');
+  }
+}
+
+export async function handleOAuthRedirectIfPresent(): Promise<boolean> {
+  if (typeof window === 'undefined' || !window.location.hash) return false;
+
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const token = params.get('access_token');
+  if (!token) return false;
+
+  accessToken = token;
+  localStorage.setItem('google_drive_token', accessToken);
+  gapi?.client?.setToken({ access_token: accessToken });
+
+  const success = await getUserInfo();
+  if (success && currentUser) {
+    isSignedIn = true;
+    localStorage.setItem('google_drive_user', JSON.stringify(currentUser));
+    useAuthStore.getState().setAuthenticated(true);
+    useAuthStore.getState().setUser(currentUser);
+  }
+
+  window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+  return success;
+}
+
+export async function adoptStoredGoogleToken(): Promise<boolean> {
+  const storedToken = localStorage.getItem('google_drive_token');
+  if (!storedToken || !isInitialized || !gapi) return false;
+
+  accessToken = storedToken;
+  gapi.client.setToken({ access_token: accessToken });
+  const success = await getUserInfo();
+  if (success && currentUser) {
+    isSignedIn = true;
+    localStorage.setItem('google_drive_user', JSON.stringify(currentUser));
+    useAuthStore.getState().setAuthenticated(true);
+    useAuthStore.getState().setUser(currentUser);
+  }
+  return success;
+}
+
 // Authenticate user using Google Identity Services
 export async function authenticate(): Promise<GoogleUser> {
   if (!isInitialized || !gapi || !tokenClient) {
@@ -438,7 +521,9 @@ export async function authenticate(): Promise<GoogleUser> {
         callback: async (tokenResponse: TokenResponse) => {
           if (tokenResponse.error) {
             tokenReceived = true;
-            if (
+            if (tokenResponse.error === 'popup_failed_to_open') {
+              reject(new Error('Google sign-in popup was blocked.'));
+            } else if (
               tokenResponse.error === 'popup_closed_by_user' ||
               tokenResponse.error === 'access_denied'
             ) {
@@ -482,7 +567,16 @@ export async function authenticate(): Promise<GoogleUser> {
       });
 
       // Request access token
-      authTokenClient.requestAccessToken();
+      try {
+        authTokenClient.requestAccessToken();
+      } catch (error: any) {
+        tokenReceived = true;
+        if (isPopupBlockedError(error)) {
+          reject(new Error('Google sign-in popup was blocked.'));
+        } else {
+          reject(error);
+        }
+      }
 
       // Timeout after 60 seconds
       setTimeout(() => {

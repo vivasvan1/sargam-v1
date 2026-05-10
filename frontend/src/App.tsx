@@ -20,6 +20,8 @@ import {
   publishToRegistry,
   unpublishFromRegistry,
   loadNotebookAndMetadata,
+  openGoogleLoginInNewTab,
+  adoptStoredGoogleToken,
 } from './lib/googleDrive';
 // GoogleUser type no longer needed here as it is in store
 import { MenuBar } from './components/MenuBar';
@@ -105,7 +107,7 @@ function AuthGate({
 
               <Button
                 onClick={onSignIn}
-                disabled={isBusy || !!errorMessage}
+                disabled={isBusy}
                 size="lg"
                 variant="outline"
                 className="h-12 justify-center gap-3 rounded-xl text-sm font-medium bg-white text-black hover:bg-gray-50 border-gray-200 shadow-sm transition-all"
@@ -241,7 +243,15 @@ function App() {
       return;
     }
 
-    initializeGoogleAPI(GOOGLE_CLIENT_ID)
+    Promise.race([
+      initializeGoogleAPI(GOOGLE_CLIENT_ID),
+      new Promise((_, reject) =>
+        window.setTimeout(
+          () => reject(new Error('Google authentication initialization timed out.')),
+          20000
+        )
+      ),
+    ])
       .then(() => {
         setAuthInitError(null);
       })
@@ -251,6 +261,19 @@ function App() {
           error.message || 'Failed to initialize Google authentication.'
         );
       });
+  }, []);
+
+  useEffect(() => {
+    const handleStorage = async (event: StorageEvent) => {
+      if (event.key !== 'google_drive_token' || !event.newValue) return;
+      const adopted = await adoptStoredGoogleToken();
+      if (adopted) {
+        toast.success('Connected to Google Drive');
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   // Load content only after Google authentication is established.
@@ -530,6 +553,20 @@ function App() {
       console.error('Error connecting to Google Drive:', error);
       if (error.message === 'Sign-in cancelled') {
         toast.info('Sign-in cancelled');
+      } else if (error.message?.toLowerCase().includes('popup')) {
+        toast.error('Google sign-in popup was blocked.', {
+          duration: Infinity,
+          action: {
+            label: 'Open login',
+            onClick: () => {
+              try {
+                openGoogleLoginInNewTab();
+              } catch (openError: any) {
+                toast.error(openError.message || 'Could not open login tab');
+              }
+            },
+          },
+        });
       } else {
         toast.error(error.message || 'Failed to connect to Google Drive');
       }
