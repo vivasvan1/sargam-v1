@@ -22,7 +22,7 @@ export function VisualizerBar({
       className={cn(
         'absolute top-0 bottom-0 cursor-pointer pointer-events-auto hover:border-primary transition-colors',
         event.double
-          ? 'border-l-[3px] border-primary/70 shadow-[1px_0_0_0_rgba(var(--primary),0.3)]'
+          ? 'border-l-[3px] border-primary/70'
           : 'border-l-2 border-primary/50'
       )}
       onClick={() => onSeek?.(event.audioStartTime + 0.001)}

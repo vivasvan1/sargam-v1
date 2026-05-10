@@ -3,17 +3,10 @@ import { MusicCell } from './MusicCell';
 import { MarkdownCell } from './MarkdownCell';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
+import type { NotebookCell } from '@/types/notebook';
 
 interface CellProps {
-  cell: {
-    id: string;
-    cell_type: string;
-    source: string[] | string;
-    metadata?: {
-      [key: string]: any;
-    };
-    [key: string]: any;
-  };
+  cell: NotebookCell;
   onChange: (newCell: any) => void;
   onDelete: () => void;
   theme: string;
@@ -37,7 +30,7 @@ export function Cell({
 
   return (
     <div className="group/cell relative bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-border/80 transition-all duration-300 max-w-full h-full">
-      <div className="px-3 md:px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between min-w-0">
+      <div className="px-3 md:px-4 py-0.5 border-b border-border bg-muted/30 flex items-center justify-between min-w-0">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {isMusic ? (
             <Music2 className="w-3 h-3 shrink-0" />

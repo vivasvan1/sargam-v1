@@ -77,7 +77,7 @@ export const VisualizerLine = memo(function VisualizerLine({
         />
       )}
       <div
-        className={cn('relative group transition-all duration-500')}
+        className={cn('relative group')}
         style={{
           height: '4rem',
           width: `${lineWidth}px`,

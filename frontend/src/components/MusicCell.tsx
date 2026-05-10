@@ -16,6 +16,14 @@ import { Controls } from './music-cell/Controls';
 import { useNotebookSettings } from '../context/NotebookSettingsContext';
 import { usePlaybackStore } from '../store/usePlaybackStore';
 import { useIsMobile } from '../hooks/use-mobile';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Button } from './ui/button';
+import { Separator } from './ui/separator';
+import { Save } from 'lucide-react';
 
 interface MusicCellProps {
   cell: {
@@ -47,6 +55,12 @@ const beatsToTime = (beats: number) => {
   return `${bars}:${quarters}:${sixteenths.toFixed(2)}`;
 };
 
+// Tone.Transport can miss events scheduled exactly on a loop boundary.
+// Nudge note events by an imperceptible amount so the first note fires after wrap.
+const LOOP_BOUNDARY_EPSILON_BEATS = 0.001;
+const beatsToScheduledTime = (beats: number) =>
+  beatsToTime(beats + LOOP_BOUNDARY_EPSILON_BEATS);
+
 export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const content = Array.isArray(cell.source)
     ? cell.source.join('\n')
@@ -62,7 +76,12 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   >({});
   const [showMixer, setShowMixer] = useState(false);
   const activeNodesRef = useRef<Record<string, ActiveNode>>({});
-  const { setActiveCell, clearActiveCell, registerCellController, unregisterCellController } = usePlaybackStore();
+  const {
+    setActiveCell,
+    clearActiveCell,
+    registerCellController,
+    unregisterCellController,
+  } = usePlaybackStore();
   const {
     defaultInstruments,
     updateDefaultInstrument,
@@ -121,23 +140,35 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   };
 
   const notationKeys = [
-    { label: 'sa', value: 'sa' },
-    { label: 're', value: 're' },
-    { label: 'ga', value: 'ga' },
-    { label: 'ma', value: 'ma' },
-    { label: 'pa', value: 'pa' },
-    { label: 'dha', value: 'dha' },
-    { label: 'ni', value: 'ni' },
-    { label: ':0.25', value: ':0.25' },
-    { label: ':0.5', value: ':0.5' },
-    { label: ':1', value: ':1' },
-    { label: '|', value: '| ' },
-    { label: '||', value: '|| ' },
-    { label: 'space', value: ' ' },
+    { tooltip: 'sa', label: 'S', value: 'S' },
+    { tooltip: 're (komal)', label: 'r', value: 'r' },
+    { tooltip: 're', label: 'R', value: 'R' },
+    { tooltip: 'ga (komal)', label: 'g', value: 'g' },
+    { tooltip: 'ga', label: 'G', value: 'G' },
+    { tooltip: 'ma', label: 'm', value: 'm' },
+    { tooltip: 'ma (tivra)', label: 'Mt', value: 'Mt' },
+    { tooltip: 'pa', label: 'P', value: 'P' },
+    { tooltip: 'dha (komal)', label: 'd', value: 'd' },
+    { tooltip: 'dha', label: 'D', value: 'D' },
+    { tooltip: 'ni (komal)', label: 'n', value: 'n' },
+    { tooltip: 'ni', label: 'N', value: 'N' },
+  ];
+
+  const octaveKeys = [
+    { tooltip: 'lower octave', label: ',', value: ',' },
+    { tooltip: 'upper octave', label: "'", value: "'" },
+  ];
+
+  const durationKeys = [
+    { tooltip: 'quarter note', label: ': 1/4', value: ':0.25 ' },
+    { tooltip: 'half note', label: ': 1/2', value: ':0.5 ' },
+    { tooltip: 'whole note', label: ': 1', value: ':1 ' },
+    { tooltip: '|', label: '|', value: '| ' },
+    { tooltip: '||', label: '||', value: '|| \n' },
+    { tooltip: 'space', label: '⎵', value: ' ' },
   ];
 
   const hasUnsavedChanges = editorValue !== savedContent;
-  const editorRows = Math.max(8, editorValue.split('\n').length + 1);
 
   // Parse saved content only. The visualizer updates after pressing Save.
   useEffect(() => {
@@ -264,7 +295,9 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     }
   };
 
-  const playPromiseResolveRef = useRef<((isNatural: boolean) => void) | null>(null);
+  const playPromiseResolveRef = useRef<((isNatural: boolean) => void) | null>(
+    null
+  );
 
   const handlePlay = async (): Promise<boolean> => {
     if (isPlaying) {
@@ -353,10 +386,10 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     activeNodesRef.current = {};
     clearActiveCell(cell.id);
     setIsPlaying(false);
-    
+
     if (playPromiseResolveRef.current) {
-        playPromiseResolveRef.current(isNatural);
-        playPromiseResolveRef.current = null;
+      playPromiseResolveRef.current(isNatural);
+      playPromiseResolveRef.current = null;
     }
   };
 
@@ -494,7 +527,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     // const beatDur = 60 / bpm;
 
     let initialSkipBeats = 0;
-    const mainVoice = parsedData.voices['default'] || Object.values(parsedData.voices)[0];
+    const mainVoice =
+      parsedData.voices['default'] || Object.values(parsedData.voices)[0];
     if (mainVoice) {
       for (const event of mainVoice.events) {
         if (event.type === 'skip') {
@@ -588,7 +622,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
           talaPart.loop = true;
           talaPart.loopEnd = beatsToTime(cycleDurationBeats);
-          const offsetBeats = cycleDurationBeats > 0 ? (initialSkipBeats % cycleDurationBeats) : 0;
+          const offsetBeats =
+            cycleDurationBeats > 0 ? initialSkipBeats % cycleDurationBeats : 0;
           talaPart.start(0, beatsToTime(offsetBeats));
 
           activeNodesRef.current['__tala'] = {
@@ -866,7 +901,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                     mSynth.triggerRelease(t + slideDur);
                   }
                 }
-              }, beatsToTime(currentTimeBeats));
+              }, beatsToScheduledTime(currentTimeBeats));
             } else {
               // Normal Note Playback
               const instrument =
@@ -896,7 +931,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                     );
                   });
                 }
-              }, beatsToTime(currentTimeBeats));
+              }, beatsToScheduledTime(currentTimeBeats));
             }
           }
           currentTimeBeats += durBeats;
@@ -906,7 +941,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     }
 
     Tone.getTransport().loopStart = startOffset;
-    Tone.getTransport().loopEnd = beatsToTime(maxDuration + 0.5);
+    Tone.getTransport().loopEnd = beatsToTime(maxDuration);
     Tone.getTransport().loop = isLooping;
 
     Tone.getTransport().start(undefined, startOffset);
@@ -941,7 +976,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
           />
         }
       />
-      <div className="p-1 overflow-x-auto max-w-full">
+      <div className="p-2 max-w-full">
         <div className="min-w-0">
           <div
             className={
@@ -958,57 +993,116 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 onFocus={onFocus}
                 readOnly={!localShowCode}
                 spellCheck={false}
-                rows={editorRows}
-                className="w-full resize-none overflow-hidden rounded-md border border-border bg-background px-3 py-2 pb-12 text-base md:text-sm font-mono text-foreground outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full resize-none overflow-hidden rounded-md border border-border bg-background/70 px-3 py-2 pb-12 text-base md:text-sm font-mono text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  height: `${textareaRef.current?.scrollHeight || 160}px`,
+                }}
               />
               {localShowCode && hasUnsavedChanges && (
-                <button
-                  type="button"
+                <Button
+                  size={'sm'}
                   onClick={handleSave}
-                  className="absolute top-3 right-3 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow hover:bg-primary/90"
+                  className="absolute top-3 right-3"
                 >
-                  Save
-                </button>
+                  <Save className="w-4 h-4" />
+                </Button>
               )}
-              {localShowCode && (
-                <div className="mt-2 flex flex-wrap gap-2 rounded-md border border-border/60 bg-muted/20 p-2">
-                  {notationKeys.map((key) => (
-                    <button
-                      key={key.label}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => insertAtCursor(key.value)}
-                      className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-                    >
-                      {key.label}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={handleSave}
-                    disabled={!hasUnsavedChanges}
-                    className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow hover:bg-primary/90 disabled:opacity-50 disabled:hover:bg-primary"
-                  >
-                    save
-                  </button>
-                  {isMobile && (
-                    <button
-                      type="button"
-                      onClick={() => textareaRef.current?.focus()}
-                      className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-                    >
-                      show normal keyboard
-                    </button>
-                  )}
-                </div>
+              {localShowCode && hasUnsavedChanges && (
+                <Button
+                  size={'sm'}
+                  onClick={handleSave}
+                  className="absolute bottom-3 right-3"
+                >
+                  <Save className="w-4 h-4" />
+                </Button>
               )}
             </div>
+            {localShowCode && (
+              <div className="mt-2 sticky top-0 flex flex-wrap gap-2 rounded-md border border-border/60 bg-muted/20 p-2">
+                <div className="flex flex-wrap gap-2 w-full justify-between">
+                  <div className="flex flex-wrap gap-2 w-full md:w-max justify-start">
+                    {notationKeys.map((key) => (
+                      <Tooltip key={key.label} delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <button
+                            key={key.label}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => insertAtCursor(key.value)}
+                            className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
+                          >
+                            {key.label}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          {key.tooltip}
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2 w-full md:w-max justify-end">
+                    {octaveKeys.map((key) => (
+                      <Tooltip key={key.label} delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <button
+                            key={key.label}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => insertAtCursor(key.value)}
+                            className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
+                          >
+                            {key.label}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          {key.tooltip}
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex flex-wrap justify-end w-full gap-2 items-center">
+                  {durationKeys.map((key) => (
+                    <Tooltip key={key.label} delayDuration={0}>
+                      <TooltipTrigger asChild>
+                        <button
+                          key={key.label}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => insertAtCursor(key.value)}
+                          className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
+                        >
+                          {key.label}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{key.tooltip}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                  <Button
+                    size={'sm'}
+                    onClick={handleSave}
+                    disabled={!hasUnsavedChanges}
+                  >
+                    Save
+                  </Button>
+                </div>
+
+                {isMobile && (
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded-md border border-border bg-background text-sm font-medium"
+                  >
+                    show normal keyboard
+                  </button>
+                )}
+              </div>
+            )}
             {!localShowCode && (
-              <div className="absolute inset-0 z-10 bg-background/50 backdrop-blur-md flex items-center justify-center border-b border-border/50">
+              <div className="absolute inset-0 z-10 bg-background flex items-center justify-center border-b border-border/50">
                 <button
                   onClick={() => setLocalShowCode(true)}
-                  className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md shadow-lg hover:bg-primary/90 transition-colors cursor-pointer z-50 pointer-events-auto"
+                  className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md cursor-pointer z-50 pointer-events-auto"
                 >
                   Show Music Code
                 </button>

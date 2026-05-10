@@ -59,23 +59,16 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
               id={`cell-${cell.id}`}
               className="relative scroll-mt-20"
             >
-              <div
-                className={`${
-                  activeCellId === cell.id
-                    ? 'ring-2 ring-primary ring-offset-2 rounded-xl'
-                    : ''
-                }`}
-              >
-                <Cell
-                  cell={cell}
-                  theme={theme}
-                  onChange={(newCell) => {
-                    updateCell(cell.id, newCell.source);
-                  }}
-                  onDelete={() => deleteCell(idx)}
-                  onFocus={() => setActiveCellId(cell.id)}
-                />
-              </div>
+              <Cell
+                cell={cell}
+                theme={theme}
+                onChange={(newCell) => {
+                  updateCell(cell.id, newCell.source);
+                }}
+                onDelete={() => deleteCell(idx)}
+                onFocus={() => setActiveCellId(cell.id)}
+              />
+
               <AddCellControls onAdd={(type) => addCell(type, idx)} />
             </div>
           ))}
@@ -92,8 +85,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
         <footer className="mt-12 py-6 border-t border-muted-foreground/20 text-center text-sm text-muted-foreground">
           <div className="flex flex-col items-center gap-2">
             <p>
-              made with <span className="inline-block">❤️</span>{' '}
-              in India
+              made with <span className="inline-block">❤️</span> in India
             </p>
             <div className="flex gap-4">
               <a

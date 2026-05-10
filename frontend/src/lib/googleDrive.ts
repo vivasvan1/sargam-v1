@@ -242,24 +242,30 @@ export async function initializeGoogleAPI(
       if (storedUserStr) {
         try {
           currentUser = JSON.parse(storedUserStr);
-          isSignedIn = true;
-          // Optimistically show as authenticated
-          useAuthStore.getState().setAuthenticated(true);
           useAuthStore.getState().setUser(currentUser);
         } catch (e) {
           // Ignore parsing error
         }
+      }
+
+      // Validate the stored token before marking the app authenticated.
+      // If it expired, try a silent Google Identity Services refresh first so
+      // shared-file loading doesn't start with a stale token and hit a 401.
+      const success = await getUserInfo();
+      if (success) {
+        isSignedIn = true;
+        useAuthStore.getState().setAuthenticated(true);
       } else {
-        // Legacy fallback
-        const success = await getUserInfo();
-        if (success) {
+        const refreshed = await refreshTokenSilently();
+        if (refreshed) {
           isSignedIn = true;
+          useAuthStore.getState().setAuthenticated(true);
         } else {
-          // Token might be expired, but we DON'T remove the local user. 
-          // We'll let `withRetry` handle renewing it silently when needed.
           accessToken = null;
+          isSignedIn = false;
           localStorage.removeItem('google_drive_token');
           gapi.client.setToken(null);
+          useAuthStore.getState().setAuthenticated(false);
         }
       }
     }
@@ -294,6 +300,12 @@ export async function refreshTokenSilently(): Promise<boolean> {
 
   isRefreshing = true;
   refreshPromise = new Promise((resolve) => {
+    const finish = (success: boolean) => {
+      isRefreshing = false;
+      refreshPromise = null;
+      resolve(success);
+    };
+
     try {
       const config: any = {
         client_id: clientId!,
@@ -305,7 +317,7 @@ export async function refreshTokenSilently(): Promise<boolean> {
             localStorage.removeItem('google_drive_token');
             useAuthStore.getState().setAuthenticated(false);
             isSignedIn = false;
-            resolve(false);
+            finish(false);
             return;
           }
 
@@ -317,7 +329,7 @@ export async function refreshTokenSilently(): Promise<boolean> {
           if (success) {
             isSignedIn = true;
           }
-          resolve(true);
+          finish(success);
         },
       };
 
@@ -331,10 +343,7 @@ export async function refreshTokenSilently(): Promise<boolean> {
       silentTokenClient.requestAccessToken({ prompt: 'none' });
     } catch (error) {
       console.error('Silent refresh error:', error);
-      resolve(false);
-    } finally {
-      isRefreshing = false;
-      refreshPromise = null;
+      finish(false);
     }
   });
 

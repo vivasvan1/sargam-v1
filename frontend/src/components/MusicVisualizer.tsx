@@ -51,6 +51,7 @@ export function MusicVisualizer({
   // We keep a ref for the current time to avoid closure staleness in the loop without re-renders
   const currentTimeRef = useRef(initialTime);
   const requestRef = useRef<number>(null);
+  const lastUserScrollRef = useRef(0);
 
   // Group events by line_index for the first voice (primary visual)
   const voiceData = useMemo<VoiceData | null>(() => {
@@ -248,8 +249,11 @@ export function MusicVisualizer({
         // Use transform for smooth GPU animation
         playheadRef.current.style.transform = `translateX(${visualProgressOffset * PIXELS_PER_SECOND}px)`;
 
-        // 3. Handle Auto-scroll inside the loop
-        if (scrollContainerRef.current) {
+        // 3. Handle Auto-scroll inside the loop, but don't fight user scrolling.
+        if (
+          scrollContainerRef.current &&
+          Date.now() - lastUserScrollRef.current > 800
+        ) {
           const scrollContainer = scrollContainerRef.current;
           const playhead = playheadRef.current;
           const lineContainer = playhead.closest('[style*="height"]'); // VisualizerLine container
@@ -349,7 +353,7 @@ export function MusicVisualizer({
   return (
     <div
       ref={containerRef}
-      className="mt-4 md:mt-6 p-4 md:p-6 bg-card/60 backdrop-blur-xl border border-border/40 rounded-xl md:rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-full relative group/viz"
+      className="mt-4 md:mt-6 p-4 md:p-6 bg-card border border-border/40 rounded-xl md:rounded-2xl shadow-sm overflow-hidden max-w-full relative group/viz"
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
@@ -369,6 +373,15 @@ export function MusicVisualizer({
 
       <div
         ref={scrollContainerRef}
+        onPointerDown={() => {
+          lastUserScrollRef.current = Date.now();
+        }}
+        onWheel={() => {
+          lastUserScrollRef.current = Date.now();
+        }}
+        onTouchStart={() => {
+          lastUserScrollRef.current = Date.now();
+        }}
         className="overflow-x-auto custom-scrollbar py-5 max-w-full"
       >
         <div className="min-w-max flex flex-col">

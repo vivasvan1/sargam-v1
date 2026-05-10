@@ -185,7 +185,7 @@ export function VisualizerNote({
       <Tooltip delayDuration={0} open={open} onOpenChange={setOpen}>
         <TooltipTrigger asChild>
           <div
-            className="absolute top-[5%] bottom-[5%] rounded-md overflow-hidden transition-all duration-500 shadow-lg bg-linear-to-r from-primary/50 via-primary/25 to-primary/50 border-[1.5px] border-primary/60 cursor-pointer pointer-events-auto hover:border-primary/80 select-none"
+            className="absolute top-[5%] bottom-[5%] rounded-md overflow-hidden bg-primary/20 border-[1.5px] border-primary/60 cursor-pointer pointer-events-auto hover:border-primary/80 select-none"
             onClick={handleClick}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
@@ -322,7 +322,7 @@ export function VisualizerNote({
         <div
           className={cn(
             'absolute top-[5%] bottom-[5%] rounded-md flex items-center justify-center',
-            'font-black transition-all duration-500 shadow-sm cursor-pointer pointer-events-auto hover:border-primary/70 select-none',
+            'font-black cursor-pointer pointer-events-auto hover:border-primary/70 select-none',
             event.swara
               ? 'bg-linear-to-br from-primary/40 to-primary/10 text-primary border border-primary/40'
               : 'bg-muted/10 border border-transparent opacity-40 hover:opacity-60'
