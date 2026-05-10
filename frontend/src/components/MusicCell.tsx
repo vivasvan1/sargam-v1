@@ -16,13 +16,9 @@ import { Controls } from './music-cell/Controls';
 import { useNotebookSettings } from '../context/NotebookSettingsContext';
 import { usePlaybackStore } from '../store/usePlaybackStore';
 import { useIsMobile } from '../hooks/use-mobile';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { Button } from './ui/button';
-import { CornerDownLeftIcon, DeleteIcon, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
+import { SargamKeyboard } from './music-cell/SargamKeyboard';
 
 interface MusicCellProps {
   cell: {
@@ -207,7 +203,6 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     { tooltip: 'whole note', label: ': 1', value: ':1 ' },
     { tooltip: '|', label: '|', value: '| ' },
     { tooltip: '||', label: '||', value: '|| \n' },
-    { tooltip: 'space', label: '⎵', value: ' ' },
   ];
 
   const hasUnsavedChanges = editorValue !== savedContent;
@@ -1076,135 +1071,25 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
           </div>
         </div>
       </div>
-      {localShowCode && isEditorFocused && keyboardMinimized && (
-        <Button
-          size="sm"
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => setKeyboardMinimized(false)}
-          className="fixed bottom-3 right-3 z-50"
-        >
-          Show keyboard
-        </Button>
-      )}
-      {localShowCode && isEditorFocused && !keyboardMinimized && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background p-2">
-          <div className="mx-auto flex max-w-6xl flex-wrap gap-2">
-            <div className="flex w-full items-center justify-between gap-2">
-              <div className="flex flex-wrap gap-2">
-                {notationKeys.map((key) => (
-                  <Tooltip key={key.label} delayDuration={0}>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => insertAtCursor(key.value)}
-                      >
-                        {key.label}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">{key.tooltip}</TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => setKeyboardMinimized(true)}
-              >
-                Minimise
-              </Button>
-            </div>
-
-            <div className="flex w-full flex-wrap justify-between gap-2">
-              <div className="flex flex-wrap gap-2">
-                {octaveKeys.map((key) => (
-                  <Tooltip key={key.label} delayDuration={0}>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => insertAtCursor(key.value)}
-                      >
-                        {key.label}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">{key.tooltip}</TooltipContent>
-                  </Tooltip>
-                ))}
-                {durationKeys.map((key) => (
-                  <Tooltip key={key.label} delayDuration={0}>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => insertAtCursor(key.value)}
-                      >
-                        {key.label}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">{key.tooltip}</TooltipContent>
-                  </Tooltip>
-                ))}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    insertAtCursor('\n');
-                  }}
-                >
-                  <CornerDownLeftIcon className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={deleteAtCursor}
-                >
-                  <DeleteIcon className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={handleSave}
-                  disabled={!hasUnsavedChanges}
-                >
-                  Save
-                </Button>
-                {isMobile && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    type="button"
-                    onClick={() => {
-                      setKeyboardMinimized(true);
-                      setUseNormalKeyboard(true);
-                      requestAnimationFrame(() => textareaRef.current?.focus());
-                    }}
-                  >
-                    show normal keyboard
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <SargamKeyboard
+        visible={localShowCode && isEditorFocused}
+        minimized={keyboardMinimized}
+        isMobile={isMobile}
+        hasUnsavedChanges={hasUnsavedChanges}
+        notationKeys={notationKeys}
+        octaveKeys={octaveKeys}
+        durationKeys={durationKeys}
+        onInsert={insertAtCursor}
+        onDelete={deleteAtCursor}
+        onSave={handleSave}
+        onMinimize={() => setKeyboardMinimized(true)}
+        onShow={() => setKeyboardMinimized(false)}
+        onShowNormalKeyboard={() => {
+          setKeyboardMinimized(true);
+          setUseNormalKeyboard(true);
+          requestAnimationFrame(() => textareaRef.current?.focus());
+        }}
+      />
       {(localShowVisualizer || (isPlaying && lastParsedData)) && bpm && (
         <div className="px-3 md:px-4 pb-4 overflow-x-auto max-w-full">
           <div className="min-w-0">
