@@ -22,6 +22,7 @@ import {
   loadNotebookAndMetadata,
   openGoogleLoginInNewTab,
   adoptStoredGoogleToken,
+  clearGoogleAuthCache,
 } from './lib/googleDrive';
 // GoogleUser type no longer needed here as it is in store
 import { MenuBar } from './components/MenuBar';
@@ -74,7 +75,7 @@ function AuthGate({
   errorMessage,
   onSignIn,
 }: AuthGateProps) {
-  const isBusy = isInitializing || isSigningIn;
+  const isBusy = isSigningIn;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_40%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)/0.35))] text-foreground">
@@ -140,10 +141,10 @@ function AuthGate({
                   </svg>
                 )}
                 <span className="font-medium text-primary">
-                  {isInitializing
-                    ? 'Initializing...'
-                    : isSigningIn
-                      ? 'Waiting for Google...'
+                  {isSigningIn
+                    ? 'Waiting for Google...'
+                    : isInitializing
+                      ? 'Sign in with Google'
                       : 'Sign in with Google'}
                 </span>
               </Button>
@@ -247,7 +248,10 @@ function App() {
       initializeGoogleAPI(GOOGLE_CLIENT_ID),
       new Promise((_, reject) =>
         window.setTimeout(
-          () => reject(new Error('Google authentication initialization timed out.')),
+          () =>
+            reject(
+              new Error('Google authentication initialization timed out.')
+            ),
           20000
         )
       ),
@@ -257,6 +261,11 @@ function App() {
       })
       .catch((error) => {
         console.error('Failed to initialize Google API:', error);
+        if (
+          error.message === 'Google authentication initialization timed out.'
+        ) {
+          clearGoogleAuthCache();
+        }
         setAuthInitError(
           error.message || 'Failed to initialize Google authentication.'
         );
@@ -536,9 +545,11 @@ function App() {
     }
 
     if (!isInitialized) {
-      toast.error(
-        'Google Drive is still initializing. Please wait a moment and try again.'
-      );
+      try {
+        openGoogleLoginInNewTab(GOOGLE_CLIENT_ID);
+      } catch (openError: any) {
+        toast.error(openError.message || 'Could not open Google sign-in');
+      }
       return;
     }
 
@@ -560,7 +571,7 @@ function App() {
             label: 'Open login',
             onClick: () => {
               try {
-                openGoogleLoginInNewTab();
+                openGoogleLoginInNewTab(GOOGLE_CLIENT_ID);
               } catch (openError: any) {
                 toast.error(openError.message || 'Could not open login tab');
               }

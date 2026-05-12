@@ -435,13 +435,15 @@ function isPopupBlockedError(error: any): boolean {
   );
 }
 
-export function getGoogleOAuthUrl(): string {
-  if (!clientId) {
-    throw new Error('Google API not initialized');
+export function getGoogleOAuthUrl(fallbackClientId?: string): string {
+  const effectiveClientId = clientId || fallbackClientId;
+
+  if (!effectiveClientId) {
+    throw new Error('Google Client ID is required');
   }
 
   const params = new URLSearchParams({
-    client_id: clientId,
+    client_id: effectiveClientId,
     redirect_uri: window.location.origin + window.location.pathname,
     response_type: 'token',
     scope: SCOPES,
@@ -456,11 +458,33 @@ export function getGoogleOAuthUrl(): string {
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
-export function openGoogleLoginInNewTab(): void {
-  const popup = window.open(getGoogleOAuthUrl(), '_blank', 'noopener,noreferrer');
+export function openGoogleLoginInNewTab(fallbackClientId?: string): void {
+  const popup = window.open(
+    getGoogleOAuthUrl(fallbackClientId),
+    '_blank',
+    'noopener,noreferrer'
+  );
   if (!popup) {
     throw new Error('Popup blocked. Please allow popups or open login manually.');
   }
+}
+
+export function clearGoogleAuthCache(): void {
+  accessToken = null;
+  currentUser = null;
+  rootFolderId = null;
+  isSignedIn = false;
+
+  try {
+    gapi?.client?.setToken(null);
+  } catch (error) {
+    console.warn('Could not clear Google API token:', error);
+  }
+
+  localStorage.removeItem('google_drive_token');
+  localStorage.removeItem('google_drive_user');
+  useAuthStore.getState().setAuthenticated(false);
+  useAuthStore.getState().setUser(null);
 }
 
 export async function handleOAuthRedirectIfPresent(): Promise<boolean> {
