@@ -20,7 +20,6 @@ import {
   publishToRegistry,
   unpublishFromRegistry,
   loadNotebookAndMetadata,
-  openGoogleLoginInNewTab,
   adoptStoredGoogleToken,
   clearGoogleAuthCache,
 } from './lib/googleDrive';
@@ -75,7 +74,7 @@ function AuthGate({
   errorMessage,
   onSignIn,
 }: AuthGateProps) {
-  const isBusy = isSigningIn;
+  const isBusy = isSigningIn || isInitializing;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_40%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)/0.35))] text-foreground">
@@ -144,7 +143,7 @@ function AuthGate({
                   {isSigningIn
                     ? 'Waiting for Google...'
                     : isInitializing
-                      ? 'Sign in with Google'
+                      ? 'Preparing Google sign-in...'
                       : 'Sign in with Google'}
                 </span>
               </Button>
@@ -545,11 +544,9 @@ function App() {
     }
 
     if (!isInitialized) {
-      try {
-        openGoogleLoginInNewTab(GOOGLE_CLIENT_ID);
-      } catch (openError: any) {
-        toast.error(openError.message || 'Could not open Google sign-in');
-      }
+      toast.info(
+        'Google sign-in is still loading. Please try again in a moment.'
+      );
       return;
     }
 
@@ -565,19 +562,9 @@ function App() {
       if (error.message === 'Sign-in cancelled') {
         toast.info('Sign-in cancelled');
       } else if (error.message?.toLowerCase().includes('popup')) {
-        toast.error('Google sign-in popup was blocked.', {
-          duration: Infinity,
-          action: {
-            label: 'Open login',
-            onClick: () => {
-              try {
-                openGoogleLoginInNewTab(GOOGLE_CLIENT_ID);
-              } catch (openError: any) {
-                toast.error(openError.message || 'Could not open login tab');
-              }
-            },
-          },
-        });
+        toast.error(
+          'Google sign-in popup was blocked. Please allow popups and try again.'
+        );
       } else {
         toast.error(error.message || 'Failed to connect to Google Drive');
       }

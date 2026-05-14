@@ -69,6 +69,11 @@
     Google sign-in before it loads notebooks, community content, or shared
     links.
 
+    In the Google Cloud Console OAuth client, add the app URL under
+    **Authorized JavaScript origins**:
+    - Production: `https://sargam.speede.site`
+    - Local development: `http://localhost:5174`
+
 4.  **Run Development Server**
 
     ```bash
