@@ -100,8 +100,8 @@ function AuthGate({
                   <strong className="font-semibold text-foreground">
                     Sargam notebook{' '}
                   </strong>
-                  uses your Google Drive to load notebooks, save changes, and
-                  open shared files.
+                  uses your Google Drive to load notebooks, save changes, and open
+                  shared files.
                 </p>
               </div>
 
@@ -154,8 +154,8 @@ function AuthGate({
                 </div>
               ) : (
                 <p className="text-xs leading-5 text-muted-foreground">
-                  The first sign-in requests Google Drive access up front so the
-                  editor is ready immediately after authentication.
+                  The first sign-in requests Google Drive access up front so the editor
+                  is ready immediately after authentication.
                 </p>
               )}
             </div>
@@ -224,15 +224,12 @@ function App() {
   const [driveFileId, setDriveFileId] = useState<string | null>(null); // Track if notebook was saved to Drive
   const [isReadOnly, setIsReadOnly] = useState(false); // Track if current file is read-only
   const [lastSavedContent, setLastSavedContent] = useState<string | null>(null); // Track last saved content for change detection
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>(
-    'saved'
-  );
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('saved');
   const [isPublished, setIsPublished] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authInitError, setAuthInitError] = useState<string | null>(null);
-  const [hasLoadedInitialNotebook, setHasLoadedInitialNotebook] =
-    useState(false);
+  const [hasLoadedInitialNotebook, setHasLoadedInitialNotebook] = useState(false);
 
   // Initialize Google API on mount
   useEffect(() => {
@@ -260,9 +257,7 @@ function App() {
       })
       .catch((error) => {
         console.error('Failed to initialize Google API:', error);
-        if (
-          error.message === 'Google authentication initialization timed out.'
-        ) {
+        if (error.message === 'Google authentication initialization timed out.') {
           clearGoogleAuthCache();
         }
         setAuthInitError(
@@ -312,9 +307,7 @@ function App() {
       const title = nextNotebook.metadata?.title || 'Untitled Notebook';
       setFilePath(fileId ? `${title}.imnb` : 'raag_khamaj_demo.imnb');
       setDriveFileId(fileId);
-      setLastSavedContent(
-        fileId ? JSON.stringify(nextNotebook, null, 2) : null
-      );
+      setLastSavedContent(fileId ? JSON.stringify(nextNotebook, null, 2) : null);
       setSaveStatus('saved');
       setIsReadOnly(readOnly);
       setIsPublished(published);
@@ -369,12 +362,7 @@ function App() {
     return () => {
       isCancelled = true;
     };
-  }, [
-    googleDriveConnected,
-    hasLoadedInitialNotebook,
-    isInitialized,
-    setNotebook,
-  ]);
+  }, [googleDriveConnected, hasLoadedInitialNotebook, isInitialized, setNotebook]);
 
   useEffect(() => {
     if (!googleDriveConnected) {
@@ -412,10 +400,7 @@ function App() {
 
   useEffect(() => {
     // If content has changed, mark as unsaved
-    if (
-      lastSavedContent &&
-      JSON.stringify(notebook, null, 2) !== lastSavedContent
-    ) {
+    if (lastSavedContent && JSON.stringify(notebook, null, 2) !== lastSavedContent) {
       setSaveStatus('unsaved');
     }
 
@@ -425,12 +410,7 @@ function App() {
     // 3. Content has changed since last save
     // 4. File is not read-only
     // 5. Auto-save is enabled by user
-    if (
-      !googleDriveConnected ||
-      !driveFileId ||
-      isReadOnly ||
-      !autoSaveEnabled
-    ) {
+    if (!googleDriveConnected || !driveFileId || isReadOnly || !autoSaveEnabled) {
       return;
     }
 
@@ -544,9 +524,7 @@ function App() {
     }
 
     if (!isInitialized) {
-      toast.info(
-        'Google sign-in is still loading. Please try again in a moment.'
-      );
+      toast.info('Google sign-in is still loading. Please try again in a moment.');
       return;
     }
 
@@ -554,9 +532,7 @@ function App() {
       setIsAuthenticating(true);
       const user = await authenticate();
       // Store updates automatically via googleDrive.ts
-      toast.success(
-        `Connected to Google Drive as ${user?.email || 'Connected'}`
-      );
+      toast.success(`Connected to Google Drive as ${user?.email || 'Connected'}`);
     } catch (error: any) {
       console.error('Error connecting to Google Drive:', error);
       if (error.message === 'Sign-in cancelled') {
@@ -739,9 +715,7 @@ function App() {
   const handleUnpublish = async () => {
     if (!driveFileId || !googleDriveConnected) return;
 
-    const confirm = window.confirm(
-      'Remove this notebook from the community registry?'
-    );
+    const confirm = window.confirm('Remove this notebook from the community registry?');
     if (!confirm) return;
 
     try {
