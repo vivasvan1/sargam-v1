@@ -20,18 +20,15 @@
 ## 🖼️ Screenshots
 
 <div align="center">
-  <!-- Add your screenshot here -->
-  <img src="https://placehold.co/800x450?text=Sargam+Editor+Interface" alt="Sargam Editor Interface" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+  <img src="frontend/public/notebook_preview.jpg" alt="Sargam notebook interface preview" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
   <p><em>The intuitive notebook interface for composing Indian Classical Music.</em></p>
 </div>
 
 <br />
 
 <div align="center">
-  <div style="display: flex; gap: 10px; justify-content: center;">
-    <img src="https://placehold.co/400x300?text=Notation+View" alt="Notation View" style="border-radius: 8px;">
-    <img src="https://placehold.co/400x300?text=Playback+Controls" alt="Playback Controls" style="border-radius: 8px;">
-  </div>
+  <img src="frontend/public/sargam_language.jpg" alt="Sargam language notation preview" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+  <p><em>Sargam notation with rich language support.</em></p>
 </div>
 
 ## 🚀 Getting Started
