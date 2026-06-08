@@ -243,13 +243,9 @@ function App() {
     Promise.race([
       initializeGoogleAPI(GOOGLE_CLIENT_ID),
       new Promise((_, reject) =>
-        window.setTimeout(
-          () =>
-            reject(
-              new Error('Google authentication initialization timed out.')
-            ),
-          20000
-        )
+        window.setTimeout(() => {
+          reject(new Error('Google authentication initialization timed out.'));
+        }, 20000)
       ),
     ])
       .then(() => {
@@ -263,6 +259,7 @@ function App() {
         setAuthInitError(
           error.message || 'Failed to initialize Google authentication.'
         );
+        location.reload();
       });
   }, []);
 
