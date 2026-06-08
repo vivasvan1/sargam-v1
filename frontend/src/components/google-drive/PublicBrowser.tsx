@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import {
   fetchPublicRegistry,
-  loadNotebookAndMetadata,
+  loadRegistryNotebook,
 } from '@/lib/googleDrive';
 import type { RegistryEntry } from '@/lib/googleDrive';
 import { toast } from 'sonner';
@@ -21,7 +21,8 @@ interface PublicBrowserProps {
     notebook: any,
     fileId?: string,
     isReadOnly?: boolean,
-    isPublished?: boolean
+    isPublished?: boolean,
+    ownerEmail?: string
   ) => void;
   onClose?: () => void;
   currentFileId?: string | null;
@@ -76,9 +77,8 @@ export function PublicBrowser({
   const handleFileClick = async (fileId: string) => {
     setOpeningId(fileId);
     try {
-      const { notebook, isReadOnly, isPublished } =
-        await loadNotebookAndMetadata(fileId);
-      onLoadFile?.(notebook, fileId, isReadOnly, isPublished);
+      const { notebook, entry } = await loadRegistryNotebook(fileId);
+      onLoadFile?.(notebook, fileId, true, true, entry.ownerEmail);
       onClose?.();
       console.debug('Public notebook loaded');
     } catch (error: any) {

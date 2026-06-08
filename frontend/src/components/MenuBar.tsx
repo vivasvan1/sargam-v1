@@ -119,15 +119,19 @@ export function MenuBar({
           Edit
         </MenubarTrigger>
         <MenubarContent>
-          <MenubarItem onClick={onUndo} disabled={!canUndo}>
+          <MenubarItem onClick={onUndo} disabled={!canUndo || isReadOnly}>
             Undo Cell Change <MenubarShortcut>⌘Z</MenubarShortcut>
           </MenubarItem>
-          <MenubarItem onClick={onRedo} disabled={!canRedo}>
+          <MenubarItem onClick={onRedo} disabled={!canRedo || isReadOnly}>
             Redo Cell Change <MenubarShortcut>⇧⌘Z</MenubarShortcut>
           </MenubarItem>
           <MenubarSeparator />
-          <MenubarItem onClick={onAddMusic}>Add Music Cell</MenubarItem>
-          <MenubarItem onClick={onAddMarkdown}>Add Markdown Cell</MenubarItem>
+          <MenubarItem onClick={onAddMusic} disabled={isReadOnly}>
+            Add Music Cell
+          </MenubarItem>
+          <MenubarItem onClick={onAddMarkdown} disabled={isReadOnly}>
+            Add Markdown Cell
+          </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
 

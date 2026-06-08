@@ -13,6 +13,7 @@ interface NotebookEditorProps {
   deleteCell: (index: number) => void;
   addCell: (type: 'music' | 'markdown', index: number) => void;
   theme: 'light' | 'dark' | 'system';
+  isReadOnly?: boolean;
 }
 
 export const NotebookEditor: React.FC<NotebookEditorProps> = ({
@@ -23,6 +24,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
   deleteCell,
   addCell,
   theme,
+  isReadOnly = false,
 }) => {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -63,17 +65,23 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
                 cell={cell}
                 theme={theme}
                 onChange={(newCell) => {
+                  if (isReadOnly) return;
                   updateCell(cell.id, newCell.source);
                 }}
-                onDelete={() => deleteCell(idx)}
+                onDelete={() => {
+                  if (isReadOnly) return;
+                  deleteCell(idx);
+                }}
                 onFocus={() => setActiveCellId(cell.id)}
               />
 
-              <AddCellControls onAdd={(type) => addCell(type, idx)} />
+              {!isReadOnly && (
+                <AddCellControls onAdd={(type) => addCell(type, idx)} />
+              )}
             </div>
           ))}
 
-          {notebook.cells.length === 0 && (
+          {notebook.cells.length === 0 && !isReadOnly && (
             <EmptyState
               onAddMusic={() => addCell('music', -1)}
               onAddMarkdown={() => addCell('markdown', -1)}

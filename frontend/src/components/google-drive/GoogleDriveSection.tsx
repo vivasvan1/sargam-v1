@@ -20,7 +20,8 @@ interface GoogleDriveSectionProps {
     notebook: any,
     fileId?: string,
     isReadOnly?: boolean,
-    isPublished?: boolean
+    isPublished?: boolean,
+    ownerEmail?: string
   ) => void;
   onClose?: () => void;
   currentFileId?: string | null;

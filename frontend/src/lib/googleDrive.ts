@@ -8,7 +8,7 @@ const DISCOVERY_DOCS = [
   'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
 ];
 const SCOPES =
-  'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+  'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
 // The URL of our deployed Google Apps Script Web App
 const REGISTRY_SCRIPT_URL =
@@ -1229,6 +1229,12 @@ export interface RegistryEntry {
   author: string;
   description: string;
   date: string;
+  ownerEmail?: string;
+}
+
+export interface RegistryNotebookResult {
+  notebook: any;
+  entry: RegistryEntry;
 }
 
 // Publish to the registry (Apps Script)
@@ -1236,13 +1242,12 @@ export async function publishToRegistry(
   fileId: string,
   name: string,
   description: string = '',
-  author: string = 'Anonymous'
+  author: string = 'Anonymous',
+  notebook?: any,
+  ownerEmail: string = ''
 ): Promise<void> {
-  // 1. Ensure file is public first
-  await setFilePublic(fileId);
-
-  // 2. Post to registry
-  // We use mode: 'no-cors' which makes the response opaque.
+  // We use mode: 'no-cors' because Apps Script web apps do not always return
+  // browser-friendly CORS headers for simple deployments.
   try {
     await fetch(REGISTRY_SCRIPT_URL, {
       method: 'POST',
@@ -1255,6 +1260,8 @@ export async function publishToRegistry(
         name: name,
         description: description,
         author: author,
+        ownerEmail,
+        content: notebook ? JSON.stringify(notebook) : undefined,
       }),
     });
   } catch (error) {
@@ -1299,6 +1306,30 @@ export async function checkIsPublished(fileId: string): Promise<boolean> {
     console.error('Error checking published status:', error);
     return false;
   }
+}
+
+// Load a public/community notebook directly from the registry snapshot.
+export async function loadRegistryNotebook(
+  fileId: string
+): Promise<RegistryNotebookResult> {
+  const url = new URL(REGISTRY_SCRIPT_URL);
+  url.searchParams.append('action', 'open');
+  url.searchParams.append('id', fileId);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error('This notebook is not published or is no longer available.');
+  }
+
+  const data = await response.json();
+  if (data.status === 'not_found' || !data.notebook) {
+    throw new Error('This notebook is not published or is no longer available.');
+  }
+
+  return {
+    notebook: data.notebook,
+    entry: data.entry,
+  };
 }
 
 // Fetch public files from registry with search and pagination

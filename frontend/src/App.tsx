@@ -19,7 +19,7 @@ import {
   updateFileById,
   publishToRegistry,
   unpublishFromRegistry,
-  loadNotebookAndMetadata,
+  loadRegistryNotebook,
   adoptStoredGoogleToken,
   clearGoogleAuthCache,
 } from './lib/googleDrive';
@@ -226,6 +226,7 @@ function App() {
   const [lastSavedContent, setLastSavedContent] = useState<string | null>(null); // Track last saved content for change detection
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('saved');
   const [isPublished, setIsPublished] = useState(false);
+  const [publishedOwnerEmail, setPublishedOwnerEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authInitError, setAuthInitError] = useState<string | null>(null);
@@ -259,7 +260,6 @@ function App() {
         setAuthInitError(
           error.message || 'Failed to initialize Google authentication.'
         );
-        location.reload();
       });
   }, []);
 
@@ -276,9 +276,9 @@ function App() {
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  // Load content only after Google authentication is established.
+  // Load public/shared content without requiring Google sign-in.
   useEffect(() => {
-    if (!isInitialized || !googleDriveConnected || hasLoadedInitialNotebook) {
+    if (hasLoadedInitialNotebook) {
       return;
     }
 
@@ -288,8 +288,15 @@ function App() {
       nextNotebook: Notebook,
       fileId: string | null,
       readOnly: boolean,
-      published: boolean
+      published: boolean,
+      ownerEmail: string | null = null
     ) => {
+      const isOwner =
+        !!ownerEmail &&
+        !!googleDriveUser?.email &&
+        ownerEmail.toLowerCase() === googleDriveUser.email.toLowerCase();
+      const effectiveReadOnly = published && isOwner ? false : readOnly;
+
       setNotebook(nextNotebook);
       useNotebookStore
         .getState()
@@ -297,7 +304,7 @@ function App() {
           nextNotebook,
           fileId,
           nextNotebook.metadata || null,
-          readOnly,
+          effectiveReadOnly,
           published
         );
 
@@ -306,8 +313,9 @@ function App() {
       setDriveFileId(fileId);
       setLastSavedContent(fileId ? JSON.stringify(nextNotebook, null, 2) : null);
       setSaveStatus('saved');
-      setIsReadOnly(readOnly);
+      setIsReadOnly(effectiveReadOnly);
       setIsPublished(published);
+      setPublishedOwnerEmail(ownerEmail);
       setActiveCellId(null);
     };
 
@@ -319,28 +327,24 @@ function App() {
 
       try {
         if (fileId) {
-          toast.info('Loading shared notebook...');
-          const { notebook, isReadOnly, isPublished } =
-            await loadNotebookAndMetadata(fileId);
+          toast.info('Loading community notebook...');
+          const { notebook, entry } = await loadRegistryNotebook(fileId);
 
           if (isCancelled) return;
 
-          applyLoadedNotebook(notebook, fileId, isReadOnly, isPublished);
+          applyLoadedNotebook(notebook, fileId, true, true, entry.ownerEmail || null);
 
-          if (isReadOnly) {
+          if (!googleDriveUser?.email || entry.ownerEmail !== googleDriveUser.email) {
             toast.info('Notebook loaded in read-only mode.');
           }
-          toast.success('Loaded shared notebook');
+          toast.success('Loaded community notebook');
           return;
         }
-
-        const defaultNotebook = await loadDefaultNotebook();
-        if (isCancelled) return;
-
-        applyLoadedNotebook(defaultNotebook, null, false, false);
       } catch (error) {
         console.error('Failed to load initial notebook:', error);
-        toast.error('Failed to load notebook. Opening the default notebook.');
+        toast.error(
+          'This notebook is not published or is no longer available.'
+        );
 
         const defaultNotebook = await loadDefaultNotebook();
         if (isCancelled) return;
@@ -359,15 +363,35 @@ function App() {
     return () => {
       isCancelled = true;
     };
-  }, [googleDriveConnected, hasLoadedInitialNotebook, isInitialized, setNotebook]);
+  }, [googleDriveUser?.email, hasLoadedInitialNotebook, setNotebook]);
 
   useEffect(() => {
     if (!googleDriveConnected) {
-      setHasLoadedInitialNotebook(false);
       setIsLoading(false);
-      useNotebookStore.getState().reset();
     }
   }, [googleDriveConnected]);
+
+  useEffect(() => {
+    if (!isPublished || !publishedOwnerEmail) return;
+
+    if (!googleDriveUser?.email) {
+      if (!isReadOnly) {
+        setIsReadOnly(true);
+        useNotebookStore.getState().setReadOnly(true);
+      }
+      return;
+    }
+
+    const isOwner =
+      publishedOwnerEmail.toLowerCase() === googleDriveUser.email.toLowerCase();
+    if (isOwner && isReadOnly) {
+      setIsReadOnly(false);
+      useNotebookStore.getState().setReadOnly(false);
+    } else if (!isOwner && !isReadOnly) {
+      setIsReadOnly(true);
+      useNotebookStore.getState().setReadOnly(true);
+    }
+  }, [googleDriveUser?.email, isPublished, isReadOnly, publishedOwnerEmail]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -394,6 +418,25 @@ function App() {
 
   // Auto-save to Google Drive
   const { autoSaveEnabled } = useNotebookSettings();
+
+  const syncPublishedRegistry = async (
+    fileId: string,
+    currentNotebook: Notebook
+  ) => {
+    if (!isPublished || isReadOnly || !googleDriveUser?.email) return;
+
+    const authorName = googleDriveUser.name || 'Anonymous';
+    const title = currentNotebook.metadata?.title || 'Untitled Notebook';
+    await publishToRegistry(
+      fileId,
+      title,
+      '',
+      authorName,
+      currentNotebook,
+      googleDriveUser.email
+    );
+    setPublishedOwnerEmail(googleDriveUser.email);
+  };
 
   useEffect(() => {
     // If content has changed, mark as unsaved
@@ -424,6 +467,12 @@ function App() {
       try {
         setSaveStatus('saving');
         await updateFileById(driveFileId, currentContent);
+        try {
+          await syncPublishedRegistry(driveFileId, notebook);
+        } catch (error) {
+          console.error('Auto-publish sync failed:', error);
+          toast.error('Saved to Drive, but community copy did not update.');
+        }
         setLastSavedContent(currentContent);
         setSaveStatus('saved');
         // Silently save - don't show toast to avoid spam
@@ -454,6 +503,9 @@ function App() {
     lastSavedContent,
     isReadOnly,
     autoSaveEnabled,
+    isPublished,
+    googleDriveUser?.email,
+    googleDriveUser?.name,
   ]);
 
   const handleNew = () => {
@@ -469,6 +521,7 @@ function App() {
       setLastSavedContent(null);
       setActiveCellId(null);
       setIsPublished(false);
+      setPublishedOwnerEmail(null);
     }
   };
 
@@ -486,6 +539,7 @@ function App() {
         setIsReadOnly(false);
         setLastSavedContent(null);
         setIsPublished(false);
+        setPublishedOwnerEmail(null);
         toast.success(`Loaded ${file.name}`);
       } catch (err) {
         console.error('Malformed IMNB file', err);
@@ -549,12 +603,10 @@ function App() {
   const handleGoogleDriveDisconnect = async () => {
     try {
       await disconnect();
-      setHasLoadedInitialNotebook(false);
-      setDriveFileId(null);
-      setLastSavedContent(null);
-      setIsPublished(false);
-      setIsReadOnly(false);
-      useNotebookStore.getState().reset();
+      if (driveFileId) {
+        setIsReadOnly(true);
+        useNotebookStore.getState().setReadOnly(true);
+      }
       // Store updates automatically via googleDrive.ts
       toast.success('Disconnected from Google Drive');
     } catch (error) {
@@ -577,6 +629,12 @@ function App() {
       try {
         const content = JSON.stringify(notebook, null, 2);
         await updateFileById(driveFileId, content);
+        try {
+          await syncPublishedRegistry(driveFileId, notebook);
+        } catch (error) {
+          console.error('Publish sync failed:', error);
+          toast.error('Saved to Drive, but community copy did not update.');
+        }
         setLastSavedContent(content);
         toast.dismiss(loadingToast);
         toast.success('Notebook saved');
@@ -621,6 +679,8 @@ function App() {
 
     setDriveFileId(null);
     setIsReadOnly(false);
+    setIsPublished(false);
+    setPublishedOwnerEmail(null);
     setSaveDialogOpen(true);
     toast.info('Saving a copy to your Drive...');
   };
@@ -633,8 +693,16 @@ function App() {
     loadedNotebook: Notebook,
     fileId?: string,
     readOnlyStatus?: boolean,
-    publishedStatus?: boolean
+    publishedStatus?: boolean,
+    ownerEmail?: string
   ) => {
+    const isOwner =
+      !!ownerEmail &&
+      !!googleDriveUser?.email &&
+      ownerEmail.toLowerCase() === googleDriveUser.email.toLowerCase();
+    const effectiveReadOnly =
+      publishedStatus && isOwner ? false : readOnlyStatus || false;
+
     setNotebook(loadedNotebook);
 
     // Update global store
@@ -644,7 +712,7 @@ function App() {
         loadedNotebook,
         fileId || null,
         loadedNotebook.metadata || null,
-        readOnlyStatus || false,
+        effectiveReadOnly,
         publishedStatus || false
       );
 
@@ -659,8 +727,8 @@ function App() {
 
       // Use the statuses passed from loadNotebookAndMetadata
       if (typeof readOnlyStatus === 'boolean') {
-        setIsReadOnly(readOnlyStatus);
-        if (readOnlyStatus && useAuthStore.getState().isAuthenticated) {
+        setIsReadOnly(effectiveReadOnly);
+        if (effectiveReadOnly && useAuthStore.getState().isAuthenticated) {
           toast.info('This notebook is read-only. Save a copy to edit.');
         }
       } else {
@@ -670,15 +738,20 @@ function App() {
 
       if (typeof publishedStatus === 'boolean') {
         setIsPublished(publishedStatus);
+        setPublishedOwnerEmail(ownerEmail || null);
       } else {
         setIsPublished(false);
+        setPublishedOwnerEmail(null);
       }
     } else {
       setDriveFileId(null);
       setIsReadOnly(false);
       setIsPublished(false);
+      setPublishedOwnerEmail(null);
     }
-    toast.success('Notebook loaded from Google Drive');
+    toast.success(
+      publishedStatus ? 'Community notebook loaded' : 'Notebook loaded from Google Drive'
+    );
   };
 
   const handlePublish = async () => {
@@ -699,8 +772,16 @@ function App() {
       const authorName = googleDriveUser?.name || 'Anonymous';
       const title = notebook.metadata?.title || 'Untitled Notebook';
 
-      await publishToRegistry(driveFileId, title, '', authorName);
+      await publishToRegistry(
+        driveFileId,
+        title,
+        '',
+        authorName,
+        notebook,
+        googleDriveUser?.email || ''
+      );
       setIsPublished(true);
+      setPublishedOwnerEmail(googleDriveUser?.email || null);
       toast.dismiss(loadingToast);
       toast.success('Successfully published to community!');
     } catch (error) {
@@ -719,6 +800,7 @@ function App() {
       const loadingToast = toast.loading('Unpublishing...');
       await unpublishFromRegistry(driveFileId);
       setIsPublished(false);
+      setPublishedOwnerEmail(null);
       toast.dismiss(loadingToast);
       toast.success('Removed from community');
     } catch (error) {
@@ -757,7 +839,7 @@ function App() {
     }
   };
 
-  const showAuthGate = !googleDriveConnected;
+  const showAuthGate = false;
 
   return (
     <>
@@ -844,6 +926,7 @@ function App() {
                   deleteCell={deleteCell}
                   addCell={addCell}
                   theme={theme}
+                  isReadOnly={isReadOnly}
                 />
               </SidebarInset>
             )}
@@ -874,6 +957,7 @@ function App() {
                       false
                     );
                   setIsPublished(false); // Ensure local state is also reset if needed
+                  setPublishedOwnerEmail(null);
                 }
               }}
             />

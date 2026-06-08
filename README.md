@@ -71,7 +71,21 @@
     - Production: `https://sargam.speede.site`
     - Local development: `http://localhost:5174`
 
-4.  **Run Development Server**
+    The app only requests Google Drive `drive.file` access. Community notebooks
+    are served from the public Apps Script registry rather than by reading other
+    users' Drive files.
+
+4.  **Configure the Community Registry**
+
+    Create a Google Sheet with two tabs:
+    - `Registry`: `ID`, `Name`, `Author`, `Description`, `Date`, `OwnerEmail`
+    - `Content`: `ID`, `ChunkIndex`, `ChunkText`, `UpdatedAt`
+
+    Paste `frontend/src/lib/appscript.gs` into the Sheet's Apps Script editor
+    and deploy it as a Web App that executes as you and is accessible to anyone.
+    Published notebooks are stored as snapshot JSON chunks in the `Content` tab.
+
+5.  **Run Development Server**
 
     ```bash
     npm run dev
