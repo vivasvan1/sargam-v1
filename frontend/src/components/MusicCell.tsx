@@ -198,8 +198,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   ];
 
   const durationKeys = [
-    { tooltip: 'quarter note', label: ': 1/4', value: ':0.25 ' },
-    { tooltip: 'half note', label: ': 1/2', value: ':0.5 ' },
+    { tooltip: 'quarter note', label: ': 0.25', value: ':0.25 ' },
+    { tooltip: 'half note', label: ': 0.5', value: ':0.5 ' },
     { tooltip: 'whole note', label: ': 1', value: ':1 ' },
     { tooltip: '|', label: '|', value: '| ' },
     { tooltip: '||', label: '||', value: '|| \n' },
