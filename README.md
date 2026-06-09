@@ -63,8 +63,7 @@
     ```
 
     Set `VITE_GOOGLE_CLIENT_ID` in `frontend/.env.local`. The app now requires
-    Google sign-in before it loads notebooks, community content, or shared
-    links.
+    Google sign-in before it saves or loads files from your personal Drive.
 
     In the Google Cloud Console OAuth client, add the app URL under
     **Authorized JavaScript origins**:
