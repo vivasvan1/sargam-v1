@@ -12,7 +12,7 @@ const SCOPES =
 
 // The URL of our deployed Google Apps Script Web App
 const REGISTRY_SCRIPT_URL =
-  'https://script.google.com/macros/s/AKfycbzAYl69gVoft_Qvlblqx9rOKO5DTOm3TIHVm6roCmtfEKJiKnRIA0SeN-9AFg295n0w/exec';
+  'https://script.google.com/macros/s/AKfycbwCoJsK1v5HDQI1CTz2QS514SDIJ8edxBsYfyYgXSYwqgHPAw7HCeoYpkwQLfApUbOi/exec';
 
 
 // Type declarations for Google API

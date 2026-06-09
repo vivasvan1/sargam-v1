@@ -231,6 +231,7 @@ function App() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authInitError, setAuthInitError] = useState<string | null>(null);
   const [hasLoadedInitialNotebook, setHasLoadedInitialNotebook] = useState(false);
+  const savingContentRef = React.useRef<string | null>(null);
 
   // Initialize Google API on mount
   useEffect(() => {
@@ -439,8 +440,15 @@ function App() {
   };
 
   useEffect(() => {
+    const currentContent = JSON.stringify(notebook, null, 2);
+
+    if (savingContentRef.current === currentContent) {
+      setSaveStatus('saving');
+      return;
+    }
+
     // If content has changed, mark as unsaved
-    if (lastSavedContent && JSON.stringify(notebook, null, 2) !== lastSavedContent) {
+    if (lastSavedContent && currentContent !== lastSavedContent) {
       setSaveStatus('unsaved');
     }
 
@@ -454,8 +462,6 @@ function App() {
       return;
     }
 
-    const currentContent = JSON.stringify(notebook, null, 2);
-
     // Skip if content hasn't changed
     if (currentContent === lastSavedContent) {
       setSaveStatus('saved');
@@ -465,6 +471,7 @@ function App() {
     // Debounce: wait 2 seconds after last change before auto-saving
     const autoSaveTimer = setTimeout(async () => {
       try {
+        savingContentRef.current = currentContent;
         setSaveStatus('saving');
         await updateFileById(driveFileId, currentContent);
         try {
@@ -473,11 +480,13 @@ function App() {
           console.error('Auto-publish sync failed:', error);
           toast.error('Saved to Drive, but community copy did not update.');
         }
+        savingContentRef.current = null;
         setLastSavedContent(currentContent);
         setSaveStatus('saved');
         // Silently save - don't show toast to avoid spam
       } catch (error: any) {
         console.error('Auto-save failed:', error);
+        savingContentRef.current = null;
         setSaveStatus('unsaved'); // Revert to unsaved on failure
         // Don't show error toast for auto-save failures to avoid spam
         // User can manually save if needed
@@ -628,6 +637,8 @@ function App() {
       const loadingToast = toast.loading('Saving changes...');
       try {
         const content = JSON.stringify(notebook, null, 2);
+        savingContentRef.current = content;
+        setSaveStatus('saving');
         await updateFileById(driveFileId, content);
         try {
           await syncPublishedRegistry(driveFileId, notebook);
@@ -635,11 +646,15 @@ function App() {
           console.error('Publish sync failed:', error);
           toast.error('Saved to Drive, but community copy did not update.');
         }
+        savingContentRef.current = null;
         setLastSavedContent(content);
+        setSaveStatus('saved');
         toast.dismiss(loadingToast);
         toast.success('Notebook saved');
       } catch (error: any) {
         console.error('Save failed:', error);
+        savingContentRef.current = null;
+        setSaveStatus('unsaved');
         toast.dismiss(loadingToast);
         if (error.message?.includes('session expired')) {
           toast.error('Session expired.', {

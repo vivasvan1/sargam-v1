@@ -69,7 +69,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="h-14 md:h-16 border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-2">
-      <SidebarTrigger className="-ml-2 md:inline-flex" />
+      <SidebarTrigger
+        variant="outline"
+        className="-ml-2 size-10 md:size-7 [&_svg]:size-5 md:[&_svg]:size-4"
+      />
 
       <div className="max-w-4xl flex items-center gap-2 md:gap-4 flex-1 min-w-0">
         <div className="flex-1 min-w-0">
