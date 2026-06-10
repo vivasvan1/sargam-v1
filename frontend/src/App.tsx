@@ -231,6 +231,7 @@ function App() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authInitError, setAuthInitError] = useState<string | null>(null);
   const [hasLoadedInitialNotebook, setHasLoadedInitialNotebook] = useState(false);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const savingContentRef = React.useRef<string | null>(null);
 
   // Initialize Google API on mount
@@ -854,6 +855,10 @@ function App() {
     }
   };
 
+  const toggleAutoScroll = React.useCallback(() => {
+    setIsAutoScrolling((current) => !current);
+  }, []);
+
   const showAuthGate = false;
 
   return (
@@ -926,6 +931,8 @@ function App() {
                     onAddMarkdown={() => addCell('markdown', -1)}
                     theme={theme}
                     setTheme={setTheme}
+                    isAutoScrolling={isAutoScrolling}
+                    onToggleAutoScroll={toggleAutoScroll}
                     googleDriveConnected={googleDriveConnected}
                     currentFileId={driveFileId}
                     onPlayCell={handlePlayCell}
@@ -942,6 +949,9 @@ function App() {
                   addCell={addCell}
                   theme={theme}
                   isReadOnly={isReadOnly}
+                  isAutoScrolling={isAutoScrolling}
+                  setIsAutoScrolling={setIsAutoScrolling}
+                  toggleAutoScroll={toggleAutoScroll}
                 />
               </SidebarInset>
             )}

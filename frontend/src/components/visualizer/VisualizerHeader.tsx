@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Play,
-  Minus,
-  Plus,
-  Square,
-  Search,
-  Activity,
-  Repeat,
-} from 'lucide-react';
+import { Play, Minus, Plus, Square, Search, Activity, Repeat } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -44,9 +36,7 @@ export function VisualizerHeader({
     <div className="flex items-start justify-between w-full gap-4 overflow-x-auto custom-scrollbar pb-1">
       <div className="space-y-1 shrink-0">
         <div className="flex items-center gap-1">
-          <h3 className="text-xss font-bold text-primary/80">
-            {scoreTitle}
-          </h3>
+          <h3 className="text-xss font-bold text-primary/80">{scoreTitle}</h3>
           <NoteLegendModal />
         </div>
         <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">
@@ -117,9 +107,7 @@ export function VisualizerHeader({
                         className="h-8 w-14 text-center text-xs p-0 border-none bg-transparent focus-visible:ring-0"
                       />
                     ) : (
-                      <span className="text-xs font-mono w-14 text-center">
-                        {bpm}
-                      </span>
+                      <span className="text-xs font-mono w-14 text-center">{bpm}</span>
                     )}
                   </div>
                   <Button
@@ -191,7 +179,7 @@ export function VisualizerHeader({
           </Popover>
         </div>
 
-        <div className='flex flex-col gap-2 justify-center items-end'>
+        <div className="flex flex-col md: flex-row gap-2 justify-center items-end">
           {/* Loop Toggle Button */}
           <Button
             onClick={onToggleLoop}
@@ -222,7 +210,7 @@ export function VisualizerHeader({
               </>
             )}
           </Button>
-</div>
+        </div>
 
         {/* Desktop Controls - Hidden on Mobile */}
         <div className="hidden md:flex gap-5 bg-muted/30 p-2 rounded-xl border border-border/50 shrink-0">
@@ -271,9 +259,7 @@ export function VisualizerHeader({
                     className="h-7 w-12 text-center text-xs p-0 border-none bg-transparent focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 ) : (
-                  <span className="text-xs font-mono w-12 text-center">
-                    {bpm}
-                  </span>
+                  <span className="text-xs font-mono w-12 text-center">{bpm}</span>
                 )}
                 <span className="text-[9px] text-muted-foreground/60 font-medium pr-1">
                   BPM

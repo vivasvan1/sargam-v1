@@ -32,6 +32,8 @@ interface MenuBarProps {
 
   theme: 'light' | 'dark' | 'system';
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  isAutoScrolling: boolean;
+  onToggleAutoScroll: () => void;
 
   googleDriveConnected: boolean;
   
@@ -58,6 +60,8 @@ export function MenuBar({
   onAddMusic,
   onAddMarkdown,
   setTheme,
+  isAutoScrolling,
+  onToggleAutoScroll,
   googleDriveConnected,
   currentFileId,
   onPlayCell,
@@ -149,6 +153,10 @@ export function MenuBar({
           </MenubarItem>
           <MenubarItem onClick={toggleCode}>
             {showCode ? 'Hide' : 'Show'} All Code
+          </MenubarItem>
+          <MenubarItem onClick={onToggleAutoScroll}>
+            {isAutoScrolling ? 'Stop' : 'Start'} Auto Scroll{' '}
+            <MenubarShortcut>Space</MenubarShortcut>
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => setTheme('dark')}>Dark Mode</MenubarItem>
