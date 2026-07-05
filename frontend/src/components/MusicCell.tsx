@@ -437,7 +437,6 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
             Object.values(synth.players).forEach((player) => {
               try {
                 player.stop();
-                player.dispose();
               } catch (e) {
                 /* ignore */
               }
@@ -446,7 +445,6 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
             if (synth instanceof Tone.PolySynth || synth instanceof Tone.Sampler) {
               (synth as any).releaseAll?.();
             }
-            synth.dispose();
           }
 
           if (chikariSynth) {
@@ -457,7 +455,6 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
               ) {
                 (chikariSynth as any).releaseAll?.();
               }
-              chikariSynth.dispose();
             }
           }
 
@@ -584,14 +581,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
             Object.values(synth.players).forEach((player) => {
               try {
                 player.stop();
-                player.dispose();
               } catch (e) {}
             });
-          } else if (isTonalInstrument(synth)) {
-            synth.dispose();
-          }
-          if (chikariSynth && isTonalInstrument(chikariSynth)) {
-            chikariSynth.dispose();
           }
           volumeNode?.dispose();
           chikariVolumeNode?.dispose();

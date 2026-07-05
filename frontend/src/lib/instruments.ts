@@ -303,27 +303,32 @@ export function isTonalInstrument(
   return !isRhythmicInstrument(instrument);
 }
 
+const instrumentCache = new Map<string, Instrument>();
+
 export async function createInstrument(
   instrumentId: string
 ): Promise<Instrument> {
+  const cached = instrumentCache.get(instrumentId);
+  if (cached) {
+    return cached;
+  }
+
   const config = INSTRUMENTS[instrumentId] || INSTRUMENTS.synth;
+  let instrument: Instrument;
 
   if (config.type === 'sampler') {
-    return new Promise((resolve) => {
+    instrument = await new Promise< Tone.Sampler>((resolve) => {
       const sampler = new Tone.Sampler({
         urls: config.samples!,
         baseUrl: config.baseUrl,
         onload: () => {
           resolve(sampler);
         },
-        // If loading fails or takes too long, we might want to handle it,
-        // but Tone.Sampler handles missing files gracefully usually.
       });
     });
+    instrumentCache.set(instrumentId, instrument);
   } else if (config.type === 'tabla-sampler') {
-    // For tabla sampler, we use a Player for each sample since they're not pitched
-    // We'll return a special object that can play tabla bols
-    return new Promise((resolve) => {
+    instrument = await new Promise<RhythmicInstrument>((resolve) => {
       const players: Record<string, Tone.Player> = {};
       let loadedCount = 0;
       const totalSamples = Object.keys(config.samples!).length;
@@ -348,20 +353,48 @@ export async function createInstrument(
         players[bol] = player;
       });
 
-      // If no samples, resolve immediately
       if (totalSamples === 0) {
         resolve({ type: 'tabla-sampler', players: {} });
       }
     });
+    instrumentCache.set(instrumentId, instrument);
   } else if (config.type === 'synth-custom') {
     const synth = new Tone.PolySynth(Tone.Synth, config.options);
-    return Promise.resolve(synth);
+    instrument = synth;
+    instrumentCache.set(instrumentId, instrument);
   } else if (config.type === 'synth-membrane') {
     const synth = new Tone.MembraneSynth(config.options);
-    return Promise.resolve(synth);
+    instrument = synth;
+    instrumentCache.set(instrumentId, instrument);
   } else {
-    // Default Synth
     const synth = new Tone.PolySynth(Tone.Synth);
-    return Promise.resolve(synth);
+    instrument = synth;
+    instrumentCache.set(instrumentId, instrument);
   }
+
+  return instrument;
+}
+
+export function disposeInstrument(instrumentId: string): void {
+  const cached = instrumentCache.get(instrumentId);
+  if (cached) {
+    try {
+      if (isRhythmicInstrument(cached)) {
+        Object.values(cached.players).forEach((player) => {
+          try { player.stop(); player.dispose(); } catch (_) { /* ignore */ }
+        });
+      } else if (cached instanceof Tone.PolySynth || cached instanceof Tone.Sampler) {
+        (cached as any).releaseAll?.();
+        cached.dispose();
+      } else if (cached instanceof Tone.MembraneSynth) {
+        cached.dispose();
+      }
+    } catch (_) { /* ignore */ }
+    instrumentCache.delete(instrumentId);
+  }
+}
+
+export function clearInstrumentCache(): void {
+  instrumentCache.forEach((_, id) => disposeInstrument(id));
+  instrumentCache.clear();
 }
