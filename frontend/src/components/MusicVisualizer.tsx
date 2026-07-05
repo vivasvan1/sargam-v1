@@ -353,7 +353,7 @@ export function MusicVisualizer({
   return (
     <div
       ref={containerRef}
-      className="mt-4 md:mt-6 p-4 md:p-6 bg-card border border-border/40 rounded-xl md:rounded-2xl shadow-sm overflow-hidden max-w-full relative group/viz"
+      className="p-4 md:p-6 bg-card border border-border/40 rounded-xl md:rounded-2xl shadow-sm overflow-hidden max-w-full relative group/viz"
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
