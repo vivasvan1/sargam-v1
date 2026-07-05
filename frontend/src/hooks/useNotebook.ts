@@ -81,7 +81,7 @@ const reducer = (state: State, action: Action): State => {
               id: uuidv4(),
               cell_type: 'markdown',
               source: [
-                '# New markdown cell',
+                '# Title looks like this',
                 'Double click or double tap to edit.',
               ],
             }
@@ -89,7 +89,16 @@ const reducer = (state: State, action: Action): State => {
               id: uuidv4(),
               cell_type: 'music',
               metadata: { language: 'sargam-v1' },
-              source: ['#voice melody', 'S R G M'],
+              source: [
+                '@sa D4',
+                '@tala Tintal(16)',
+                '@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha',
+                '@tempo 120',
+                '@title ',
+                '',
+                '# comment',
+                "S R G M P D N S'",
+              ],
             };
 
       const newCells = [...state.notebook.cells];
