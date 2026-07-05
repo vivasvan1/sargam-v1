@@ -16,6 +16,7 @@ interface SargamKeyboardProps {
   notationKeys: SargamKeyboardKey[];
   octaveKeys: SargamKeyboardKey[];
   durationKeys: SargamKeyboardKey[];
+  specialKeys?: SargamKeyboardKey[];
   onInsert: (value: string) => void;
   onDelete: () => void;
   onSave: () => void;
@@ -60,6 +61,7 @@ export function SargamKeyboard({
   notationKeys,
   octaveKeys,
   durationKeys,
+  specialKeys,
   onInsert,
   onDelete,
   onSave,
@@ -89,6 +91,9 @@ export function SargamKeyboard({
         <div className="flex w-full items-center gap-2">
           <div className="flex flex-1 flex-wrap gap-2">
             {notationKeys.map((key) => (
+              <KeyboardKey key={key.label} keyConfig={key} onInsert={onInsert} />
+            ))}
+            {specialKeys?.map((key) => (
               <KeyboardKey key={key.label} keyConfig={key} onInsert={onInsert} />
             ))}
           </div>

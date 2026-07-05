@@ -56,8 +56,7 @@ export function VisualizerHeader({
                 size="sm"
                 className="h-9 px-2 rounded-full border-border/50 bg-muted/30"
               >
-                <Activity className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-                <span className="text-xs font-mono">{bpm}</span>
+                <span className="text-xs font-mono">{bpm} bpm</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-48 p-3" align="end">
@@ -179,7 +178,7 @@ export function VisualizerHeader({
           </Popover>
         </div>
 
-        <div className="flex flex-col md: flex-row gap-2 justify-center items-end">
+        <div className="flex flex-row gap-2 justify-center items-end">
           {/* Loop Toggle Button */}
           <Button
             onClick={onToggleLoop}
@@ -188,7 +187,7 @@ export function VisualizerHeader({
             className={`rounded-full shrink-0 ${isLooping ? '' : 'border-border/50 bg-muted/30 text-muted-foreground'}`}
             title={isLooping ? 'Looping enabled' : 'Looping disabled'}
           >
-            <Repeat className="w-4 h-4" /> Loop {isLooping ? 'ON' : 'OFF'}
+            <Repeat className="w-4 h-4" />
           </Button>
 
           {/* Play/Stop Button */}
@@ -196,7 +195,7 @@ export function VisualizerHeader({
             onClick={onPlay}
             variant={'default'}
             size="sm"
-            className="rounded-full shrink-0 md:w-auto w-full min-w-[80px]"
+            className="rounded-full shrink-0 md:w-auto"
           >
             {isPlaying ? (
               <>

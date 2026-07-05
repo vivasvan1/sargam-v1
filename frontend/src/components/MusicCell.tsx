@@ -18,7 +18,7 @@ import { usePlaybackStore } from '../store/usePlaybackStore';
 import { useIsMobile } from '../hooks/use-mobile';
 import { Button } from './ui/button';
 import { Save } from 'lucide-react';
-import { SargamKeyboard } from './music-cell/SargamKeyboard';
+import { SargamKeyboard, type SargamKeyboardKey } from './music-cell/SargamKeyboard';
 
 interface MusicCellProps {
   cell: {
@@ -57,18 +57,12 @@ const beatsToScheduledTime = (beats: number) =>
   beatsToTime(beats + LOOP_BOUNDARY_EPSILON_BEATS);
 
 export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
-  const content = Array.isArray(cell.source)
-    ? cell.source.join('\n')
-    : cell.source;
+  const content = Array.isArray(cell.source) ? cell.source.join('\n') : cell.source;
   const [editorValue, setEditorValue] = useState(content);
   const [savedContent, setSavedContent] = useState(content);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [lastParsedData, setLastParsedData] = useState<ParsedMusicCell | null>(
-    null
-  );
-  const [voiceControls, setVoiceControls] = useState<
-    Record<string, VoiceControl>
-  >({});
+  const [lastParsedData, setLastParsedData] = useState<ParsedMusicCell | null>(null);
+  const [voiceControls, setVoiceControls] = useState<Record<string, VoiceControl>>({});
   const [showMixer, setShowMixer] = useState(false);
   const activeNodesRef = useRef<Record<string, ActiveNode>>({});
   const {
@@ -77,12 +71,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     registerCellController,
     unregisterCellController,
   } = usePlaybackStore();
-  const {
-    defaultInstruments,
-    updateDefaultInstrument,
-    showVisualizer,
-    showCode,
-  } = useNotebookSettings();
+  const { defaultInstruments, updateDefaultInstrument, showVisualizer, showCode } =
+    useNotebookSettings();
   const [localShowVisualizer, setLocalShowVisualizer] = useState(true);
   const [localShowCode, setLocalShowCode] = useState(true);
   const [initialStartTime, setInitialStartTime] = useState(0);
@@ -140,8 +130,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const nextValue =
-      editorValue.slice(0, start) + text + editorValue.slice(end);
+    const nextValue = editorValue.slice(0, start) + text + editorValue.slice(end);
     const nextCursor = start + text.length;
 
     setEditorValue(nextValue);
@@ -171,11 +160,72 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     if (start === 0) return;
 
     const nextCursor = start - 1;
-    const nextValue =
-      editorValue.slice(0, nextCursor) + editorValue.slice(start);
+    const nextValue = editorValue.slice(0, nextCursor) + editorValue.slice(start);
     setEditorValue(nextValue);
     requestAnimationFrame(() => textarea.setSelectionRange(nextCursor, nextCursor));
   };
+
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deleteIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' && localShowCode) {
+        e.preventDefault();
+        if (deleteTimerRef.current) return;
+        deleteTimerRef.current = setTimeout(() => {
+          deleteTimerRef.current = null;
+          deleteAtCursor();
+          deleteIntervalRef.current = setInterval(() => {
+            deleteAtCursor();
+          }, 70);
+        }, 700);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Delete') {
+        e.preventDefault();
+        if (deleteTimerRef.current) {
+          clearTimeout(deleteTimerRef.current);
+          deleteTimerRef.current = null;
+        }
+        if (deleteIntervalRef.current) {
+          clearInterval(deleteIntervalRef.current);
+          deleteIntervalRef.current = null;
+        }
+      }
+    };
+
+    const handleBlur = () => {
+      if (deleteTimerRef.current) {
+        clearTimeout(deleteTimerRef.current);
+        deleteTimerRef.current = null;
+      }
+      if (deleteIntervalRef.current) {
+        clearInterval(deleteIntervalRef.current);
+        deleteIntervalRef.current = null;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    textareaRef.current?.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      textareaRef.current?.removeEventListener('blur', handleBlur);
+      if (deleteTimerRef.current) {
+        clearTimeout(deleteTimerRef.current);
+        deleteTimerRef.current = null;
+      }
+      if (deleteIntervalRef.current) {
+        clearInterval(deleteIntervalRef.current);
+        deleteIntervalRef.current = null;
+      }
+    };
+  }, [localShowCode, deleteAtCursor]);
 
   const notationKeys = [
     { tooltip: 'sa', label: 'S', value: 'S' },
@@ -205,6 +255,12 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     { tooltip: '||', label: '||', value: '|| \n' },
   ];
 
+  const specialKeys: SargamKeyboardKey[] = [
+    { tooltip: 'chinkari', label: '^', value: '^' },
+    { tooltip: 'skip note', label: '/', value: '/' },
+    { tooltip: 'silence', label: '.', value: '.' },
+  ];
+
   const hasUnsavedChanges = editorValue !== savedContent;
 
   // Parse saved content only. The visualizer updates after pressing Save.
@@ -213,8 +269,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
       const data = parseMusicCell(savedContent.split('\n'));
 
       if (!bpm && !data.directives.tempo) setBpm(80);
-      if (!bpm && data.directives.tempo)
-        setBpm(parseFloat(data.directives.tempo));
+      if (!bpm && data.directives.tempo) setBpm(parseFloat(data.directives.tempo));
       if (bpm) data.directives.tempo = bpm.toString();
       Tone.getTransport().bpm.value = bpm ?? 80;
 
@@ -248,9 +303,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
           if (prev['__tala']) {
             next['__tala'] = prev['__tala'];
           } else {
-            const instrument = data.directives.tala_pattern
-              ? 'tabla-sampler'
-              : 'tabla';
+            const instrument = data.directives.tala_pattern ? 'tabla-sampler' : 'tabla';
             const instConfig = INSTRUMENTS[instrument];
             next['__tala'] = {
               volume: instConfig?.defaultVolume ?? -5,
@@ -332,9 +385,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     }
   };
 
-  const playPromiseResolveRef = useRef<((isNatural: boolean) => void) | null>(
-    null
-  );
+  const playPromiseResolveRef = useRef<((isNatural: boolean) => void) | null>(null);
 
   const handlePlay = async (): Promise<boolean> => {
     if (isPlaying) {
@@ -392,10 +443,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
               }
             });
           } else if (isTonalInstrument(synth)) {
-            if (
-              synth instanceof Tone.PolySynth ||
-              synth instanceof Tone.Sampler
-            ) {
+            if (synth instanceof Tone.PolySynth || synth instanceof Tone.Sampler) {
               (synth as any).releaseAll?.();
             }
             synth.dispose();
@@ -453,10 +501,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     }
   }, [isLooping, isPlaying]);
 
-  const updateVoiceControl = (
-    voiceName: string,
-    updates: Partial<VoiceControl>
-  ) => {
+  const updateVoiceControl = (voiceName: string, updates: Partial<VoiceControl>) => {
     setVoiceControls((prev) => {
       const current = prev[voiceName];
       const next = { ...current, ...updates };
@@ -532,10 +577,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
     // Clean up previous
     Object.entries(activeNodesRef.current).forEach(
-      ([
-        _vName,
-        { synth, volumeNode, part, chikariSynth, chikariVolumeNode },
-      ]) => {
+      ([_vName, { synth, volumeNode, part, chikariSynth, chikariVolumeNode }]) => {
         try {
           if (part) part.dispose();
           if (isRhythmicInstrument(synth)) {
@@ -583,9 +625,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
       const talaCtrl = currentControls['__tala'] || {
         volume: -5,
         muted: false,
-        instrument: parsedData.directives.tala_pattern
-          ? 'tabla-sampler'
-          : 'tabla',
+        instrument: parsedData.directives.tala_pattern ? 'tabla-sampler' : 'tabla',
       };
       const talaVol = new Tone.Volume(talaCtrl.volume).toDestination();
       talaVol.mute = talaCtrl.muted;
@@ -603,8 +643,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
           // Parse pattern
           const parseTalaPattern = (patternStr: string, defaultDur: number) => {
-            const events: { bol: string; duration: number; time: number }[] =
-              [];
+            const events: { bol: string; duration: number; time: number }[] = [];
             const cleanPattern = patternStr.split('#')[0].trim();
             const tokens = cleanPattern.split(/\s+/).filter((t) => t);
 
@@ -676,11 +715,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
           membrane.connect(talaVol);
 
           const talaLoop = new Tone.Loop((time) => {
-            (membrane as Tone.MembraneSynth).triggerAttackRelease(
-              'C2',
-              '8n',
-              time
-            );
+            (membrane as Tone.MembraneSynth).triggerAttackRelease('C2', '8n', time);
           }, '4n');
           talaLoop.start(0);
 
@@ -797,9 +832,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
             const meendOrnament =
               !isChingari &&
-              event.ornaments?.find(
-                (o) => o.name === 'meend' || o.name === 'slide'
-              );
+              event.ornaments?.find((o) => o.name === 'meend' || o.name === 'slide');
 
             if (meendOrnament && meendOrnament.params.length > 0) {
               const startFreq = frequencies[0];
@@ -829,10 +862,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
               if (targetSwaraStr.includes('k') || targetSwaraStr.includes('b'))
                 targetVariant = 'k';
-              else if (
-                targetSwaraStr.includes('t') ||
-                targetSwaraStr.includes('#')
-              )
+              else if (targetSwaraStr.includes('t') || targetSwaraStr.includes('#'))
                 targetVariant = 't';
 
               const octaveUp = (targetSwaraStr.match(/'/g) || []).length;
@@ -853,7 +883,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
               Tone.getTransport().schedule((t) => {
                 // Calculate dynamic seconds based on current BPM at trigger time
-                const currentBeatDur = 60 / Tone.Transport.bpm.value;
+                const currentBeatDur = 60 / Tone.getTransport().bpm.value;
                 const totalDurSeconds = durBeats * currentBeatDur;
 
                 // Scale for meend parts
@@ -866,13 +896,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                   const parsedStart = parseFloat(meendOrnament.params[1]);
                   const parsedSlide = parseFloat(meendOrnament.params[2]);
                   const parsedEnd = parseFloat(meendOrnament.params[3]);
-                  if (
-                    !isNaN(parsedStart) &&
-                    !isNaN(parsedSlide) &&
-                    !isNaN(parsedEnd)
-                  ) {
-                    const totalSpecified =
-                      parsedStart + parsedSlide + parsedEnd;
+                  if (!isNaN(parsedStart) && !isNaN(parsedSlide) && !isNaN(parsedEnd)) {
+                    const totalSpecified = parsedStart + parsedSlide + parsedEnd;
                     if (totalSpecified > 0) {
                       const scale = durBeats / totalSpecified;
                       startDur = parsedStart * scale * currentBeatDur;
@@ -902,19 +927,11 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                       for (let i = 1; i <= steps; i++) {
                         const stepTime = t + startDur + i * stepDur;
                         const stepFreq = startFreq + i * freqStep;
-                        if (i > 1)
-                          mSynth.triggerRelease(stepTime - stepDur * 0.1);
-                        mSynth.triggerAttack(
-                          stepFreq,
-                          stepTime - stepDur * 0.1
-                        );
+                        if (i > 1) mSynth.triggerRelease(stepTime - stepDur * 0.1);
+                        mSynth.triggerAttack(stepFreq, stepTime - stepDur * 0.1);
                       }
                     } else {
-                      mSynth.frequency.rampTo(
-                        targetFreq,
-                        slideDur,
-                        t + startDur
-                      );
+                      mSynth.frequency.rampTo(targetFreq, slideDur, t + startDur);
                     }
                   }
                   mSynth.triggerRelease(t + startDur + slideDur + endDur);
@@ -928,8 +945,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                     for (let i = 1; i <= steps; i++) {
                       const stepTime = t + i * stepDur;
                       const stepFreq = startFreq + i * freqStep;
-                      if (i > 1)
-                        mSynth.triggerRelease(stepTime - stepDur * 0.1);
+                      if (i > 1) mSynth.triggerRelease(stepTime - stepDur * 0.1);
                       mSynth.triggerAttack(stepFreq, stepTime - stepDur * 0.1);
                     }
                     mSynth.triggerRelease(t + slideDur);
@@ -947,7 +963,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                   : synth;
 
               Tone.getTransport().schedule((t) => {
-                const currentBeatDur = 60 / Tone.Transport.bpm.value;
+                const currentBeatDur = 60 / Tone.getTransport().bpm.value;
                 const durSeconds = durBeats * currentBeatDur;
 
                 if (
@@ -961,11 +977,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 } else {
                   // Fallback for other tonal instruments if any
                   frequencies.forEach((f) => {
-                    (instrument as any).triggerAttackRelease?.(
-                      f,
-                      durSeconds,
-                      t
-                    );
+                    (instrument as any).triggerAttackRelease?.(f, durSeconds, t);
                   });
                 }
               }, beatsToScheduledTime(currentTimeBeats));
@@ -1017,9 +1029,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
         <div className="min-w-0">
           <div
             className={
-              localShowCode
-                ? ''
-                : 'relative h-[50px] overflow-hidden select-none'
+              localShowCode ? '' : 'hidden'
             }
           >
             <div className="relative">
@@ -1029,45 +1039,32 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 onChange={(e) => handleChange(e.target.value)}
                 onFocus={handleEditorFocus}
                 onBlur={handleEditorBlur}
-                readOnly={!localShowCode}
                 inputMode={isMobile && !useNormalKeyboard ? 'none' : undefined}
                 spellCheck={false}
                 className="w-full resize-none overflow-hidden rounded-md border border-border bg-background/70 px-3 py-2 pb-12 text-base md:text-sm font-mono text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 style={{
-                  height: `${textareaRef.current?.scrollHeight || 160}px`,
+                  height: `${textareaRef.current?.scrollHeight || 400}px`,
                 }}
               />
               {localShowCode && hasUnsavedChanges && (
-                <Button
-                  size={'sm'}
-                  onClick={handleSave}
-                  className="absolute top-3 right-3"
-                >
-                  <Save className="w-4 h-4" />
-                </Button>
-              )}
-              {localShowCode && hasUnsavedChanges && (
-                <Button
-                  size={'sm'}
-                  onClick={handleSave}
-                  className="absolute bottom-3 right-3"
-                >
-                  <Save className="w-4 h-4" />
-                </Button>
+                <>
+                  <Button
+                    size={'sm'}
+                    onClick={handleSave}
+                    className="absolute top-3 right-3"
+                  >
+                    <Save className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size={'sm'}
+                    onClick={handleSave}
+                    className="absolute bottom-3 right-3"
+                  >
+                    <Save className="w-4 h-4" />
+                  </Button>
+                </>
               )}
             </div>
-
-            {!localShowCode && (
-              <div className="absolute inset-0 z-10 bg-background flex items-center justify-center border-b border-border/50">
-                <Button
-                  type="button"
-                  onClick={() => setLocalShowCode(true)}
-                  className="z-50 pointer-events-auto"
-                >
-                  Show Music Code
-                </Button>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1079,6 +1076,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
         notationKeys={notationKeys}
         octaveKeys={octaveKeys}
         durationKeys={durationKeys}
+        specialKeys={specialKeys}
         onInsert={insertAtCursor}
         onDelete={deleteAtCursor}
         onSave={handleSave}
