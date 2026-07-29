@@ -5,6 +5,7 @@ import {
   Cloud,
   MoreHorizontal,
   Download,
+  Printer,
   X,
   Share2,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ interface HeaderProps {
   googleDriveConnected: boolean;
   onSaveToDrive: () => void;
   onDownload: () => void;
+  onPrint: () => void;
 
   currentFileId?: string | null;
   saveStatus?: 'saved' | 'unsaved' | 'saving';
@@ -48,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   googleDriveConnected,
   onSaveToDrive,
   onDownload,
+  onPrint,
   currentFileId,
   saveStatus = 'saved',
   isReadOnly = false,
@@ -219,6 +222,13 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Download className="w-4 h-4" />
               Download
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={onPrint}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+              Print notebook
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -16,7 +16,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 COPY package.json bun.lock* ./
 # Copy the rest of the app
 COPY . .
-EXPOSE 5174
+EXPOSE 4715
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["bun", "run", "dev"]
 

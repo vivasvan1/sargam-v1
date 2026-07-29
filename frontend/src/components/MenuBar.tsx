@@ -20,6 +20,7 @@ interface MenuBarProps {
   isPublished: boolean;
   isReadOnly: boolean;
   onDownload: () => void;
+  onPrint: () => void;
   currentFileId?: string | null;
 
   canUndo: boolean;
@@ -53,6 +54,7 @@ export function MenuBar({
   isPublished,
   isReadOnly,
   onDownload,
+  onPrint,
   canUndo,
   canRedo,
   onUndo,
@@ -115,6 +117,9 @@ export function MenuBar({
             {autoSaveEnabled ? 'Disable' : 'Enable'} Auto Save
           </MenubarItem>
           <MenubarItem onClick={onDownload}>Download .imnb</MenubarItem>
+          <MenubarItem onClick={onPrint}>
+            Print Notebook <MenubarShortcut>⌘P</MenubarShortcut>
+          </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
 

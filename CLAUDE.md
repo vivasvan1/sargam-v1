@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd frontend && npm install  # or bun install
 
 # Run development server
-cd frontend && npm run dev  # Available at http://localhost:5174
+cd frontend && npm run dev  # Available at http://localhost:4715
 
 # Build for production
 cd frontend && npm run build
@@ -24,7 +24,7 @@ cd frontend && npm run lint
 cd frontend && npm run format
 ```
 
-Docker dev (exposes port 5174):
+Docker dev (exposes port 4715):
 ```bash
 docker-compose up
 ```

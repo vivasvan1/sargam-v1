@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
       target: development
     ports:
-      - "5174:5174"
+      - "4715:4715"
     volumes:
       - ./frontend:/app
       # Use a named volume for node_modules so it doesn't get overwritten by the bind mount

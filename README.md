@@ -68,7 +68,7 @@
     In the Google Cloud Console OAuth client, add the app URL under
     **Authorized JavaScript origins**:
     - Production: `https://sargam.speede.site`
-    - Local development: `http://localhost:5174`
+    - Local development: `http://localhost:4715`
 
     The app only requests Google Drive `drive.file` access. Community notebooks
     are served from the public Apps Script registry rather than by reading other
@@ -90,7 +90,7 @@
     npm run dev
     ```
 
-    The app will be available at `http://localhost:5174`.
+    The app will be available at `http://localhost:4715`.
 
 ## 🛠️ Tech Stack
 

@@ -7,6 +7,7 @@ import { GoogleDriveSaveDialog } from '@/components/google-drive/GoogleDriveSave
 import { GoogleDriveLoadDialog } from '@/components/google-drive/GoogleDriveLoadDialog';
 import { Header } from './components/Header';
 import { NotebookEditor } from './components/NotebookEditor';
+import { PrintNotebook } from './components/PrintNotebook';
 
 // Libs
 import { toast, Toaster } from 'sonner';
@@ -575,6 +576,12 @@ function App() {
     toast.success('Notebook downloaded');
   };
 
+  const handlePrint = () => {
+    // Radix menus render in a portal. Wait for the selected menu to close
+    // before the browser captures the page for printing.
+    window.setTimeout(() => window.print(), 0);
+  };
+
   // Google Drive handlers
   const handleGoogleDriveConnect = async () => {
     if (!GOOGLE_CLIENT_ID) {
@@ -872,7 +879,7 @@ function App() {
         />
       ) : (
         <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <div className="flex h-screen w-full bg-background text-foreground overflow-hidden selection:bg-primary/10">
+          <div className="app-shell flex h-screen w-full bg-background text-foreground overflow-hidden selection:bg-primary/10">
             <Sidebar
               onFileUpload={handleFileUpload}
               onNew={handleNew}
@@ -906,6 +913,7 @@ function App() {
                   googleDriveConnected={googleDriveConnected}
                   onSaveToDrive={handleSaveToDrive}
                   onDownload={handleDownload}
+                  onPrint={handlePrint}
                   currentFileId={driveFileId}
                   saveStatus={saveStatus}
                   isReadOnly={isReadOnly}
@@ -923,6 +931,7 @@ function App() {
                     isPublished={isPublished}
                     isReadOnly={isReadOnly}
                     onDownload={handleDownload}
+                    onPrint={handlePrint}
                     canUndo={canUndo}
                     canRedo={canRedo}
                     onUndo={undo}
@@ -1001,6 +1010,7 @@ function App() {
               onChange={handleFileUpload}
             />
           </div>
+          <PrintNotebook notebook={notebook} />
         </SidebarProvider>
       )}
       <Toaster position="bottom-right" theme={theme} closeButton />
