@@ -4,9 +4,6 @@ import { Cell } from './Cell';
 import { AddCellControls } from './AddCellControls';
 import { EmptyState } from './EmptyState';
 import type { Notebook } from '../types/notebook';
-import { Minus, Pause, Play, Plus } from 'lucide-react';
-import { Button } from './ui/button';
-import { ButtonGroup, ButtonGroupText } from './ui/button-group';
 
 interface NotebookEditorProps {
   notebook: Notebook;
@@ -18,6 +15,7 @@ interface NotebookEditorProps {
   theme: 'light' | 'dark' | 'system';
   isReadOnly?: boolean;
   isAutoScrolling: boolean;
+  autoScrollSpeed: number;
   setIsAutoScrolling: (isAutoScrolling: boolean) => void;
   toggleAutoScroll: () => void;
 }
@@ -32,6 +30,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
   theme,
   isReadOnly = false,
   isAutoScrolling,
+  autoScrollSpeed,
   setIsAutoScrolling,
   toggleAutoScroll,
 }) => {
@@ -40,23 +39,6 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
   const lastFrameTimeRef = useRef<number | null>(null);
   const lastUserScrollTimeRef = useRef(0);
   const autoScrollTopRef = useRef<number | null>(null);
-  const hideControlsTimeoutRef = useRef<number | null>(null);
-  const [scrollSpeed, setScrollSpeed] = React.useState(25);
-  const [showAutoScrollControls, setShowAutoScrollControls] =
-    React.useState(true);
-
-  const revealAutoScrollControls = () => {
-    setShowAutoScrollControls(true);
-
-    if (hideControlsTimeoutRef.current !== null) {
-      window.clearTimeout(hideControlsTimeoutRef.current);
-    }
-
-    hideControlsTimeoutRef.current = window.setTimeout(() => {
-      setShowAutoScrollControls(false);
-    }, 500);
-  };
-
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const scrollCellId = urlParams.get('cellId');
@@ -80,17 +62,6 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
       return () => clearTimeout(timer);
     }
   }, [notebook.cells.length, setActiveCellId]);
-
-  useEffect(() => {
-    revealAutoScrollControls();
-
-    return () => {
-      if (hideControlsTimeoutRef.current !== null) {
-        window.clearTimeout(hideControlsTimeoutRef.current);
-        hideControlsTimeoutRef.current = null;
-      }
-    };
-  }, []);
 
   useEffect(() => {
     const root = scrollRootRef.current;
@@ -128,7 +99,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
 
       const nextScrollTop = Math.min(
         autoScrollTopRef.current +
-          (isUserScrolling ? 0 : scrollSpeed * elapsedSeconds),
+          (isUserScrolling ? 0 : autoScrollSpeed * elapsedSeconds),
         maxScrollTop
       );
 
@@ -157,7 +128,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
       autoScrollTopRef.current = null;
       viewport.style.scrollBehavior = previousScrollBehavior;
     };
-  }, [isAutoScrolling, scrollSpeed, setIsAutoScrolling]);
+  }, [autoScrollSpeed, isAutoScrolling, setIsAutoScrolling]);
 
   useEffect(() => {
     const root = scrollRootRef.current;
@@ -169,32 +140,22 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
 
     const handleUserScroll = () => {
       lastUserScrollTimeRef.current = performance.now();
-      revealAutoScrollControls();
     };
 
     viewport.addEventListener('wheel', handleUserScroll, { passive: true });
-    viewport.addEventListener('touchstart', handleUserScroll, { passive: true });
+    viewport.addEventListener('touchstart', handleUserScroll, {
+      passive: true,
+    });
     viewport.addEventListener('touchmove', handleUserScroll, { passive: true });
-    viewport.addEventListener('pointerdown', handleUserScroll, { passive: true });
+    viewport.addEventListener('pointerdown', handleUserScroll, {
+      passive: true,
+    });
 
     return () => {
       viewport.removeEventListener('wheel', handleUserScroll);
       viewport.removeEventListener('touchstart', handleUserScroll);
       viewport.removeEventListener('touchmove', handleUserScroll);
       viewport.removeEventListener('pointerdown', handleUserScroll);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handlePointerMove = () => revealAutoScrollControls();
-    const handleTouchStart = () => revealAutoScrollControls();
-
-    window.addEventListener('mousemove', handlePointerMove, { passive: true });
-    window.addEventListener('touchstart', handleTouchStart, { passive: true });
-
-    return () => {
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('touchstart', handleTouchStart);
     };
   }, []);
 
@@ -222,7 +183,8 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.key !== ' ') return;
-      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey)
+        return;
       if (isEditableTarget(event.target)) return;
 
       event.preventDefault();
@@ -235,56 +197,6 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
 
   return (
     <ScrollArea ref={scrollRootRef} className="flex-1 overflow-hidden h-full">
-      <ButtonGroup
-        className={`absolute bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 z-50 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-border/40 bg-card/65 p-0.5 shadow-md backdrop-blur-md transition-all duration-300 md:bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] ${
-          showAutoScrollControls
-            ? 'translate-y-0 opacity-100'
-            : 'translate-y-2 opacity-0 pointer-events-none'
-        }`}
-      >
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={toggleAutoScroll}
-          className="h-8 rounded-full px-2 text-xs shadow-sm"
-          aria-label={isAutoScrolling ? 'Stop auto-scroll' : 'Start auto-scroll'}
-        >
-          {isAutoScrolling ? (
-            <Pause className="size-3.5" />
-          ) : (
-            <Play className="ml-0.5 size-3.5" />
-          )}
-          Scroll
-        </Button>
-        <ButtonGroupText
-          className="h-8 min-w-9 justify-center rounded-full border-none bg-transparent px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground shadow-none"
-          aria-label={`Auto-scroll speed ${scrollSpeed}`}
-        >
-          {scrollSpeed}
-        </ButtonGroupText>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setScrollSpeed((speed) => Math.max(5, speed - 5))}
-          className="rounded-full text-muted-foreground"
-          aria-label="Decrease auto-scroll speed"
-        >
-          <Minus className="size-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setScrollSpeed((speed) => Math.min(50, speed + 5))}
-          className="rounded-full text-muted-foreground"
-          aria-label="Increase auto-scroll speed"
-        >
-          <Plus className="size-3.5" />
-        </Button>
-      </ButtonGroup>
-
       <div className="max-w-5xl mx-auto py-6 md:py-12 px-4 md:px-8 w-full min-w-0">
         {/* <GoogleAd slot="top-banner" /> */}
         <div className="w-full min-w-0">

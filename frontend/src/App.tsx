@@ -101,8 +101,8 @@ function AuthGate({
                   <strong className="font-semibold text-foreground">
                     Sargam notebook{' '}
                   </strong>
-                  uses your Google Drive to load notebooks, save changes, and open
-                  shared files.
+                  uses your Google Drive to load notebooks, save changes, and
+                  open shared files.
                 </p>
               </div>
 
@@ -155,8 +155,8 @@ function AuthGate({
                 </div>
               ) : (
                 <p className="text-xs leading-5 text-muted-foreground">
-                  The first sign-in requests Google Drive access up front so the editor
-                  is ready immediately after authentication.
+                  The first sign-in requests Google Drive access up front so the
+                  editor is ready immediately after authentication.
                 </p>
               )}
             </div>
@@ -225,15 +225,29 @@ function App() {
   const [driveFileId, setDriveFileId] = useState<string | null>(null); // Track if notebook was saved to Drive
   const [isReadOnly, setIsReadOnly] = useState(false); // Track if current file is read-only
   const [lastSavedContent, setLastSavedContent] = useState<string | null>(null); // Track last saved content for change detection
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('saved');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>(
+    'saved'
+  );
   const [isPublished, setIsPublished] = useState(false);
-  const [publishedOwnerEmail, setPublishedOwnerEmail] = useState<string | null>(null);
+  const [publishedOwnerEmail, setPublishedOwnerEmail] = useState<string | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authInitError, setAuthInitError] = useState<string | null>(null);
-  const [hasLoadedInitialNotebook, setHasLoadedInitialNotebook] = useState(false);
+  const [hasLoadedInitialNotebook, setHasLoadedInitialNotebook] =
+    useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(false);
+  const [autoScrollSpeed, setAutoScrollSpeed] = useState(25);
   const savingContentRef = React.useRef<string | null>(null);
+
+  // Keep the browser document title equal to the notebook title. Browsers use
+  // this value as the suggested filename for both menu and keyboard printing.
+  useEffect(() => {
+    document.title = (
+      notebook.metadata?.title?.trim() || 'Sargam Notebook'
+    ).replace(/\.(imnb|pdf)$/i, '');
+  }, [notebook.metadata?.title]);
 
   // Initialize Google API on mount
   useEffect(() => {
@@ -257,7 +271,9 @@ function App() {
       })
       .catch((error) => {
         console.error('Failed to initialize Google API:', error);
-        if (error.message === 'Google authentication initialization timed out.') {
+        if (
+          error.message === 'Google authentication initialization timed out.'
+        ) {
           clearGoogleAuthCache();
         }
         setAuthInitError(
@@ -314,7 +330,9 @@ function App() {
       const title = nextNotebook.metadata?.title || 'Untitled Notebook';
       setFilePath(fileId ? `${title}.imnb` : 'raag_khamaj_demo.imnb');
       setDriveFileId(fileId);
-      setLastSavedContent(fileId ? JSON.stringify(nextNotebook, null, 2) : null);
+      setLastSavedContent(
+        fileId ? JSON.stringify(nextNotebook, null, 2) : null
+      );
       setSaveStatus('saved');
       setIsReadOnly(effectiveReadOnly);
       setIsPublished(published);
@@ -335,9 +353,18 @@ function App() {
 
           if (isCancelled) return;
 
-          applyLoadedNotebook(notebook, fileId, true, true, entry.ownerEmail || null);
+          applyLoadedNotebook(
+            notebook,
+            fileId,
+            true,
+            true,
+            entry.ownerEmail || null
+          );
 
-          if (!googleDriveUser?.email || entry.ownerEmail !== googleDriveUser.email) {
+          if (
+            !googleDriveUser?.email ||
+            entry.ownerEmail !== googleDriveUser.email
+          ) {
             toast.info('Notebook loaded in read-only mode.');
           }
           toast.success('Loaded community notebook');
@@ -460,7 +487,12 @@ function App() {
     // 3. Content has changed since last save
     // 4. File is not read-only
     // 5. Auto-save is enabled by user
-    if (!googleDriveConnected || !driveFileId || isReadOnly || !autoSaveEnabled) {
+    if (
+      !googleDriveConnected ||
+      !driveFileId ||
+      isReadOnly ||
+      !autoSaveEnabled
+    ) {
       return;
     }
 
@@ -579,7 +611,16 @@ function App() {
   const handlePrint = () => {
     // Radix menus render in a portal. Wait for the selected menu to close
     // before the browser captures the page for printing.
-    window.setTimeout(() => window.print(), 0);
+    window.setTimeout(() => {
+      const notebookTitle = (
+        notebook.metadata?.title?.trim() || 'Sargam Notebook'
+      ).replace(/\.(imnb|pdf)$/i, '');
+
+      document.title = notebookTitle;
+      // Give the browser a frame to commit the title before creating the
+      // print-preview document and its default PDF filename.
+      window.requestAnimationFrame(() => window.print());
+    }, 0);
   };
 
   // Google Drive handlers
@@ -592,7 +633,9 @@ function App() {
     }
 
     if (!isInitialized) {
-      toast.info('Google sign-in is still loading. Please try again in a moment.');
+      toast.info(
+        'Google sign-in is still loading. Please try again in a moment.'
+      );
       return;
     }
 
@@ -600,7 +643,9 @@ function App() {
       setIsAuthenticating(true);
       const user = await authenticate();
       // Store updates automatically via googleDrive.ts
-      toast.success(`Connected to Google Drive as ${user?.email || 'Connected'}`);
+      toast.success(
+        `Connected to Google Drive as ${user?.email || 'Connected'}`
+      );
     } catch (error: any) {
       console.error('Error connecting to Google Drive:', error);
       if (error.message === 'Sign-in cancelled') {
@@ -773,7 +818,9 @@ function App() {
       setPublishedOwnerEmail(null);
     }
     toast.success(
-      publishedStatus ? 'Community notebook loaded' : 'Notebook loaded from Google Drive'
+      publishedStatus
+        ? 'Community notebook loaded'
+        : 'Notebook loaded from Google Drive'
     );
   };
 
@@ -816,7 +863,9 @@ function App() {
   const handleUnpublish = async () => {
     if (!driveFileId || !googleDriveConnected) return;
 
-    const confirm = window.confirm('Remove this notebook from the community registry?');
+    const confirm = window.confirm(
+      'Remove this notebook from the community registry?'
+    );
     if (!confirm) return;
 
     try {
@@ -941,6 +990,8 @@ function App() {
                     theme={theme}
                     setTheme={setTheme}
                     isAutoScrolling={isAutoScrolling}
+                    autoScrollSpeed={autoScrollSpeed}
+                    setAutoScrollSpeed={setAutoScrollSpeed}
                     onToggleAutoScroll={toggleAutoScroll}
                     googleDriveConnected={googleDriveConnected}
                     currentFileId={driveFileId}
@@ -959,6 +1010,7 @@ function App() {
                   theme={theme}
                   isReadOnly={isReadOnly}
                   isAutoScrolling={isAutoScrolling}
+                  autoScrollSpeed={autoScrollSpeed}
                   setIsAutoScrolling={setIsAutoScrolling}
                   toggleAutoScroll={toggleAutoScroll}
                 />
