@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import Markdown from 'react-markdown';
 import type { Notebook, NotebookCell } from '../types/notebook';
 import {
@@ -14,6 +15,7 @@ const PRINT_COPY = {
   en: {
     subtitle: 'Indian music notebook',
     notation: 'Notation',
+    cell: 'Cell',
     cycle: 'Cycle',
     beat: 'beat',
     beats: 'beats',
@@ -25,6 +27,7 @@ const PRINT_COPY = {
   hi: {
     subtitle: 'भारतीय संगीत नोटबुक',
     notation: 'स्वरलिपि',
+    cell: 'सेल',
     cycle: 'आवर्तन',
     beat: 'मात्रा',
     beats: 'मात्राएँ',
@@ -46,6 +49,19 @@ function PrintMusicCell({
 }) {
   const copy = PRINT_COPY[language];
   const layout = buildPrintMusicLayout(cell.source, language);
+  const firstCommentRowIndex = layout.rows.findIndex(
+    (row) => row.comments.length > 0
+  );
+  const firstComment =
+    firstCommentRowIndex >= 0
+      ? layout.rows[firstCommentRowIndex].comments[0]
+      : undefined;
+  const directiveTitle = layout.directives.title?.trim();
+  const usesFirstCommentAsTitle = !directiveTitle && Boolean(firstComment);
+  const cardTitle =
+    directiveTitle || firstComment || `${copy.cell} ${index + 1}`;
+  const cellLink = new URL(window.location.href);
+  cellLink.searchParams.set('cellId', cell.id);
   const tala =
     layout.directives.tala ||
     layout.directives.taal ||
@@ -63,7 +79,9 @@ function PrintMusicCell({
           <p className="print-kicker">
             {copy.notation} {index + 1}
           </p>
-          {layout.comments.length > 0 && <h2>{layout.comments.join(' · ')}</h2>}
+          <h2 className="print-cell-title">
+            <a href={cellLink.toString()}>{cardTitle}</a>
+          </h2>
         </div>
         <p className="print-music-details">{details.join('  ·  ')}</p>
       </div>
@@ -90,43 +108,65 @@ function PrintMusicCell({
           </tr>
         </thead>
         <tbody>
-          {layout.rows.map((row) => (
-            <tr key={`${row.voice}-${row.cycle}`}>
-              <th className="print-row-label">
-                <span>{row.cycle}</span>
-                {row.voice !== 'default' && <small>{row.voice}</small>}
-              </th>
-              {row.beats.map((beat, beatIndex) => (
-                <td
-                  key={beatIndex}
-                  className={
-                    (beatIndex + 1) % 4 === 0 ? 'print-vibhag-end' : ''
-                  }
-                >
-                  {beat.entries.length > 0 ? (
-                    <span className="print-note-group">
-                      {beat.entries.map((entry, entryIndex) => (
+          {layout.rows.map((row, rowIndex) => {
+            const comments =
+              usesFirstCommentAsTitle && rowIndex === firstCommentRowIndex
+                ? row.comments.slice(1)
+                : row.comments;
+
+            return (
+              <Fragment key={`${row.voice}-${row.cycle}`}>
+                {comments.length > 0 && (
+                  <tr className="print-comment-row">
+                    <td colSpan={layout.beatCount + 1}>
+                      {comments.join(' · ')}
+                    </td>
+                  </tr>
+                )}
+                <tr>
+                  <th className="print-row-label">
+                    <span>{row.cycle}</span>
+                    {row.voice !== 'default' && <small>{row.voice}</small>}
+                  </th>
+                  {row.beats.map((beat, beatIndex) => (
+                    <td
+                      key={beatIndex}
+                      className={
+                        (beatIndex + 1) % 4 === 0 ? 'print-vibhag-end' : ''
+                      }
+                    >
+                      {beat.entries.length > 0 ? (
                         <span
-                          key={`${entry}-${entryIndex}`}
-                          className={
-                            entry === '—'
-                              ? 'print-sustain'
-                              : entry === '∫'
-                                ? 'print-chikari'
-                                : undefined
-                          }
+                          className={`print-note-group ${
+                            beat.entries.length <= 6
+                              ? 'print-note-group-nowrap'
+                              : 'print-note-group-wrap'
+                          } print-note-count-${Math.min(beat.entries.length, 6)}`}
                         >
-                          {entry}
+                          {beat.entries.map((entry, entryIndex) => (
+                            <span
+                              key={`${entry}-${entryIndex}`}
+                              className={
+                                entry === '—'
+                                  ? 'print-sustain'
+                                  : entry === '∫'
+                                    ? 'print-chikari'
+                                    : undefined
+                              }
+                            >
+                              {entry}
+                            </span>
+                          ))}
                         </span>
-                      ))}
-                    </span>
-                  ) : (
-                    <span className="print-empty-beat">·</span>
-                  )}
-                </td>
-              ))}
-            </tr>
-          ))}
+                      ) : (
+                        <span className="print-empty-beat">·</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </section>

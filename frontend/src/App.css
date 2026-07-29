@@ -230,13 +230,21 @@ button {
     margin-bottom: 3mm;
   }
 
-  .print-music-heading h2 {
+  .print-cell-title {
     margin: 0;
     font-family: Georgia, "Times New Roman", serif;
-    color: #59615c;
+    color: #20392a;
     font-size: 12pt;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.2;
+  }
+
+  .print-cell-title a {
+    color: inherit;
+    text-decoration-color: #9eb1a3;
+    text-decoration-line: underline;
+    text-decoration-thickness: 0.2mm;
+    text-underline-offset: 0.8mm;
   }
 
   .print-music-details {
@@ -284,12 +292,25 @@ button {
   }
 
   .print-beat-table tbody td {
-    height: 10mm;
+    height: 12mm;
     padding: 1mm 0.6mm;
     background: #fff;
     font-family: Georgia, "Times New Roman", serif;
-    font-size: clamp(5.5pt, calc(100pt / var(--beat-columns)), 9pt);
+    font-size: clamp(9pt, calc(160pt / var(--beat-columns)), 12pt);
     font-weight: 600;
+  }
+
+  .print-beat-table .print-comment-row td {
+    height: auto;
+    padding: 1.6mm 2.2mm;
+    border-right: 0;
+    background: #f4f5f4;
+    color: #59615c;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 8pt;
+    font-style: italic;
+    font-weight: 500;
+    text-align: left;
   }
 
   .print-beat-table .print-row-label {
@@ -323,7 +344,38 @@ button {
     display: flex;
     align-items: center;
     justify-content: space-evenly;
-    gap: 0.7mm;
+    gap: 0.5mm 0.8mm;
+    line-height: 1.1;
+  }
+
+  .print-note-group-nowrap {
+    flex-wrap: nowrap;
+    gap: 0.25mm;
+    white-space: nowrap;
+  }
+
+  .print-note-group-wrap {
+    flex-wrap: wrap;
+  }
+
+  .print-note-count-3 {
+    font-size: 0.92em;
+  }
+
+  .print-note-count-4 {
+    font-size: 0.82em;
+  }
+
+  .print-note-count-5 {
+    font-size: 0.72em;
+  }
+
+  .print-note-count-6 {
+    font-size: 0.64em;
+  }
+
+  .print-note-group > span {
+    white-space: nowrap;
   }
 
   .print-sustain {

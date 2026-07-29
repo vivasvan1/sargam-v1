@@ -13,11 +13,11 @@ export interface PrintNotationRow {
   voice: string;
   cycle: number;
   beats: PrintBeatCell[];
+  comments: string[];
 }
 
 export interface PrintMusicLayout {
   beatCount: number;
-  comments: string[];
   directives: Record<string, string>;
   rows: PrintNotationRow[];
 }
@@ -140,11 +140,6 @@ export function buildPrintMusicLayout(
 ): PrintMusicLayout {
   const lines = Array.isArray(source) ? source : source.split('\n');
   const parsed = parseMusicCell(lines);
-  const comments = Object.values(parsed.voices)
-    .flatMap((voice) => voice.events)
-    .filter((event) => event.type === 'comment')
-    .map((event) => event.text.replace(/^(#|\/\/)\s*/, '').trim())
-    .filter(Boolean);
 
   const inferredBeatCount = Math.max(
     1,
@@ -157,9 +152,19 @@ export function buildPrintMusicLayout(
 
   for (const voice of Object.values(parsed.voices)) {
     const voiceRows = new Map<number, PrintBeatCell[]>();
+    const voiceComments = new Map<number, string[]>();
     let currentBeat = 0;
 
     for (const event of voice.events) {
+      if (event.type === 'comment') {
+        const cycle = Math.floor((currentBeat + EPSILON) / beatCount);
+        const text = event.text.replace(/^(#|\/\/)\s*/, '').trim();
+        if (text) {
+          voiceComments.set(cycle, [...(voiceComments.get(cycle) || []), text]);
+        }
+        continue;
+      }
+
       if (event.type === 'bar') {
         if (event.double) {
           // A double bar closes the phrase. Pad to the end of the current
@@ -198,20 +203,24 @@ export function buildPrintMusicLayout(
       );
     }
 
-    for (const [cycle, beats] of [...voiceRows.entries()].sort(
-      ([a], [b]) => a - b
-    )) {
+    const cycles = [
+      ...new Set([...voiceRows.keys(), ...voiceComments.keys()]),
+    ].sort((a, b) => a - b);
+
+    for (const cycle of cycles) {
       rows.push({
         voice: voice.name,
         cycle: cycle + 1,
-        beats,
+        beats:
+          voiceRows.get(cycle) ||
+          Array.from({ length: beatCount }, () => ({ entries: [] })),
+        comments: voiceComments.get(cycle) || [],
       });
     }
   }
 
   return {
     beatCount,
-    comments: [...new Set(comments)],
     directives: parsed.directives,
     rows,
   };
