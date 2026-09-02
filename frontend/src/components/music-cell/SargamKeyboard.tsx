@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef } from 'react';
 import { CornerDownLeftIcon, DeleteIcon, Keyboard, Minimize, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -18,7 +19,7 @@ interface SargamKeyboardProps {
   durationKeys: SargamKeyboardKey[];
   specialKeys?: SargamKeyboardKey[];
   onInsert: (value: string) => void;
-  onDelete: () => void;
+  onDelete: () => boolean | void;
   onSave: () => void;
   onMinimize: () => void;
   onShow: () => void;
@@ -50,6 +51,116 @@ function KeyboardKey({
       </TooltipTrigger>
       <TooltipContent side="top">{keyConfig.tooltip}</TooltipContent>
     </Tooltip>
+  );
+}
+
+function BackspaceButton({
+  onDelete,
+  className = '',
+}: {
+  onDelete: () => boolean | void;
+  className?: string;
+}) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const didDeleteOnPointerRef = useRef(false);
+  const onDeleteRef = useRef(onDelete);
+  onDeleteRef.current = onDelete;
+
+  const stopDeleting = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleBlur = () => stopDeleting();
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      stopDeleting();
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [stopDeleting]);
+
+  const startDeleting = useCallback(() => {
+    stopDeleting();
+    didDeleteOnPointerRef.current = true;
+
+    // Delete once immediately on press
+    const hasMore = onDeleteRef.current();
+    if (hasMore === false) {
+      return;
+    }
+
+    let repeatCount = 0;
+
+    const runInterval = (speed: number) => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(() => {
+        repeatCount++;
+        const canContinue = onDeleteRef.current();
+        if (canContinue === false) {
+          stopDeleting();
+          return;
+        }
+        // Accelerate deletion speed as the key is held longer
+        if (repeatCount === 10) {
+          runInterval(40);
+        } else if (repeatCount === 25) {
+          runInterval(25);
+        }
+      }, speed);
+    };
+
+    timerRef.current = setTimeout(() => {
+      runInterval(70);
+    }, 400);
+  }, [stopDeleting]);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    startDeleting();
+
+    const handleGlobalPointerUp = () => {
+      stopDeleting();
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerUp);
+    };
+
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
+  };
+
+  const handleClick = () => {
+    if (didDeleteOnPointerRef.current) {
+      didDeleteOnPointerRef.current = false;
+      return;
+    }
+    onDeleteRef.current();
+  };
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onPointerDown={handlePointerDown}
+      onPointerUp={stopDeleting}
+      onPointerCancel={stopDeleting}
+      onPointerLeave={stopDeleting}
+      onContextMenu={(e) => e.preventDefault()}
+      onClick={handleClick}
+      className={`min-w-24 select-none touch-manipulation ${className}`}
+      aria-label="Delete"
+    >
+      <DeleteIcon className="w-4 h-4" />
+    </Button>
   );
 }
 
@@ -109,16 +220,7 @@ export function SargamKeyboard({
             >
               <Minimize className="w-4 h-4" />
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={onDelete}
-              className="min-w-24"
-            >
-              <DeleteIcon className="w-4 h-4" />
-            </Button>
+            <BackspaceButton onDelete={onDelete} />
           </div>
         </div>
 

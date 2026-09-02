@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import * as Tone from 'tone';
 import { toast } from 'sonner';
 import { parseMusicCell } from '../utils/sargam_parser';
@@ -93,12 +93,19 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     setLocalShowCode(showCode);
   }, [showCode]);
 
+  const editorValueRef = useRef(editorValue);
+  useEffect(() => {
+    editorValueRef.current = editorValue;
+  }, [editorValue]);
+
   useEffect(() => {
     setEditorValue(content);
     setSavedContent(content);
+    editorValueRef.current = content;
   }, [content]);
 
   const handleChange = (val: string) => {
+    editorValueRef.current = val;
     setEditorValue(val);
   };
 
@@ -124,108 +131,75 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const insertAtCursor = (text: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setEditorValue((prev) => prev + text);
+      setEditorValue((prev) => {
+        const next = prev + text;
+        editorValueRef.current = next;
+        return next;
+      });
       return;
     }
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const nextValue = editorValue.slice(0, start) + text + editorValue.slice(end);
+    const currentVal = editorValueRef.current;
+    let start = textarea.selectionStart ?? currentVal.length;
+    let end = textarea.selectionEnd ?? currentVal.length;
+    if (start > currentVal.length) start = currentVal.length;
+    if (end > currentVal.length) end = currentVal.length;
+
+    const nextValue = currentVal.slice(0, start) + text + currentVal.slice(end);
     const nextCursor = start + text.length;
 
+    editorValueRef.current = nextValue;
     setEditorValue(nextValue);
-    requestAnimationFrame(() => {
-      if (!isMobile) textarea.focus();
-      textarea.setSelectionRange(nextCursor, nextCursor);
-    });
+    textarea.value = nextValue;
+    textarea.setSelectionRange(nextCursor, nextCursor);
+    if (!isMobile && document.activeElement !== textarea) {
+      textarea.focus();
+    }
   };
 
-  const deleteAtCursor = () => {
+  const deleteAtCursor = useCallback((): boolean => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setEditorValue((prev) => prev.slice(0, -1));
-      return;
+      const current = editorValueRef.current;
+      if (current.length === 0) return false;
+      const nextValue = current.slice(0, -1);
+      editorValueRef.current = nextValue;
+      setEditorValue(nextValue);
+      return nextValue.length > 0;
     }
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
+    const currentVal = editorValueRef.current;
+    let start = textarea.selectionStart ?? currentVal.length;
+    let end = textarea.selectionEnd ?? currentVal.length;
+
+    if (start > currentVal.length) start = currentVal.length;
+    if (end > currentVal.length) end = currentVal.length;
 
     if (start !== end) {
-      const nextValue = editorValue.slice(0, start) + editorValue.slice(end);
+      const nextValue = currentVal.slice(0, start) + currentVal.slice(end);
+      editorValueRef.current = nextValue;
       setEditorValue(nextValue);
-      requestAnimationFrame(() => textarea.setSelectionRange(start, start));
-      return;
+      textarea.value = nextValue;
+      textarea.setSelectionRange(start, start);
+      if (!isMobile && document.activeElement !== textarea) {
+        textarea.focus();
+      }
+      return start > 0;
     }
 
-    if (start === 0) return;
+    if (start === 0) return false;
 
     const nextCursor = start - 1;
-    const nextValue = editorValue.slice(0, nextCursor) + editorValue.slice(start);
+    const nextValue = currentVal.slice(0, nextCursor) + currentVal.slice(start);
+    editorValueRef.current = nextValue;
     setEditorValue(nextValue);
-    requestAnimationFrame(() => textarea.setSelectionRange(nextCursor, nextCursor));
-  };
-
-  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const deleteIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' && localShowCode) {
-        e.preventDefault();
-        if (deleteTimerRef.current) return;
-        deleteTimerRef.current = setTimeout(() => {
-          deleteTimerRef.current = null;
-          deleteAtCursor();
-          deleteIntervalRef.current = setInterval(() => {
-            deleteAtCursor();
-          }, 70);
-        }, 700);
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Delete') {
-        e.preventDefault();
-        if (deleteTimerRef.current) {
-          clearTimeout(deleteTimerRef.current);
-          deleteTimerRef.current = null;
-        }
-        if (deleteIntervalRef.current) {
-          clearInterval(deleteIntervalRef.current);
-          deleteIntervalRef.current = null;
-        }
-      }
-    };
-
-    const handleBlur = () => {
-      if (deleteTimerRef.current) {
-        clearTimeout(deleteTimerRef.current);
-        deleteTimerRef.current = null;
-      }
-      if (deleteIntervalRef.current) {
-        clearInterval(deleteIntervalRef.current);
-        deleteIntervalRef.current = null;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    textareaRef.current?.addEventListener('blur', handleBlur);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      textareaRef.current?.removeEventListener('blur', handleBlur);
-      if (deleteTimerRef.current) {
-        clearTimeout(deleteTimerRef.current);
-        deleteTimerRef.current = null;
-      }
-      if (deleteIntervalRef.current) {
-        clearInterval(deleteIntervalRef.current);
-        deleteIntervalRef.current = null;
-      }
-    };
-  }, [localShowCode, deleteAtCursor]);
+    textarea.value = nextValue;
+    textarea.setSelectionRange(nextCursor, nextCursor);
+    if (!isMobile && document.activeElement !== textarea) {
+      textarea.focus();
+    }
+    return nextCursor > 0;
+  }, [isMobile]);
 
   const notationKeys = [
     { tooltip: 'sa', label: 'S', value: 'S' },
@@ -952,6 +926,24 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 isChingari && chikariSynth && isTonalInstrument(chikariSynth)
                   ? chikariSynth
                   : synth;
+
+              // Debug: print what frequency each swara resolves to, and which
+              // sampler note Tone.js will map it to (nearest sample + pitch shift)
+              frequencies.forEach((f) => {
+                try {
+                  const freqObj = Tone.Frequency(f);
+                  console.log(
+                    `[vocal-debug] voice=${voiceName} inst=${volControl.instrument} ` +
+                      `swara=${event.swara}${event.variant ?? ''}${event.octave > 0 ? "'".repeat(event.octave) : event.octave < 0 ? ",".repeat(-event.octave) : ""} ` +
+                      `SA=${SA_FREQ.toFixed(2)}Hz freq=${f.toFixed(2)}Hz ` +
+                      `note=${freqObj.toNote()} midi=${freqObj.toMidi()}`
+                  );
+                } catch {
+                  console.log(
+                    `[vocal-debug] voice=${voiceName} swara=${event.swara} freq=${f}`
+                  );
+                }
+              });
 
               Tone.getTransport().schedule((t) => {
                 const currentBeatDur = 60 / Tone.getTransport().bpm.value;
