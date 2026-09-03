@@ -197,7 +197,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
 
   return (
     <ScrollArea ref={scrollRootRef} className="flex-1 overflow-hidden h-full">
-      <div className="max-w-5xl mx-auto py-6 md:py-12 px-4 md:px-8 w-full min-w-0">
+      <div className="mx-auto py-6 md:py-12 px-4 md:px-12 w-full min-w-0">
         {/* <GoogleAd slot="top-banner" /> */}
         <div className="w-full min-w-0">
           {notebook.cells.map((cell, idx) => (
