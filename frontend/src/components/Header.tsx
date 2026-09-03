@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import {
-  FileMusic,
   Pencil,
   Cloud,
   MoreHorizontal,
   Download,
   Printer,
-  X,
   Share2,
 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -72,6 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="h-10 border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-2">
+      <div className='flex items-center gap-2 md:gap-5 w-full'>
       <SidebarTrigger
         variant="outline"
         className="-ml-1 size-7 md:size-7 [&_svg]:size-5 md:[&_svg]:size-4"
@@ -122,6 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
+      </div>
       <div className="flex items-center gap-2 md:gap-3">
         {googleDriveConnected && currentFileId && (
           <span className="text-xs text-muted-foreground flex items-center gap-1">
