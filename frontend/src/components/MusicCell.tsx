@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import * as Tone from 'tone';
 import { toast } from 'sonner';
 import { parseMusicCell } from '../utils/sargam_parser';
@@ -55,6 +55,40 @@ const beatsToTime = (beats: number) => {
 const LOOP_BOUNDARY_EPSILON_BEATS = 0.001;
 const beatsToScheduledTime = (beats: number) =>
   beatsToTime(beats + LOOP_BOUNDARY_EPSILON_BEATS);
+
+const NOTATION_KEYS: SargamKeyboardKey[] = [
+  { tooltip: 'sa', label: 'S', value: 'S' },
+  { tooltip: 're (komal)', label: 'r', value: 'r' },
+  { tooltip: 're', label: 'R', value: 'R' },
+  { tooltip: 'ga (komal)', label: 'g', value: 'g' },
+  { tooltip: 'ga', label: 'G', value: 'G' },
+  { tooltip: 'ma', label: 'M', value: 'M' },
+  { tooltip: 'ma (tivra)', label: 'Mt', value: 'Mt' },
+  { tooltip: 'pa', label: 'P', value: 'P' },
+  { tooltip: 'dha (komal)', label: 'd', value: 'd' },
+  { tooltip: 'dha', label: 'D', value: 'D' },
+  { tooltip: 'ni (komal)', label: 'n', value: 'n' },
+  { tooltip: 'ni', label: 'N', value: 'N' },
+];
+
+const OCTAVE_KEYS: SargamKeyboardKey[] = [
+  { tooltip: 'lower octave', label: ',', value: ',' },
+  { tooltip: 'upper octave', label: "'", value: "'" },
+];
+
+const DURATION_KEYS: SargamKeyboardKey[] = [
+  { tooltip: 'quarter note', label: ': 0.25', value: ':0.25 ' },
+  { tooltip: 'half note', label: ': 0.5', value: ':0.5 ' },
+  { tooltip: 'whole note', label: ': 1', value: ':1 ' },
+  { tooltip: '|', label: '|', value: '| ' },
+  { tooltip: '||', label: '||', value: '|| \n' },
+];
+
+const SPECIAL_KEYS: SargamKeyboardKey[] = [
+  { tooltip: 'chinkari', label: '^', value: '^' },
+  { tooltip: 'skip note', label: '/', value: '/' },
+  { tooltip: 'silence', label: '.', value: '.' },
+];
 
 export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const content = Array.isArray(cell.source) ? cell.source.join('\n') : cell.source;
@@ -123,12 +157,12 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     }, 0);
   };
 
-  const handleSave = () => {
-    setSavedContent(editorValue);
-    onChange({ ...cell, source: editorValue.split('\n') });
-  };
+  const handleSave = useCallback(() => {
+    setSavedContent(editorValueRef.current);
+    onChange({ ...cell, source: editorValueRef.current.split('\n') });
+  }, [cell, onChange]);
 
-  const insertAtCursor = (text: string) => {
+  const insertAtCursor = useCallback((text: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
       setEditorValue((prev) => {
@@ -155,7 +189,33 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     if (!isMobile && document.activeElement !== textarea) {
       textarea.focus();
     }
-  };
+  }, [isMobile]);
+
+  const onToggleMixer = useCallback(() => setShowMixer((prev) => !prev), []);
+  const onToggleVisualizer = useCallback(() => setLocalShowVisualizer((prev) => !prev), []);
+  const onToggleCode = useCallback(() => setLocalShowCode((prev) => !prev), []);
+  const onToggleLoop = useCallback(() => setIsLooping((prev) => !prev), []);
+  const handleMinimizeKeyboard = useCallback(() => setKeyboardMinimized(true), []);
+  const handleShowKeyboard = useCallback(() => setKeyboardMinimized(false), []);
+  const handleShowNormalKeyboard = useCallback(() => {
+    setKeyboardMinimized(true);
+    setUseNormalKeyboard(true);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
+
+  const adjustHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    if (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('field-sizing', 'content')) {
+      return;
+    }
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.max(160, textarea.scrollHeight)}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    adjustHeight();
+  }, [editorValue, adjustHeight]);
 
   const deleteAtCursor = useCallback((): boolean => {
     const textarea = textareaRef.current;
@@ -200,40 +260,6 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     }
     return nextCursor > 0;
   }, [isMobile]);
-
-  const notationKeys = [
-    { tooltip: 'sa', label: 'S', value: 'S' },
-    { tooltip: 're (komal)', label: 'r', value: 'r' },
-    { tooltip: 're', label: 'R', value: 'R' },
-    { tooltip: 'ga (komal)', label: 'g', value: 'g' },
-    { tooltip: 'ga', label: 'G', value: 'G' },
-    { tooltip: 'ma', label: 'M', value: 'M' },
-    { tooltip: 'ma (tivra)', label: 'Mt', value: 'Mt' },
-    { tooltip: 'pa', label: 'P', value: 'P' },
-    { tooltip: 'dha (komal)', label: 'd', value: 'd' },
-    { tooltip: 'dha', label: 'D', value: 'D' },
-    { tooltip: 'ni (komal)', label: 'n', value: 'n' },
-    { tooltip: 'ni', label: 'N', value: 'N' },
-  ];
-
-  const octaveKeys = [
-    { tooltip: 'lower octave', label: ',', value: ',' },
-    { tooltip: 'upper octave', label: "'", value: "'" },
-  ];
-
-  const durationKeys = [
-    { tooltip: 'quarter note', label: ': 0.25', value: ':0.25 ' },
-    { tooltip: 'half note', label: ': 0.5', value: ':0.5 ' },
-    { tooltip: 'whole note', label: ': 1', value: ':1 ' },
-    { tooltip: '|', label: '|', value: '| ' },
-    { tooltip: '||', label: '||', value: '|| \n' },
-  ];
-
-  const specialKeys: SargamKeyboardKey[] = [
-    { tooltip: 'chinkari', label: '^', value: '^' },
-    { tooltip: 'skip note', label: '/', value: '/' },
-    { tooltip: 'silence', label: '.', value: '.' },
-  ];
 
   const hasUnsavedChanges = editorValue !== savedContent;
 
@@ -572,7 +598,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
     // Clean up previous
     Object.entries(activeNodesRef.current).forEach(
-      ([_vName, { synth, volumeNode, part, chikariSynth, chikariVolumeNode }]) => {
+      ([_vName, { synth, volumeNode, part, chikariVolumeNode }]) => {
         try {
           if (part) part.dispose();
           if (isRhythmicInstrument(synth)) {
@@ -1017,11 +1043,11 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
         isPlaying={isPlaying}
         onPlay={onPlayButtonClick}
         mixerOpen={showMixer}
-        onToggleMixer={() => setShowMixer(!showMixer)}
+        onToggleMixer={onToggleMixer}
         showVisualizer={localShowVisualizer}
-        onToggleVisualizer={() => setLocalShowVisualizer(!localShowVisualizer)}
+        onToggleVisualizer={onToggleVisualizer}
         showCode={localShowCode}
-        onToggleCode={() => setLocalShowCode(!localShowCode)}
+        onToggleCode={onToggleCode}
         mixerContent={
           <Mixer
             show={showMixer}
@@ -1032,47 +1058,40 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
           />
         }
       />
-      <div className="p-2 max-w-full">
-        <div className="min-w-0">
-          <div
-            className={
-              localShowCode ? '' : 'hidden'
-            }
-          >
-            <div className="relative">
-              <textarea
-                ref={textareaRef}
-                value={editorValue}
-                onChange={(e) => handleChange(e.target.value)}
-                onFocus={handleEditorFocus}
-                onBlur={handleEditorBlur}
-                inputMode={isMobile && !useNormalKeyboard ? 'none' : undefined}
-                spellCheck={false}
-                className="w-full resize-none overflow-hidden rounded-md border border-border bg-background/70 px-3 py-2 pb-12 text-base md:text-sm font-mono text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                style={{
-                  height: `${textareaRef.current?.scrollHeight || 400}px`,
-                }}
-              />
-              {localShowCode && hasUnsavedChanges && (
-                <>
-                  <Button
-                    size={'sm'}
-                    onClick={handleSave}
-                    className="absolute top-3 right-3"
-                  >
-                    <Save className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size={'sm'}
-                    onClick={handleSave}
-                    className="absolute bottom-3 right-3"
-                  >
-                    <Save className="w-4 h-4" />
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
+      <div
+        className={
+          localShowCode ? '' : 'hidden'
+        }
+      >
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={editorValue}
+            onChange={(e) => handleChange(e.target.value)}
+            onFocus={handleEditorFocus}
+            onBlur={handleEditorBlur}
+            inputMode={isMobile && !useNormalKeyboard ? 'none' : undefined}
+            spellCheck={false}
+            className="w-full resize-none overflow-hidden rounded-md border border-border bg-background px-3 py-2 pb-12 text-base md:text-sm font-mono text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50 min-h-[160px] [field-sizing:content]"
+          />
+          {localShowCode && hasUnsavedChanges && (
+            <>
+              <Button
+                size={'sm'}
+                onClick={handleSave}
+                className="absolute top-3 right-3"
+              >
+                <Save className="w-4 h-4" />
+              </Button>
+              <Button
+                size={'sm'}
+                onClick={handleSave}
+                className="absolute bottom-3 right-3"
+              >
+                <Save className="w-4 h-4" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
       <SargamKeyboard
@@ -1080,20 +1099,16 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
         minimized={keyboardMinimized}
         isMobile={isMobile}
         hasUnsavedChanges={hasUnsavedChanges}
-        notationKeys={notationKeys}
-        octaveKeys={octaveKeys}
-        durationKeys={durationKeys}
-        specialKeys={specialKeys}
+        notationKeys={NOTATION_KEYS}
+        octaveKeys={OCTAVE_KEYS}
+        durationKeys={DURATION_KEYS}
+        specialKeys={SPECIAL_KEYS}
         onInsert={insertAtCursor}
         onDelete={deleteAtCursor}
         onSave={handleSave}
-        onMinimize={() => setKeyboardMinimized(true)}
-        onShow={() => setKeyboardMinimized(false)}
-        onShowNormalKeyboard={() => {
-          setKeyboardMinimized(true);
-          setUseNormalKeyboard(true);
-          requestAnimationFrame(() => textareaRef.current?.focus());
-        }}
+        onMinimize={handleMinimizeKeyboard}
+        onShow={handleShowKeyboard}
+        onShowNormalKeyboard={handleShowNormalKeyboard}
       />
       {(localShowVisualizer || (isPlaying && lastParsedData)) && bpm && (
         <div className="px-3 md:px-4 pb-4 overflow-x-auto max-w-full">
@@ -1107,7 +1122,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
               bpm={bpm}
               setBpm={setBpm}
               isLooping={isLooping}
-              onToggleLoop={() => setIsLooping(!isLooping)}
+              onToggleLoop={onToggleLoop}
             />
           </div>
         </div>

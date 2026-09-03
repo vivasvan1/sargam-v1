@@ -1,13 +1,5 @@
 import React from 'react';
-import {
-  Play,
-  Square,
-  Settings2,
-  Eye,
-  EyeOff,
-  Code2,
-  Pause,
-} from 'lucide-react';
+import { Play, Square, Settings2, Eye, EyeOff, Code2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 
@@ -23,7 +15,7 @@ interface ControlsProps {
   onToggleCode?: () => void;
 }
 
-export function Controls({
+export const Controls = React.memo(function Controls({
   isPlaying,
   onPlay,
   mixerOpen,
@@ -112,4 +104,4 @@ export function Controls({
       </div>
     </div>
   );
-}
+});

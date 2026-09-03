@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback, memo } from 'react';
 import * as Tone from 'tone';
 import type { MusicCell as ParsedMusicCell } from '../utils/sargam_parser';
 import { VisualizerHeader } from './visualizer/VisualizerHeader';
@@ -34,7 +34,7 @@ interface VoiceData {
   beatCount: number;
 }
 
-export function MusicVisualizer({
+export const MusicVisualizer = memo(function MusicVisualizer({
   parsedData,
   isPlaying,
   onPlay,
@@ -424,4 +424,4 @@ export function MusicVisualizer({
       </div>
     </div>
   );
-}
+});
