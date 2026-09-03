@@ -34,12 +34,14 @@ interface VisualizerBeatNumbersProps {
   beatCount: number;
   beatWidth: number;
   zoomLevel: number;
+  startBeatNumber?: number;
 }
 
 export const VisualizerBeatNumbers = memo(function VisualizerBeatNumbers({
   beatCount,
   beatWidth,
   zoomLevel,
+  startBeatNumber = 1,
 }: VisualizerBeatNumbersProps) {
   if (beatCount <= 0) return null;
 
@@ -63,7 +65,7 @@ export const VisualizerBeatNumbers = memo(function VisualizerBeatNumbers({
                   : 'text-sm'
           }`}
         >
-          {bIdx + 1}
+          {startBeatNumber + bIdx}
         </div>
       ))}
     </div>

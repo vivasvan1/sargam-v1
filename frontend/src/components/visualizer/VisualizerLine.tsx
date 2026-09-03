@@ -25,6 +25,8 @@ interface VisualizerLineProps {
   onSeek?: (time: number) => void;
   playheadRef?: React.RefObject<HTMLDivElement | null>;
   zoomLevel: number;
+  startBeatNumber?: number;
+  showBeatNumbers?: boolean;
 }
 
 export const VisualizerLine = memo(function VisualizerLine({
@@ -39,6 +41,8 @@ export const VisualizerLine = memo(function VisualizerLine({
   onSeek,
   playheadRef,
   zoomLevel,
+  startBeatNumber = 1,
+  showBeatNumbers = false,
 }: VisualizerLineProps) {
   const isCommentLine = line.events.some((e) => e.type === 'comment');
   const isPreviousCommentLine = previousLine?.events.some(
@@ -68,9 +72,10 @@ export const VisualizerLine = memo(function VisualizerLine({
   const totalBeatsInLine = Math.ceil(line.duration / beatDur);
   const lineWidth = (beatCount || totalBeatsInLine || 4) * beatWidth;
   return (
-    <>
-      {isPreviousCommentLine && (
+    <div className={cn('flex flex-col', showBeatNumbers ? 'mb-5' : '')}>
+      {(showBeatNumbers || isPreviousCommentLine) && (
         <VisualizerBeatNumbers
+          startBeatNumber={startBeatNumber}
           beatCount={beatCount}
           beatWidth={beatWidth}
           zoomLevel={zoomLevel}
@@ -131,6 +136,6 @@ export const VisualizerLine = memo(function VisualizerLine({
           />
         )}
       </div>
-    </>
+    </div>
   );
 });

@@ -190,7 +190,90 @@ export function parseMusicCell(lines: string[]): MusicCell {
     }
   }
 
+  // Auto add skip note at the end if the last line of any voice is less than total taal
+  const totalTaal = extractTalaBeats(directives);
+  if (totalTaal && totalTaal > 0) {
+    for (const voice of Object.values(voices)) {
+      // Find the last line that has non-comment events
+      let lastLineIndex: number | null = null;
+      for (let j = voice.events.length - 1; j >= 0; j--) {
+        const ev = voice.events[j];
+        if (ev.type !== 'comment' && ev.line_index !== undefined) {
+          lastLineIndex = ev.line_index;
+          break;
+        }
+      }
+
+      if (lastLineIndex === null) continue;
+
+      // Find the last event belonging to this last line
+      let lastEventIndex = -1;
+      for (let j = voice.events.length - 1; j >= 0; j--) {
+        if (voice.events[j].line_index === lastLineIndex) {
+          lastEventIndex = j;
+          break;
+        }
+      }
+
+      if (lastEventIndex === -1) continue;
+
+      // Calculate total duration of the last line
+      let lastLineDuration = 0;
+      for (const ev of voice.events) {
+        if (ev.line_index === lastLineIndex) {
+          if ('duration' in ev && typeof (ev as any).duration === 'number') {
+            lastLineDuration += (ev as any).duration;
+          }
+        }
+      }
+
+      const rem = lastLineDuration % totalTaal;
+      if (lastLineDuration > 0 && rem > 0.0001 && rem < totalTaal - 0.0001) {
+        const skipDuration = Math.round((totalTaal - rem) * 10000) / 10000;
+        if (skipDuration > 0) {
+          const skipEvent: SkipEvent = {
+            type: 'skip',
+            duration: skipDuration,
+            line_index: lastLineIndex,
+          };
+
+          const lastEv = voice.events[lastEventIndex];
+          if (lastEv.type === 'bar' && lastEv.double) {
+            voice.events.splice(lastEventIndex, 0, skipEvent);
+          } else {
+            voice.events.splice(lastEventIndex + 1, 0, skipEvent);
+          }
+        }
+      }
+    }
+  }
+
   return { directives, voices };
+}
+
+export function extractTalaBeats(
+  directives: Record<string, string>
+): number | null {
+  const talaStr =
+    directives.tala ||
+    directives.taal ||
+    directives.beats ||
+    directives.beat;
+  if (!talaStr) return null;
+
+  const parenMatch = talaStr.match(/\((\d+(?:\.\d+)?)\)/);
+  if (parenMatch) {
+    const val = parseFloat(parenMatch[1]);
+    if (!isNaN(val) && val > 0) return val;
+  }
+
+  const numMatch = talaStr.match(/\b(\d+(?:\.\d+)?)\b/);
+  if (numMatch) {
+    const val = parseFloat(numMatch[1]);
+    if (!isNaN(val) && val > 0) return val;
+  }
+
+  return null;
 }
 
 export function parseToken(
