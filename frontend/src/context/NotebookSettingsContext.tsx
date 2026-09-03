@@ -17,6 +17,8 @@ interface NotebookSettingsContextType {
   toggleAutoSave: () => void;
   language: 'en' | 'hi';
   setLanguage: (lang: 'en' | 'hi') => void;
+  globalZoomLevel: number;
+  setGlobalZoomLevel: (zoom: number | ((prev: number) => number)) => void;
 }
 
 const NotebookSettingsContext = createContext<
@@ -43,11 +45,27 @@ export function NotebookSettingsProvider({
     const saved = localStorage.getItem('sargam-language');
     return (saved as 'en' | 'hi') || 'en';
   });
+  const [globalZoomLevel, setGlobalZoomLevelState] = useState<number>(() => {
+    const saved = localStorage.getItem('sargam-global-zoom');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed) && parsed >= 0.5 && parsed <= 3) {
+        return parsed;
+      }
+    }
+    return 1;
+  });
 
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'sargam-language') {
         setLanguage((e.newValue as 'en' | 'hi') || 'en');
+      }
+      if (e.key === 'sargam-global-zoom' && e.newValue) {
+        const parsed = parseFloat(e.newValue);
+        if (!isNaN(parsed) && parsed >= 0.5 && parsed <= 3) {
+          setGlobalZoomLevelState(parsed);
+        }
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -67,6 +85,15 @@ export function NotebookSettingsProvider({
   const updateLanguage = (newLang: 'en' | 'hi') => {
     setLanguage(newLang);
     localStorage.setItem('sargam-language', newLang);
+  };
+
+  const setGlobalZoomLevel = (zoom: number | ((prev: number) => number)) => {
+    setGlobalZoomLevelState((prev) => {
+      const next = typeof zoom === 'function' ? zoom(prev) : zoom;
+      const clamped = Math.min(3, Math.max(0.5, Math.round(next * 100) / 100));
+      localStorage.setItem('sargam-global-zoom', String(clamped));
+      return clamped;
+    });
   };
 
   const updateDefaultInstrument = (voiceName: string, instrumentId: string) => {
@@ -89,6 +116,8 @@ export function NotebookSettingsProvider({
         toggleAutoSave,
         language,
         setLanguage: updateLanguage,
+        globalZoomLevel,
+        setGlobalZoomLevel,
       }}
     >
       {children}

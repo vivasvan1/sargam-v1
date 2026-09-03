@@ -71,13 +71,13 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-14 md:h-16 border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-2">
+    <header className="h-10 border-b border-border bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 shrink-0 shadow-sm gap-2">
       <SidebarTrigger
         variant="outline"
-        className="-ml-2 size-10 md:size-7 [&_svg]:size-5 md:[&_svg]:size-4"
+        className="-ml-1 size-7 md:size-7 [&_svg]:size-5 md:[&_svg]:size-4"
       />
 
-      <div className="max-w-4xl flex items-center gap-2 md:gap-4 flex-1 min-w-0">
+      <div className="max-w-4xl flex items-center gap-2 md:gap-4 flex-1 min-w-0 pl-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 group">
             {isEditingTitle && !isReadOnly ? (
@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
               <>
                 <h3
                   onDoubleClick={() => !isReadOnly && setIsEditingTitle(true)}
-                  className={`font-bold text-base md:text-xl truncate transition-colors ${!isReadOnly ? 'cursor-text hover:text-primary' : ''}`}
+                  className={`font-bold text-base md:text-base truncate transition-colors ${!isReadOnly ? 'cursor-text hover:text-primary' : ''}`}
                 >
                   {title || 'Untitled Notebook'}
                 </h3>
@@ -112,11 +112,13 @@ export const Header: React.FC<HeaderProps> = ({
               </>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-muted-foreground font-mono truncate hidden md:block">
-              {filePath}
-            </p>
-          </div>
+          {isEditingTitle && !isReadOnly && (
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground font-mono truncate hidden md:block">
+                {filePath}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -159,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
           <Button
             onClick={handleShare}
             variant="default"
-            size="default"
+            size="xs"
             title="Copy shareable link"
           >
             <Share2 className="w-5 h-5" />
@@ -172,11 +174,7 @@ export const Header: React.FC<HeaderProps> = ({
               <MoreHorizontal className="w-5 h-5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="min-w-[180px]"
-            sideOffset={5}
-            align="end"
-          >
+          <DropdownMenuContent className="min-w-[180px]" sideOffset={5} align="end">
             {googleDriveConnected && !isReadOnly && (
               <DropdownMenuItem
                 onClick={onSaveToDrive}
@@ -207,12 +205,8 @@ export const Header: React.FC<HeaderProps> = ({
                   value={language}
                   onValueChange={(val) => setLanguage(val as 'en' | 'hi')}
                 >
-                  <DropdownMenuRadioItem value="en">
-                    English
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="hi">
-                    Hindi
-                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="hi">Hindi</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>

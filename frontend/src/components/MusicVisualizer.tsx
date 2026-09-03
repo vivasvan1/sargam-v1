@@ -5,6 +5,7 @@ import { VisualizerHeader } from './visualizer/VisualizerHeader';
 import { VisualizerBeatNumbers } from './visualizer/VisualizerGrid';
 import { VisualizerLine } from './visualizer/VisualizerLine';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useNotebookSettings } from '../context/NotebookSettingsContext';
 
 interface MusicVisualizerProps {
   parsedData: ParsedMusicCell | null;
@@ -191,7 +192,12 @@ export const MusicVisualizer = memo(function MusicVisualizer({
   const [containerWidth, setContainerWidth] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth : 0
   );
-  const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
+  const { globalZoomLevel } = useNotebookSettings();
+  const [zoomLevel, setZoomLevel] = useState(globalZoomLevel);
+
+  useEffect(() => {
+    setZoomLevel(globalZoomLevel);
+  }, [globalZoomLevel]);
 
   const displayLines = useMemo<DisplayLineData[]>(() => {
     if (!voiceData) return [];

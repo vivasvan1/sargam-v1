@@ -3,15 +3,21 @@ import {
   MenubarContent,
   MenubarItem,
   MenubarMenu,
+  MenubarRadioGroup,
+  MenubarRadioItem,
   MenubarSeparator,
   MenubarShortcut,
+  MenubarSub,
+  MenubarSubContent,
+  MenubarSubTrigger,
   MenubarTrigger,
 } from '@/components/ui/menubar';
-import type { Dispatch, SetStateAction } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { ExternalLink, Minus, Pause, Play, Plus } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Button } from './ui/button';
 import { ButtonGroup, ButtonGroupText } from './ui/button-group';
+import { GlobalZoomDialog } from './GlobalZoomDialog';
 
 interface MenuBarProps {
   onNew: () => void;
@@ -86,7 +92,10 @@ export function MenuBar({
     toggleCode,
     autoSaveEnabled,
     toggleAutoSave,
+    globalZoomLevel,
+    setGlobalZoomLevel,
   } = useNotebookSettings();
+  const [isCustomZoomOpen, setIsCustomZoomOpen] = useState(false);
 
   return (
     <div className="flex w-full items-center justify-between gap-2">
@@ -173,6 +182,54 @@ export function MenuBar({
               {isAutoScrolling ? 'Stop' : 'Start'} Auto Scroll{' '}
               <MenubarShortcut>Space</MenubarShortcut>
             </MenubarItem>
+            <MenubarSeparator />
+            <MenubarSub>
+              <MenubarSubTrigger>
+                <span>Set Global Zoom Level</span>
+                <span className="text-muted-foreground ml-auto pl-4 pr-1 text-xs font-mono">
+                  {Math.round(globalZoomLevel * 100)}%
+                </span>
+              </MenubarSubTrigger>
+              <MenubarSubContent>
+                <MenubarItem
+                  onClick={() => setGlobalZoomLevel((z) => Math.min(3, z + 0.25))}
+                  disabled={globalZoomLevel >= 3}
+                >
+                  Zoom In (+25%)
+                </MenubarItem>
+                <MenubarItem
+                  onClick={() => setGlobalZoomLevel((z) => Math.max(0.5, z - 0.25))}
+                  disabled={globalZoomLevel <= 0.5}
+                >
+                  Zoom Out (-25%)
+                </MenubarItem>
+                <MenubarSeparator />
+                <MenubarRadioGroup
+                  value={String(Math.round(globalZoomLevel * 100))}
+                  onValueChange={(val) => setGlobalZoomLevel(Number(val) / 100)}
+                >
+                  <MenubarRadioItem value="50">50%</MenubarRadioItem>
+                  <MenubarRadioItem value="75">75%</MenubarRadioItem>
+                  <MenubarRadioItem value="100">100% (Default)</MenubarRadioItem>
+                  <MenubarRadioItem value="125">125%</MenubarRadioItem>
+                  <MenubarRadioItem value="150">150%</MenubarRadioItem>
+                  <MenubarRadioItem value="175">175%</MenubarRadioItem>
+                  <MenubarRadioItem value="200">200%</MenubarRadioItem>
+                  <MenubarRadioItem value="250">250%</MenubarRadioItem>
+                  <MenubarRadioItem value="300">300%</MenubarRadioItem>
+                </MenubarRadioGroup>
+                <MenubarSeparator />
+                <MenubarItem onClick={() => setIsCustomZoomOpen(true)}>
+                  Custom Zoom...
+                </MenubarItem>
+                <MenubarItem
+                  onClick={() => setGlobalZoomLevel(1)}
+                  disabled={globalZoomLevel === 1}
+                >
+                  Reset to 100%
+                </MenubarItem>
+              </MenubarSubContent>
+            </MenubarSub>
             <MenubarSeparator />
             <MenubarItem onClick={() => setTheme('dark')}>
               Dark Mode
@@ -270,6 +327,11 @@ export function MenuBar({
           <Plus className="size-3.5" />
         </Button>
       </ButtonGroup>
+
+      <GlobalZoomDialog
+        open={isCustomZoomOpen}
+        onOpenChange={setIsCustomZoomOpen}
+      />
     </div>
   );
 }

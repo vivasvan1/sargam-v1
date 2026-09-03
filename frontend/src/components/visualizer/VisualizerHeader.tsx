@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Minus, Plus, Square, Search, Activity, Repeat } from 'lucide-react';
+import { Play, Minus, Plus, Square, Search, Repeat } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -33,7 +33,7 @@ export function VisualizerHeader({
   const scoreTitle = parsedData?.directives.title?.trim() || 'Score';
 
   return (
-    <div className="flex items-start justify-between w-full gap-4 overflow-x-auto custom-scrollbar pb-1">
+    <div className="flex items-start md:items-center justify-between w-full gap-4 overflow-x-auto custom-scrollbar pb-1">
       <div className="space-y-1 shrink-0">
         <div className="flex items-center gap-1">
           <h3 className="text-xss font-bold text-primary/80">{scoreTitle}</h3>
@@ -44,7 +44,7 @@ export function VisualizerHeader({
         </p>
       </div>
 
-      <div className="flex flex-col items-end md:items-end gap-2 md:gap-3 shrink-0">
+      <div className="flex flex-col md:flex-row items-end md:items-center gap-2 shrink-0">
         {/* Mobile Controls - Popovers */}
         <div className="flex md:hidden items-center gap-1.5 shrink-0">
           {/* BPM Popover */}
@@ -178,50 +178,14 @@ export function VisualizerHeader({
           </Popover>
         </div>
 
-        <div className="flex flex-row gap-2 justify-center items-end">
-          {/* Loop Toggle Button */}
-          <Button
-            onClick={onToggleLoop}
-            variant={isLooping ? 'default' : 'outline'}
-            size="sm"
-            className={`rounded-full shrink-0 ${isLooping ? '' : 'border-border/50 bg-muted/30 text-muted-foreground'}`}
-            title={isLooping ? 'Looping enabled' : 'Looping disabled'}
-          >
-            <Repeat className="w-4 h-4" />
-          </Button>
-
-          {/* Play/Stop Button */}
-          <Button
-            onClick={onPlay}
-            variant={'default'}
-            size="sm"
-            className="rounded-full shrink-0 md:w-auto"
-          >
-            {isPlaying ? (
-              <>
-                <Square className="w-3 h-3 fill-current shrink-0 mr-2" />
-                <span className="inline">Stop</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-3 h-3 fill-current shrink-0 mr-2" />
-                <span className="inline">Play</span>
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* Desktop Controls - Hidden on Mobile */}
-        <div className="hidden md:flex gap-5 bg-muted/30 p-2 rounded-xl border border-border/50 shrink-0">
-          {/* Tempo Control */}
-          <div className="flex flex-col gap-1.5 border-r border-border/40 pr-5">
-            <div className="flex items-center gap-1.5 px-1">
-              <Activity className="w-3 h-3 text-muted-foreground" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Tempo
-              </span>
-            </div>
-            <div className="flex items-center gap-1 bg-background/50 p-1 rounded-lg">
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Desktop Controls - Hidden on Mobile */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
+            {/* Tempo Control */}
+            <div
+              className="flex items-center bg-muted/30 border border-border/50 rounded-lg p-0.5 shrink-0"
+              title="Tempo"
+            >
               <Button
                 variant="ghost"
                 size="icon"
@@ -233,6 +197,7 @@ export function VisualizerHeader({
                     return null;
                   });
                 }}
+                title="Decrease tempo"
               >
                 <Minus className="h-3.5 w-3.5" />
               </Button>
@@ -275,21 +240,17 @@ export function VisualizerHeader({
                     return null;
                   });
                 }}
+                title="Increase tempo"
               >
                 <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
-          </div>
 
-          {/* Zoom Control */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-1.5">
-              <Search className="w-3 h-3 text-muted-foreground" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Zoom
-              </span>
-            </div>
-            <div className="flex items-center gap-1 bg-background/50 p-1 rounded-lg">
+            {/* Zoom Control */}
+            <div
+              className="flex items-center bg-muted/30 border border-border/50 rounded-lg p-0.5 shrink-0"
+              title="Zoom"
+            >
               <Button
                 variant="ghost"
                 size="icon"
@@ -315,6 +276,37 @@ export function VisualizerHeader({
               </Button>
             </div>
           </div>
+
+          {/* Loop Toggle Button */}
+          <Button
+            onClick={onToggleLoop}
+            variant={isLooping ? 'default' : 'outline'}
+            size="sm"
+            className={`rounded-full shrink-0 ${isLooping ? '' : 'border-border/50 bg-muted/30 text-muted-foreground'}`}
+            title={isLooping ? 'Looping enabled' : 'Looping disabled'}
+          >
+            <Repeat className="w-4 h-4" />
+          </Button>
+
+          {/* Play/Stop Button */}
+          <Button
+            onClick={onPlay}
+            variant={'default'}
+            size="sm"
+            className="rounded-full shrink-0 md:w-auto"
+          >
+            {isPlaying ? (
+              <>
+                <Square className="w-3 h-3 fill-current shrink-0 mr-2" />
+                <span className="inline">Stop</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3 h-3 fill-current shrink-0 mr-2" />
+                <span className="inline">Play</span>
+              </>
+            )}
+          </Button>
         </div>
       </div>
     </div>
