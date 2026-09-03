@@ -10,7 +10,8 @@ export type InstrumentType =
   | 'sampler'
   | 'synth-custom'
   | 'synth-membrane'
-  | 'tabla-sampler';
+  | 'tabla-sampler'
+  | 'vocal-sampler';
 export type InstrumentCategory = 'melody' | 'rhythm';
 
 export interface InstrumentConfig {
@@ -275,6 +276,39 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
     defaultVolume: 0,
     defaultChikariVolume: -20,
   },
+  'vocal-sampler': {
+    id: 'vocal-sampler',
+    name: 'Vocal (Sargam)',
+    type: 'vocal-sampler',
+    category: 'melody',
+    samples: {
+      // Sa (D3, D4, D5) — S2 is D4
+      D3: 'S1.mp3',
+      E3: 'R1.mp3',
+      'F#3': 'G1.mp3',
+      G3: 'M1.mp3',
+      A3: 'P1.mp3',
+      B3: 'D1.mp3',
+      'C#4': 'N1.mp3',
+
+      D4: 'S2.mp3',
+      'D#4': 'rk2.mp3',
+      E4: 'R2.mp3',
+      F4: 'gk2.mp3',
+      'F#4': 'G2.mp3',
+      G4: 'M2.mp3',
+      'G#4': 'mt2.mp3', 
+      A4: 'P2.mp3',
+      'A#4': 'dk2.mp3',
+      B4: 'D2.mp3',
+      C5: 'nk2.mp3',
+      'C#5': 'N2.mp3',
+
+      D5: 'S3.mp3',
+    },
+    baseUrl: '/vocal/',
+    defaultVolume: -8,
+  },
 };
 
 // Tonal instruments are those that can play specific frequencies/notes
@@ -365,6 +399,17 @@ export async function createInstrument(
   } else if (config.type === 'synth-membrane') {
     const synth = new Tone.MembraneSynth(config.options);
     instrument = synth;
+    instrumentCache.set(instrumentId, instrument);
+  } else if (config.type === 'vocal-sampler') {
+    instrument = await new Promise<Tone.Sampler>((resolve) => {
+      const sampler = new Tone.Sampler({
+        urls: config.samples!,
+        baseUrl: config.baseUrl!,
+        onload: () => {
+          resolve(sampler);
+        },
+      });
+    });
     instrumentCache.set(instrumentId, instrument);
   } else {
     const synth = new Tone.PolySynth(Tone.Synth);
