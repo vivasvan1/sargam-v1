@@ -4,6 +4,7 @@ import { MarkdownCell } from './MarkdownCell';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 import type { NotebookCell } from '@/types/notebook';
+import { usePlaybackStore } from '@/store/usePlaybackStore';
 
 interface CellProps {
   cell: NotebookCell;
@@ -28,9 +29,23 @@ export function Cell({
     toast.success('Cell link copied to clipboard');
   };
 
+  const handleHeaderClick = () => {
+    if (isMusic) {
+      const { isPlayingAll, activeCellId, seekPlayAll } = usePlaybackStore.getState();
+      if (isPlayingAll && activeCellId !== cell.id) {
+        seekPlayAll(cell.id, 0);
+      }
+    }
+  };
+
   return (
     <div className="group/cell relative bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-border/80 transition-all duration-300 max-w-full h-full">
-      <div className="px-3 md:px-4 py-0.5 border-b border-border bg-muted/30 flex items-center justify-between min-w-0">
+      <div
+        onClick={handleHeaderClick}
+        className={`px-3 md:px-4 py-0.5 border-b border-border bg-muted/30 flex items-center justify-between min-w-0 ${
+          isMusic ? 'cursor-pointer' : ''
+        }`}
+      >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {isMusic ? (
             <Music2 className="w-3 h-3 shrink-0" />

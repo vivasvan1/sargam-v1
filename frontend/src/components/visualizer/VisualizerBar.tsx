@@ -25,7 +25,10 @@ export function VisualizerBar({
           ? 'border-l-[3px] border-primary/70'
           : 'border-l-2 border-primary/50'
       )}
-      onClick={() => onSeek?.(event.audioStartTime + 0.001)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSeek?.(event.audioStartTime + 0.001);
+      }}
       style={{
         left: `${(event.startTime - lineStartTime) * pixelsPerSecond}px`,
         height: '100%',

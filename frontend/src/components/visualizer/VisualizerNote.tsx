@@ -157,14 +157,18 @@ export function VisualizerNote({
     }
   }, []);
 
-  const handleClick = useCallback(() => {
-    if (isLongPress.current) {
-      isLongPress.current = false;
-      return;
-    }
-    // Seeking must use audioStartTime, not visual startTime
-    onSeek?.(event.audioStartTime + 0.001);
-  }, [event.audioStartTime, event.startTime, onSeek]);
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isLongPress.current) {
+        isLongPress.current = false;
+        return;
+      }
+      // Seeking must use audioStartTime, not visual startTime
+      onSeek?.(event.audioStartTime + 0.001);
+    },
+    [event.audioStartTime, onSeek]
+  );
 
   if (hasMeend && targetSwara) {
     const displaySwaraStart =

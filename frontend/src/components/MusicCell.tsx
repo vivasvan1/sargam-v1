@@ -353,6 +353,11 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
   const handleSeek = (time: number) => {
     setInitialStartTime(time);
+    const { isPlayingAll, seekPlayAll } = usePlaybackStore.getState();
+    if (isPlayingAll) {
+      seekPlayAll(cell.id, time);
+      return;
+    }
     if (isPlaying) {
       // If already playing, we need to jump
       Tone.getTransport().seconds = time;
@@ -361,7 +366,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
   const playPromiseResolveRef = useRef<((isNatural: boolean) => void) | null>(null);
 
-  const handlePlay = async (): Promise<boolean> => {
+  const handlePlay = async (startTime?: number): Promise<boolean> => {
     if (isPlaying) {
       stopPlayback(false);
       return Promise.resolve(false);
@@ -376,11 +381,14 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
 
     await Tone.start();
 
+    const seekTime = startTime !== undefined ? startTime : initialStartTime;
+    setInitialStartTime(seekTime);
+
     return new Promise<boolean>(async (resolve) => {
       playPromiseResolveRef.current = resolve;
       try {
         setActiveCell(cell.id, () => stopPlayback(false));
-        await playMusic(parsedForPlayback, voiceControls, initialStartTime);
+        await playMusic(parsedForPlayback, voiceControls, seekTime);
         setIsPlaying(true);
       } catch (e) {
         console.error(e);
@@ -393,8 +401,21 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const handlePlayRef = useRef(handlePlay);
   handlePlayRef.current = handlePlay;
 
+  const onPlayButtonClick = () => {
+    const { isPlayingAll, stopPlayAll, seekPlayAll } = usePlaybackStore.getState();
+    if (isPlayingAll) {
+      if (isPlaying) {
+        stopPlayAll();
+      } else {
+        seekPlayAll(cell.id, initialStartTime ?? 0);
+      }
+      return;
+    }
+    handlePlay();
+  };
+
   useEffect(() => {
-    const playFn = () => handlePlayRef.current();
+    const playFn = (startTime?: number) => handlePlayRef.current(startTime);
     registerCellController(cell.id, playFn);
     return () => unregisterCellController(cell.id);
   }, [cell.id, registerCellController, unregisterCellController]);
@@ -442,6 +463,9 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     activeNodesRef.current = {};
     clearActiveCell(cell.id);
     setIsPlaying(false);
+    if (isNatural) {
+      setInitialStartTime(0);
+    }
 
     if (playPromiseResolveRef.current) {
       playPromiseResolveRef.current(isNatural);
@@ -991,7 +1015,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     <div className="flex flex-col relative max-w-full overflow-hidden">
       <Controls
         isPlaying={isPlaying}
-        onPlay={handlePlay}
+        onPlay={onPlayButtonClick}
         mixerOpen={showMixer}
         onToggleMixer={() => setShowMixer(!showMixer)}
         showVisualizer={localShowVisualizer}
@@ -1077,7 +1101,7 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
             <MusicVisualizer
               parsedData={lastParsedData}
               isPlaying={isPlaying}
-              onPlay={handlePlay}
+              onPlay={onPlayButtonClick}
               initialTime={initialStartTime}
               onSeek={handleSeek}
               bpm={bpm}

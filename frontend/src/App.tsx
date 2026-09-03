@@ -881,34 +881,42 @@ function App() {
     }
   };
 
-  const { cellControllers } = usePlaybackStore();
+  const { cellControllers, isPlayingAll, startPlayAll, stopPlayAll, setAllMusicCellIds } = usePlaybackStore();
+
+  useEffect(() => {
+    const musicCellIds = notebook.cells
+      .filter((c) => c.cell_type === 'music')
+      .map((c) => c.id);
+    setAllMusicCellIds(musicCellIds);
+  }, [notebook.cells, setAllMusicCellIds]);
 
   const handlePlayCell = () => {
     if (activeCellId && cellControllers[activeCellId]) {
+      if (isPlayingAll) {
+        stopPlayAll();
+      }
       cellControllers[activeCellId]();
     } else {
       toast.error('No active music cell selected.');
     }
   };
 
-  const handlePlayAll = async () => {
-    const musicCells = notebook.cells.filter((c) => c.cell_type === 'music');
-    if (musicCells.length === 0) {
+  const handlePlayAll = () => {
+    const musicCellIds = notebook.cells
+      .filter((c) => c.cell_type === 'music')
+      .map((c) => c.id);
+
+    if (musicCellIds.length === 0) {
       toast.info('No music cells to play.');
       return;
     }
 
-    for (const cell of musicCells) {
-      setActiveCellId(cell.id);
-
-      const playFn = usePlaybackStore.getState().cellControllers[cell.id];
-      if (playFn) {
-        const isNatural = await playFn();
-        if (!isNatural) {
-          break; // Stop sequential playback if user manually stopped it
-        }
-      }
+    if (isPlayingAll) {
+      stopPlayAll();
+      return;
     }
+
+    startPlayAll(musicCellIds);
   };
 
   const toggleAutoScroll = React.useCallback(() => {
@@ -997,6 +1005,7 @@ function App() {
                     currentFileId={driveFileId}
                     onPlayCell={handlePlayCell}
                     onPlayAll={handlePlayAll}
+                    isPlayingAll={isPlayingAll}
                   />
                 </div>
 

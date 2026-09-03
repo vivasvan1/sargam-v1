@@ -45,6 +45,7 @@ interface MenuBarProps {
 
   onPlayCell?: () => void;
   onPlayAll?: () => void;
+  isPlayingAll?: boolean;
 }
 
 import { useNotebookSettings } from '../context/NotebookSettingsContext';
@@ -75,6 +76,7 @@ export function MenuBar({
   currentFileId,
   onPlayCell,
   onPlayAll,
+  isPlayingAll,
 }: MenuBarProps) {
   const { open, toggleSidebar } = useSidebar();
   const {
@@ -193,7 +195,7 @@ export function MenuBar({
               Play Cell
             </MenubarItem>
             <MenubarItem onClick={onPlayAll} disabled={!onPlayAll}>
-              Play All Cells
+              {isPlayingAll ? 'Stop Play All' : 'Play All Cells'}
             </MenubarItem>
           </MenubarContent>
         </MenubarMenu>

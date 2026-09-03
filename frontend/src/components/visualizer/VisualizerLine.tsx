@@ -77,10 +77,16 @@ export const VisualizerLine = memo(function VisualizerLine({
         />
       )}
       <div
-        className={cn('relative group')}
+        className={cn('relative group cursor-pointer')}
         style={{
           height: '4rem',
           width: `${lineWidth}px`,
+        }}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const timeInLine = clickX / pixelsPerSecond;
+          onSeek?.(Math.max(0, line.startTime + timeInLine));
         }}
       >
         <VisualizerGrid beatCount={beatCount} beatWidth={beatWidth} />
