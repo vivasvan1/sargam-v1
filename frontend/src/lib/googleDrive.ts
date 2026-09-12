@@ -446,7 +446,7 @@ export function getGoogleOAuthUrl(fallbackClientId?: string): string {
     redirect_uri: window.location.origin + window.location.pathname,
     response_type: 'token',
     scope: SCOPES,
-    include_granted_scopes: 'true',
+    include_granted_scopes: 'false',
     prompt: 'consent',
   });
 
