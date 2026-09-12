@@ -7,9 +7,8 @@ const ROOT_FOLDER_NAME = 'sargamNotes';
 const DISCOVERY_DOCS = [
   'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
 ];
-const SCOPES =
-  'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
+const SCOPES = 'https://www.googleapis.com/auth/drive.file email profile';
 // The URL of our deployed Google Apps Script Web App
 const REGISTRY_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbwCoJsK1v5HDQI1CTz2QS514SDIJ8edxBsYfyYgXSYwqgHPAw7HCeoYpkwQLfApUbOi/exec';
