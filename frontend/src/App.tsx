@@ -17,12 +17,14 @@ import {
   initializeGoogleAPI,
   authenticate,
   disconnect,
+  adoptStoredGoogleToken,
+  clearGoogleAuthCache,
+} from './lib/googleAuth';
+import {
   updateFileById,
   publishToRegistry,
   unpublishFromRegistry,
   loadRegistryNotebook,
-  adoptStoredGoogleToken,
-  clearGoogleAuthCache,
 } from './lib/googleDrive';
 // GoogleUser type no longer needed here as it is in store
 import { MenuBar } from './components/MenuBar';

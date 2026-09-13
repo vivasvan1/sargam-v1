@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GoogleUser } from '@/lib/googleDrive';
+import type { GoogleUser } from '@/lib/googleAuth';
 
 interface AuthState {
   isInitialized: boolean;
