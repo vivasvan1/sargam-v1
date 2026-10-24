@@ -5,6 +5,7 @@ import './App.css';
 // Components
 import { GoogleDriveSaveDialog } from '@/components/google-drive/GoogleDriveSaveDialog';
 import { GoogleDriveLoadDialog } from '@/components/google-drive/GoogleDriveLoadDialog';
+import { AudioToSargamDialog } from '@/components/audio-transcription/AudioToSargamDialog';
 import { Header } from './components/Header';
 import { NotebookEditor } from './components/NotebookEditor';
 import { PrintNotebook } from './components/PrintNotebook';
@@ -224,6 +225,13 @@ function App() {
   const isInitialized = useAuthStore((state) => state.isInitialized);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [isTranscribeDialogOpen, setIsTranscribeDialogOpen] = useState(false);
+  const [transcribeTargetIndex, setTranscribeTargetIndex] = useState(-1);
+
+  const handleOpenTranscribe = (index = -1) => {
+    setTranscribeTargetIndex(index);
+    setIsTranscribeDialogOpen(true);
+  };
   const [driveFileId, setDriveFileId] = useState<string | null>(null); // Track if notebook was saved to Drive
   const [isReadOnly, setIsReadOnly] = useState(false); // Track if current file is read-only
   const [lastSavedContent, setLastSavedContent] = useState<string | null>(null); // Track last saved content for change detection
@@ -997,6 +1005,7 @@ function App() {
                     onRedo={redo}
                     onAddMusic={() => addCell('music', -1)}
                     onAddMarkdown={() => addCell('markdown', -1)}
+                    onTranscribeAudio={() => handleOpenTranscribe(-1)}
                     theme={theme}
                     setTheme={setTheme}
                     isAutoScrolling={isAutoScrolling}
@@ -1018,6 +1027,7 @@ function App() {
                   updateCell={updateCell}
                   deleteCell={deleteCell}
                   addCell={addCell}
+                  onTranscribeAudio={handleOpenTranscribe}
                   theme={theme}
                   isReadOnly={isReadOnly}
                   isAutoScrolling={isAutoScrolling}
@@ -1063,6 +1073,14 @@ function App() {
               open={loadDialogOpen}
               onOpenChange={setLoadDialogOpen}
               onLoad={handleDriveLoad}
+            />
+
+            <AudioToSargamDialog
+              open={isTranscribeDialogOpen}
+              onOpenChange={setIsTranscribeDialogOpen}
+              onInsertSargamCell={(lines) => {
+                addCell('music', transcribeTargetIndex, lines);
+              }}
             />
 
             <input

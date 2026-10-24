@@ -21,7 +21,10 @@ interface State {
 type Action =
   | { type: 'SET_NOTEBOOK'; payload: Notebook }
   | { type: 'UPDATE_CELL'; payload: { id: string; content: string[] | string } }
-  | { type: 'ADD_CELL'; payload: { type: 'music' | 'markdown'; index: number } }
+  | {
+      type: 'ADD_CELL';
+      payload: { type: 'music' | 'markdown'; index: number; source?: string[] };
+    }
   | { type: 'DELETE_CELL'; payload: { index: number } }
   | { type: 'UNDO' }
   | { type: 'REDO' }
@@ -74,13 +77,13 @@ const reducer = (state: State, action: Action): State => {
     }
 
     case 'ADD_CELL': {
-      const { type, index } = action.payload;
+      const { type, index, source } = action.payload;
       const newCell: NotebookCell =
         type === 'markdown'
           ? {
               id: uuidv4(),
               cell_type: 'markdown',
-              source: [
+              source: source || [
                 '# Title looks like this',
                 'Double click or double tap to edit.',
               ],
@@ -89,7 +92,7 @@ const reducer = (state: State, action: Action): State => {
               id: uuidv4(),
               cell_type: 'music',
               metadata: { language: 'sargam-v1' },
-              source: [
+              source: source || [
                 '@sa D4',
                 '@tala Tintal(16)',
                 '@tala_pattern dha dhin dhin dha | dha dhin dhin dha | dha tin tin ta | ta dhin dhin dha',
@@ -247,9 +250,12 @@ export function useNotebook(initialNotebook: Notebook) {
     dispatch({ type: 'UPDATE_CELL', payload: { id, content } });
   }, []);
 
-  const addCell = useCallback((type: 'music' | 'markdown', index: number) => {
-    dispatch({ type: 'ADD_CELL', payload: { type, index } });
-  }, []);
+  const addCell = useCallback(
+    (type: 'music' | 'markdown', index: number, source?: string[]) => {
+      dispatch({ type: 'ADD_CELL', payload: { type, index, source } });
+    },
+    []
+  );
 
   const deleteCell = useCallback((index: number) => {
     dispatch({ type: 'DELETE_CELL', payload: { index } });

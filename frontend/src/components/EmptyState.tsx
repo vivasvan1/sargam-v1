@@ -1,15 +1,17 @@
 import React from 'react';
-import { Layout, Plus } from 'lucide-react';
+import { Layout, Plus, Mic } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface EmptyStateProps {
   onAddMusic: () => void;
   onAddMarkdown: () => void;
+  onTranscribeAudio?: () => void;
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
   onAddMusic,
   onAddMarkdown,
+  onTranscribeAudio,
 }) => {
   return (
     <div className="border-2 border-dashed border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center text-muted-foreground gap-4">
@@ -39,6 +41,17 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           <Plus className="w-4 h-4" />
           Markdown Cell
         </Button>
+        {onTranscribeAudio && (
+          <Button
+            onClick={onTranscribeAudio}
+            variant="outline"
+            size="lg"
+            className="min-h-[44px] text-primary border-primary/40 hover:bg-primary/10"
+          >
+            <Mic className="w-4 h-4 text-primary" />
+            Transcribe Audio
+          </Button>
+        )}
       </div>
     </div>
   );

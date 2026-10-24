@@ -39,6 +39,7 @@ interface MenuBarProps {
 
   onAddMusic: () => void;
   onAddMarkdown: () => void;
+  onTranscribeAudio?: () => void;
 
   theme: 'light' | 'dark' | 'system';
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
@@ -73,6 +74,7 @@ export function MenuBar({
   onRedo,
   onAddMusic,
   onAddMarkdown,
+  onTranscribeAudio,
   setTheme,
   isAutoScrolling,
   autoScrollSpeed,
@@ -160,6 +162,11 @@ export function MenuBar({
             <MenubarItem onClick={onAddMarkdown} disabled={isReadOnly}>
               Add Markdown Cell
             </MenubarItem>
+            {onTranscribeAudio && (
+              <MenubarItem onClick={onTranscribeAudio} disabled={isReadOnly}>
+                Transcribe Audio to Sargam...
+              </MenubarItem>
+            )}
           </MenubarContent>
         </MenubarMenu>
 

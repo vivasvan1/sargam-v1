@@ -11,7 +11,8 @@ interface NotebookEditorProps {
   setActiveCellId: (id: string | null) => void;
   updateCell: (id: string, source: string) => void;
   deleteCell: (index: number) => void;
-  addCell: (type: 'music' | 'markdown', index: number) => void;
+  addCell: (type: 'music' | 'markdown', index: number, source?: string[]) => void;
+  onTranscribeAudio?: (index: number) => void;
   theme: 'light' | 'dark' | 'system';
   isReadOnly?: boolean;
   isAutoScrolling: boolean;
@@ -27,6 +28,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
   updateCell,
   deleteCell,
   addCell,
+  onTranscribeAudio,
   theme,
   isReadOnly = false,
   isAutoScrolling,
@@ -221,7 +223,12 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
               />
 
               {!isReadOnly && (
-                <AddCellControls onAdd={(type) => addCell(type, idx)} />
+                <AddCellControls
+                  onAdd={(type) => addCell(type, idx)}
+                  onTranscribeAudio={
+                    onTranscribeAudio ? () => onTranscribeAudio(idx) : undefined
+                  }
+                />
               )}
             </div>
           ))}
@@ -230,6 +237,9 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
             <EmptyState
               onAddMusic={() => addCell('music', -1)}
               onAddMarkdown={() => addCell('markdown', -1)}
+              onTranscribeAudio={
+                onTranscribeAudio ? () => onTranscribeAudio(-1) : undefined
+              }
             />
           )}
         </div>
