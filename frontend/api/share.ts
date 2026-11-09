@@ -1,4 +1,4 @@
-import { fetchNotebookFromRegistry, extractNotebookMeta } from './_utils';
+import { fetchNotebookFromRegistry, extractNotebookMeta } from './_utils.js';
 
 export const config = {
   runtime: 'edge',
