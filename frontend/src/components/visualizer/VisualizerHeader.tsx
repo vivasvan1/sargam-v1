@@ -3,7 +3,7 @@ import { Play, Minus, Plus, Square, Search, Repeat } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import type { MusicCell as ParsedMusicCell } from '../../utils/sargam_parser';
+import { getMusicCellTitle, type MusicCell as ParsedMusicCell } from '../../utils/sargam_parser';
 import { NoteLegendModal } from './NoteLegendModal';
 
 interface VisualizerHeaderProps {
@@ -30,7 +30,7 @@ export function VisualizerHeader({
   onToggleLoop,
 }: VisualizerHeaderProps) {
   const [isEditingBpm, setIsEditingBpm] = useState(false);
-  const scoreTitle = parsedData?.directives.title?.trim() || 'Score';
+  const scoreTitle = getMusicCellTitle(parsedData);
 
   return (
     <div className="flex items-start md:items-center justify-between w-full gap-4 overflow-x-auto custom-scrollbar pb-1">

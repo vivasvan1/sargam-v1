@@ -251,13 +251,36 @@ function App() {
   const [autoScrollSpeed, setAutoScrollSpeed] = useState(25);
   const savingContentRef = React.useRef<string | null>(null);
 
-  // Keep the browser document title equal to the notebook title. Browsers use
-  // this value as the suggested filename for both menu and keyboard printing.
+  // Keep the browser document title and OG tags equal to the notebook title.
   useEffect(() => {
-    document.title = (
+    const rawTitle = (
       notebook.metadata?.title?.trim() || 'Sargam Notebook'
     ).replace(/\.(imnb|pdf)$/i, '');
-  }, [notebook.metadata?.title]);
+    document.title = rawTitle;
+
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute('content', rawTitle);
+    const twTitle = document.querySelector('meta[name="twitter:title"]');
+    if (twTitle) twTitle.setAttribute('content', rawTitle);
+
+    if (driveFileId) {
+      const shareUrl = `${window.location.origin}/?fileId=${encodeURIComponent(driveFileId)}`;
+      const ogUrl = document.querySelector('meta[property="og:url"]');
+      if (ogUrl) ogUrl.setAttribute('content', shareUrl);
+      const ogImage = document.querySelector('meta[property="og:image"]');
+      if (ogImage)
+        ogImage.setAttribute(
+          'content',
+          `${window.location.origin}/api/og?fileId=${encodeURIComponent(driveFileId)}`
+        );
+      const twImage = document.querySelector('meta[name="twitter:image"]');
+      if (twImage)
+        twImage.setAttribute(
+          'content',
+          `${window.location.origin}/api/og?fileId=${encodeURIComponent(driveFileId)}`
+        );
+    }
+  }, [notebook.metadata?.title, driveFileId]);
 
   // Initialize Google API on mount
   useEffect(() => {

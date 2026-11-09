@@ -13,10 +13,42 @@
   ],
   "rewrites": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "fileId"
+        }
+      ],
+      "destination": "/api/share"
+    },
+    {
+      "source": "/index.html",
+      "has": [
+        {
+          "type": "query",
+          "key": "fileId"
+        }
+      ],
+      "destination": "/api/share"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
+  "functions": {
+    "api/share.ts": {
+      "includeFiles": "dist/**"
+    },
+    "api/og.ts": {
+      "includeFiles": "public/**"
+    }
+  },
   "installCommand": "bun install",
   "buildCommand": "bun run build",
   "framework": "vite"

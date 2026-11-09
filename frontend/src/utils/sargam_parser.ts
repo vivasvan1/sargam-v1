@@ -34,6 +34,7 @@ export interface HoldEvent {
 export interface BarEvent {
   type: 'bar';
   double: boolean;
+  comment?: string;
   line_index?: number;
 }
 
@@ -149,22 +150,26 @@ export function parseMusicCell(lines: string[]): MusicCell {
       content = line.split('#')[0];
     }
 
-    // Tokenize while respecting parentheses (for ornaments with parameters)
+    // Tokenize while respecting parentheses (for ornaments with parameters) and quotes (for lyrics/comments)
     const tokens: string[] = [];
     let current = '';
     let depth = 0;
+    let inQuotes = false;
     const trimmed = content.trim();
 
     for (let i = 0; i < trimmed.length; i++) {
       const ch = trimmed[i];
-      if (ch === '(') {
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+        current += ch;
+      } else if (ch === '(') {
         depth++;
         current += ch;
       } else if (ch === ')') {
         depth--;
         current += ch;
-      } else if ((ch === ' ' || ch === '\t') && depth === 0) {
-        // Split on whitespace only when not inside parentheses
+      } else if ((ch === ' ' || ch === '\t') && depth === 0 && !inQuotes) {
+        // Split on whitespace only when not inside parentheses or quotes
         if (current.trim()) {
           tokens.push(current.trim());
         }
@@ -251,6 +256,41 @@ export function parseMusicCell(lines: string[]): MusicCell {
   return { directives, voices };
 }
 
+export function getMusicCellTitle(
+  parsedData: MusicCell | null,
+  fallbackSource?: string[] | string
+): string {
+  const directiveTitle = parsedData?.directives?.title?.trim();
+  if (directiveTitle) return directiveTitle;
+
+  if (parsedData?.voices) {
+    for (const voice of Object.values(parsedData.voices)) {
+      for (const event of voice.events) {
+        if (event.type === 'comment') {
+          const text = event.text.replace(/^[#/\s]+/, '').trim();
+          if (text) return text;
+        }
+      }
+    }
+  }
+
+  if (fallbackSource) {
+    const text = Array.isArray(fallbackSource)
+      ? fallbackSource.join('\n')
+      : fallbackSource;
+    const titleMatch = text.match(/^\s*@title\s*(.*)$/m);
+    if (titleMatch && titleMatch[1].trim()) {
+      return titleMatch[1].trim();
+    }
+    const commentMatch = text.match(/^\s*#\s*(?!voice)(.*)$/m);
+    if (commentMatch && commentMatch[1].trim()) {
+      return commentMatch[1].trim();
+    }
+  }
+
+  return 'Score';
+}
+
 export function extractTalaBeats(
   directives: Record<string, string>
 ): number | null {
@@ -280,8 +320,20 @@ export function parseToken(
   token: string,
   defaultDuration: number
 ): Event | null {
-  if (token === '|') return { type: 'bar', double: false };
-  if (token === '||') return { type: 'bar', double: true };
+  if (token === '||' || token.startsWith('||=')) {
+    let comment: string | undefined;
+    if (token.startsWith('||=')) {
+      comment = token.slice(3).replace(/^"/, '').replace(/"$/, '').trim();
+    }
+    return { type: 'bar', double: true, comment: comment || undefined };
+  }
+  if (token === '|' || token.startsWith('|=')) {
+    let comment: string | undefined;
+    if (token.startsWith('|=')) {
+      comment = token.slice(2).replace(/^"/, '').replace(/"$/, '').trim();
+    }
+    return { type: 'bar', double: false, comment: comment || undefined };
+  }
   if (token.startsWith('^')) {
     let durStr = token.slice(1);
     if (durStr.startsWith(':')) durStr = durStr.slice(1);

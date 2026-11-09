@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import * as Tone from 'tone';
 import { toast } from 'sonner';
-import { parseMusicCell } from '../utils/sargam_parser';
+import { parseMusicCell, getMusicCellTitle } from '../utils/sargam_parser';
 import type { MusicCell as ParsedMusicCell } from '../utils/sargam_parser';
 import { MusicVisualizer } from './MusicVisualizer';
 import {
@@ -95,7 +95,18 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
   const [editorValue, setEditorValue] = useState(content);
   const [savedContent, setSavedContent] = useState(content);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [lastParsedData, setLastParsedData] = useState<ParsedMusicCell | null>(null);
+  const [lastParsedData, setLastParsedData] = useState<ParsedMusicCell | null>(
+    () => {
+      try {
+        const initialLines = Array.isArray(cell.source)
+          ? cell.source
+          : (cell.source || '').split('\n');
+        return parseMusicCell(initialLines);
+      } catch {
+        return null;
+      }
+    }
+  );
   const [voiceControls, setVoiceControls] = useState<Record<string, VoiceControl>>({});
   const [showMixer, setShowMixer] = useState(false);
   const activeNodesRef = useRef<Record<string, ActiveNode>>({});
@@ -1037,6 +1048,10 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     );
   };
 
+  const cellTitle = getMusicCellTitle(lastParsedData, savedContent);
+  const cellTala =
+    lastParsedData?.directives.tala || lastParsedData?.directives.taal;
+
   return (
     <div className="flex flex-col relative max-w-full overflow-hidden">
       <Controls
@@ -1048,6 +1063,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
         onToggleVisualizer={onToggleVisualizer}
         showCode={localShowCode}
         onToggleCode={onToggleCode}
+        title={cellTitle}
+        tala={cellTala}
         mixerContent={
           <Mixer
             show={showMixer}

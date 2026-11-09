@@ -13,6 +13,8 @@ interface ControlsProps {
   onToggleVisualizer?: () => void;
   showCode?: boolean;
   onToggleCode?: () => void;
+  title?: string;
+  tala?: string;
 }
 
 export const Controls = React.memo(function Controls({
@@ -25,10 +27,17 @@ export const Controls = React.memo(function Controls({
   onToggleVisualizer,
   showCode,
   onToggleCode,
+  title,
+  tala,
 }: ControlsProps) {
   return (
-    <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-muted/10 border-b border-border min-w-0">
-      <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
+    <div
+      className={cn(
+        'flex items-center justify-between px-3 md:px-4 py-2 bg-muted/10 min-w-0 gap-2',
+        (showVisualizer || showCode) && 'border-b border-border'
+      )}
+    >
+      <div className="flex items-center gap-2 md:gap-4 shrink-0">
         <Button
           onClick={onPlay}
           variant={'default'}
@@ -102,6 +111,25 @@ export const Controls = React.memo(function Controls({
           </Button>
         )}
       </div>
+
+      {title && !showVisualizer && (
+        <div className="flex items-center gap-2 min-w-0 ml-auto pl-2 truncate text-right">
+          <span
+            className="text-xs md:text-sm font-semibold text-foreground/90 truncate"
+            title={title}
+          >
+            {title}
+          </span>
+          {tala && (
+            <span
+              className="text-[10px] md:text-[11px] text-muted-foreground font-medium uppercase tracking-wider hidden sm:inline shrink-0"
+              title={tala}
+            >
+              • {tala}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 });
