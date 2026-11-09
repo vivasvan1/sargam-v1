@@ -1,54 +1,41 @@
 {
-  "redirects": [
+  "routes": [
     {
-      "source": "/licenses/privacy",
-      "destination": "https://experts.speede.site/licenses/privacy",
-      "permanent": true
+      "src": "^/licenses/privacy$",
+      "status": 308,
+      "headers": {
+        "Location": "https://experts.speede.site/licenses/privacy"
+      }
     },
     {
-      "source": "/licenses/terms",
-      "destination": "https://experts.speede.site/licenses/terms",
-      "permanent": true
-    }
-  ],
-  "rewrites": [
+      "src": "^/licenses/terms$",
+      "status": 308,
+      "headers": {
+        "Location": "https://experts.speede.site/licenses/terms"
+      }
+    },
     {
-      "source": "/",
+      "src": "^/(index\\.html)?$",
       "has": [
         {
           "type": "query",
           "key": "fileId"
         }
       ],
-      "destination": "/api/share"
+      "dest": "/api/share"
     },
     {
-      "source": "/index.html",
-      "has": [
-        {
-          "type": "query",
-          "key": "fileId"
-        }
-      ],
-      "destination": "/api/share"
+      "handle": "filesystem"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "src": "^/api/(.*)$",
+      "dest": "/api/$1"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "^/.*$",
+      "dest": "/index.html"
     }
   ],
-  "functions": {
-    "api/share.ts": {
-      "includeFiles": "dist/**"
-    },
-    "api/og.ts": {
-      "includeFiles": "public/**"
-    }
-  },
   "installCommand": "bun install",
   "buildCommand": "bun run build",
   "framework": "vite"

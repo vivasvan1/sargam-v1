@@ -1,6 +1,11 @@
 export const REGISTRY_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbwCoJsK1v5HDQI1CTz2QS514SDIJ8edxBsYfyYgXSYwqgHPAw7HCeoYpkwQLfApUbOi/exec';
 
+export interface MusicSection {
+  title: string;
+  notes: string[];
+}
+
 export interface ExtractedMeta {
   title: string;
   author: string;
@@ -11,8 +16,9 @@ export interface ExtractedMeta {
   time: string;
   tala: string;
   sa: string;
+  tempo: string;
   cellTitle: string;
-  noteLines: string[];
+  sections: MusicSection[];
   description: string;
 }
 
@@ -36,17 +42,27 @@ export function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMe
   const title = (entry?.name || nbMetadata?.title || 'Indian Classical Music Notebook').trim();
   const author = (entry?.author || nbMetadata?.author || '').trim();
 
-  // 1. Extract Raag Name
+  // 1. Extract Raag Name (prioritize markdown heading # Raag <Name>)
   let raag = '';
-  // Check markdown headings
   for (const c of cells) {
-    const text = Array.isArray(c.source) ? c.source.join('\n') : (c.source || '');
-    const match = text.match(/#\s*(Raag\s+[A-Za-z]+(?:\s+[A-Za-z]+)?|[A-Za-z]+(?:\s+[A-Za-z]+)?\s+Raag)/i);
-    if (match) {
-      raag = match[1].trim();
-      break;
+    if (c.cell_type === 'markdown') {
+      const text = Array.isArray(c.source) ? c.source.join('\n') : (c.source || '');
+      const match = text.match(/#\s*(Raag\s+[A-Za-z]+(?:\s+[A-Za-z]+)?|[A-Za-z]+(?:\s+[A-Za-z]+)?\s+Raag)/i);
+      if (match) {
+        raag = match[1].trim();
+        break;
+      }
     }
   }
+
+  // Check title for Raag
+  if (!raag && title) {
+    const match = title.match(/Raag\s+[A-Za-z]+(?:\s+[A-Za-z]+)?/i);
+    if (match) {
+      raag = match[0].trim();
+    }
+  }
+
   // Check @raga directive in music cells
   if (!raag) {
     for (const c of cells) {
@@ -58,13 +74,6 @@ export function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMe
           break;
         }
       }
-    }
-  }
-  // Check title
-  if (!raag && title) {
-    const match = title.match(/Raag\s+[A-Za-z]+(?:\s+[A-Za-z]+)?/i);
-    if (match) {
-      raag = match[0].trim();
     }
   }
 
@@ -89,37 +98,61 @@ export function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMe
     }
   }
 
-  // 3. Extract First Music Cell Details
+  // 3. Extract First Music Cell Details & Sections
   const musicCell = cells.find((c: any) => c.cell_type === 'music');
   let tala = '';
   let sa = '';
+  let tempo = '';
   let cellTitle = '';
-  const noteLines: string[] = [];
+  const sections: MusicSection[] = [];
 
   if (musicCell) {
-    const lines = Array.isArray(musicCell.source)
+    const lines: string[] = Array.isArray(musicCell.source)
       ? musicCell.source
       : (musicCell.source || '').split('\n');
 
-    for (const l of lines) {
-      const trimmed = l.trim();
-      if (trimmed.startsWith('@tala ')) {
-        tala = trimmed.slice(6).trim();
-      } else if (trimmed.startsWith('@taal ')) {
-        tala = trimmed.slice(6).trim();
+    let currentSectionTitle = '';
+    const sectionList: { title: string; lines: string[] }[] = [];
+    let currentLines: string[] = [];
+
+    for (const rawLine of lines) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) continue;
+
+      if (trimmed.startsWith('@tala ') || trimmed.startsWith('@taal ')) {
+        tala = trimmed.replace(/^@(tala|taal)\s+/, '').trim();
       } else if (trimmed.startsWith('@sa ')) {
         sa = trimmed.slice(4).trim();
+      } else if (trimmed.startsWith('@tempo ')) {
+        tempo = trimmed.slice(7).trim();
       } else if (trimmed.startsWith('@title ') && !cellTitle) {
         cellTitle = trimmed.slice(7).trim();
-      } else if (trimmed.startsWith('#') && !cellTitle && !trimmed.startsWith('#voice')) {
-        cellTitle = trimmed.replace(/^#+\s*/, '').trim();
-      } else if (
-        !trimmed.startsWith('@') &&
-        !trimmed.startsWith('#') &&
-        trimmed.length > 0 &&
-        noteLines.length < 2
-      ) {
-        noteLines.push(trimmed);
+      } else if (trimmed.startsWith('#') && !trimmed.startsWith('#voice')) {
+        const headerTitle = trimmed.replace(/^#+\s*/, '').trim();
+        if (!cellTitle) cellTitle = headerTitle;
+        if (currentLines.length > 0) {
+          sectionList.push({ title: currentSectionTitle || 'Section', lines: currentLines });
+          currentLines = [];
+        }
+        currentSectionTitle = headerTitle;
+      } else if (!trimmed.startsWith('@')) {
+        currentLines.push(trimmed);
+      }
+    }
+
+    if (currentLines.length > 0) {
+      sectionList.push({ title: currentSectionTitle || 'Notation', lines: currentLines });
+    }
+
+    // Convert section lines into tokenized notes
+    for (const sec of sectionList) {
+      const combined = sec.lines.join(' ');
+      const tokens = combined.split(/\s+/).filter(Boolean);
+      if (tokens.length > 0) {
+        sections.push({
+          title: sec.title,
+          notes: tokens.slice(0, 12),
+        });
       }
     }
   }
@@ -136,7 +169,7 @@ export function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMe
 
   const description =
     descParts.length > 0
-      ? descParts.join(' • ')
+      ? `${descParts.join(' • ')} | Interactive Indian Classical Music Notebook`
       : 'Indian classical music notation notebook. Open to play, edit and practice interactive swara visualizer.';
 
   return {
@@ -149,8 +182,9 @@ export function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMe
     time,
     tala,
     sa,
+    tempo,
     cellTitle,
-    noteLines,
+    sections,
     description,
   };
 }
