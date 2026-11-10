@@ -451,7 +451,10 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 1. Try rendering SVG to PNG via resvg WebAssembly
+    // 1. Build the dynamic SVG from this notebook's metadata and first music cell
+    const svg = buildOgSvg(meta);
+
+    // 2. Render SVG to PNG via resvg WebAssembly
     try {
       await ensureWasmInitialized();
       const resvg = new Resvg(svg, {
@@ -468,10 +471,10 @@ export default async function handler(req: any, res: any) {
       res.status(200).send(Buffer.from(pngBuffer));
       return;
     } catch (renderErr) {
-      console.warn('Wasm PNG render failed, falling back to SVG:', renderErr);
+      console.warn('Wasm PNG render failed, serving dynamic SVG directly:', renderErr);
     }
 
-    // 2. Fallback: serve dynamic SVG vector image directly
+    // 3. Fallback: serve dynamic SVG vector image directly (never fallback to default preview image)
     res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
     res.setHeader(
       'Cache-Control',
@@ -480,15 +483,27 @@ export default async function handler(req: any, res: any) {
     res.status(200).send(svg);
   } catch (err: any) {
     console.error('Error in og handler:', err);
-    // 3. Ultimate fallback: serve static preview if available
-    try {
-      const fallbackPath = path.join(process.cwd(), 'dist', 'notebook_preview.jpg');
-      if (fs.existsSync(fallbackPath)) {
-        res.setHeader('Content-Type', 'image/jpeg');
-        res.status(200).send(fs.readFileSync(fallbackPath));
-        return;
-      }
-    } catch {}
-    res.status(200).send('<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="630" fill="#0a0b12"/><text x="100" y="100" fill="white" font-size="40">Speede Sargam</text></svg>');
+    // Dynamic SVG fallback with whatever metadata is available
+    const fallbackSvg = buildOgSvg({
+      title: 'Sargam Notebook',
+      author: '',
+      raag: 'Sargam Notebook',
+      thaat: '',
+      vadi: '',
+      samvadi: '',
+      time: '',
+      tala: 'Tintal(16)',
+      sa: 'C4',
+      tempo: '',
+      cellTitle: '',
+      sections: [],
+      description: 'Interactive Indian Music Notation Notebook',
+    });
+    res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+    res.setHeader(
+      'Cache-Control',
+      'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400'
+    );
+    res.status(200).send(fallbackSvg);
   }
 }
