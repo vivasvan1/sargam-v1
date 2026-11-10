@@ -44,6 +44,7 @@
     "@types/uuid": "^11.0.0",
     "@uiw/react-codemirror": "^4.25.4",
     "@resvg/resvg-wasm": "2.4.1",
+    "@shuding/opentype.js": "1.4.0-beta.0",
     "@vercel/analytics": "^1.6.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

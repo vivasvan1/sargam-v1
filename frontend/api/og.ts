@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import opentype from '@shuding/opentype.js';
 import { Resvg, initWasm } from '@resvg/resvg-wasm';
 
 const REGISTRY_SCRIPT_URL =
@@ -26,6 +27,100 @@ interface ExtractedMeta {
   description: string;
 }
 
+let wasmInitPromise: Promise<void> | null = null;
+let cachedFont: any = null;
+
+async function ensureWasmInitialized(): Promise<void> {
+  if (!wasmInitPromise) {
+    wasmInitPromise = (async () => {
+      // 1. Try local node_modules path
+      try {
+        const localWasmPath = path.join(
+          process.cwd(),
+          'node_modules',
+          '@resvg',
+          'resvg-wasm',
+          'index_bg.wasm'
+        );
+        if (fs.existsSync(localWasmPath)) {
+          const buffer = fs.readFileSync(localWasmPath);
+          await initWasm(buffer);
+          return;
+        }
+      } catch (err) {
+        console.warn('Could not load local resvg wasm, falling back to CDN:', err);
+      }
+
+      // 2. Fallback to CDN
+      const cdnUrl = 'https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.4.1/index_bg.wasm';
+      const response = await fetch(cdnUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to load resvg wasm: ${response.status}`);
+      }
+      const wasmBuffer = await response.arrayBuffer();
+      await initWasm(wasmBuffer);
+    })();
+  }
+  return wasmInitPromise;
+}
+
+async function getFont(): Promise<any> {
+  if (cachedFont) return cachedFont;
+
+  const fontPaths = [
+    path.join(process.cwd(), 'public', 'Geist-Regular.ttf'),
+    path.join(process.cwd(), 'dist', 'Geist-Regular.ttf'),
+    path.join(process.cwd(), 'frontend', 'public', 'Geist-Regular.ttf'),
+  ];
+
+  for (const p of fontPaths) {
+    if (fs.existsSync(p)) {
+      try {
+        const buffer = fs.readFileSync(p);
+        cachedFont = opentype.parse(buffer.buffer);
+        return cachedFont;
+      } catch (e) {
+        console.warn(`Could not read font from ${p}:`, e);
+      }
+    }
+  }
+
+  // Fallback to CDN
+  const cdnUrl = 'https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Regular.ttf';
+  const res = await fetch(cdnUrl);
+  if (!res.ok) throw new Error(`Failed to fetch font from CDN: ${res.status}`);
+  const arrayBuffer = await res.arrayBuffer();
+  cachedFont = opentype.parse(arrayBuffer);
+  return cachedFont;
+}
+
+function renderTextPath(
+  font: any,
+  text: string,
+  x: number,
+  y: number,
+  fontSize: number,
+  fill: string,
+  align: 'left' | 'center' | 'right' = 'left'
+): string {
+  if (!text) return '';
+  let startX = x;
+  if (align === 'center') {
+    const width = font.getAdvanceWidth(text, fontSize);
+    startX = x - width / 2;
+  } else if (align === 'right') {
+    const width = font.getAdvanceWidth(text, fontSize);
+    startX = x - width;
+  }
+  try {
+    const pathData = font.getPath(text, startX, y, fontSize).toPathData(2);
+    return `<path d="${pathData}" fill="${fill}" />`;
+  } catch (err) {
+    console.warn(`Failed to render glyph path for "${text}":`, err);
+    return '';
+  }
+}
+
 async function fetchNotebookFromRegistry(fileId: string): Promise<any> {
   const url = `${REGISTRY_SCRIPT_URL}?action=open&id=${encodeURIComponent(fileId)}`;
   const response = await fetch(url);
@@ -39,7 +134,7 @@ async function fetchNotebookFromRegistry(fileId: string): Promise<any> {
   return data;
 }
 
-function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMeta {
+function extractNotebookMeta(notebook: any, entry: any = {}, targetCellId?: string): ExtractedMeta {
   const cells: any[] = notebook?.cells || [];
   const nbMetadata = notebook?.metadata || {};
 
@@ -102,18 +197,39 @@ function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMeta {
     }
   }
 
-  // 3. Extract First Music Cell Details & Sections
-  const musicCell = cells.find((c: any) => c.cell_type === 'music');
+  // 3. Find target cell or first music cell
+  let targetCell = targetCellId ? cells.find((c: any) => c.id === targetCellId) : null;
+  if (!targetCell) {
+    targetCell = cells.find((c: any) => c.cell_type === 'music');
+  }
+
   let tala = '';
   let sa = '';
   let tempo = '';
   let cellTitle = '';
   const sections: MusicSection[] = [];
 
-  if (musicCell) {
-    const lines: string[] = Array.isArray(musicCell.source)
-      ? musicCell.source
-      : (musicCell.source || '').split('\n');
+  // Scan music cells for default tala/sa/tempo
+  for (const c of cells) {
+    if (c.cell_type === 'music') {
+      const lines: string[] = Array.isArray(c.source) ? c.source : (c.source || '').split('\n');
+      for (const rawLine of lines) {
+        const trimmed = rawLine.trim();
+        if ((trimmed.startsWith('@tala ') || trimmed.startsWith('@taal ')) && !tala) {
+          tala = trimmed.replace(/^@(tala|taal)\s+/, '').trim();
+        } else if (trimmed.startsWith('@sa ') && !sa) {
+          sa = trimmed.slice(4).trim();
+        } else if (trimmed.startsWith('@tempo ') && !tempo) {
+          tempo = trimmed.slice(7).trim();
+        }
+      }
+    }
+  }
+
+  if (targetCell) {
+    const lines: string[] = Array.isArray(targetCell.source)
+      ? targetCell.source
+      : (targetCell.source || '').split('\n');
 
     let currentSectionTitle = '';
     const sectionList: { title: string; lines: string[] }[] = [];
@@ -129,7 +245,7 @@ function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMeta {
         sa = trimmed.slice(4).trim();
       } else if (trimmed.startsWith('@tempo ')) {
         tempo = trimmed.slice(7).trim();
-      } else if (trimmed.startsWith('@title ') && !cellTitle) {
+      } else if (trimmed.startsWith('@title ')) {
         cellTitle = trimmed.slice(7).trim();
       } else if (trimmed.startsWith('#') && !trimmed.startsWith('#voice')) {
         const headerTitle = trimmed.replace(/^#+\s*/, '').trim();
@@ -160,20 +276,6 @@ function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMeta {
     }
   }
 
-  const descParts: string[] = [];
-  if (raag) descParts.push(raag);
-  if (thaat) descParts.push(`Thaat: ${thaat}`);
-  if (vadi) descParts.push(`Vadi: ${vadi}`);
-  if (samvadi) descParts.push(`Samvadi: ${samvadi}`);
-  if (tala) descParts.push(`Tala: ${tala}`);
-  if (sa) descParts.push(`Sa: ${sa}`);
-  if (author) descParts.push(`By ${author}`);
-
-  const description =
-    descParts.length > 0
-      ? `${descParts.join(' • ')} | Interactive Indian Classical Music Notebook`
-      : 'Indian classical music notation notebook. Open to play, edit and practice interactive swara visualizer.';
-
   return {
     title,
     author,
@@ -187,87 +289,38 @@ function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMeta {
     tempo,
     cellTitle,
     sections,
-    description,
+    description: '',
   };
 }
 
-let wasmInitPromise: Promise<void> | null = null;
-
-async function ensureWasmInitialized(): Promise<void> {
-  if (!wasmInitPromise) {
-    wasmInitPromise = (async () => {
-      // 1. Try local node_modules path
-      try {
-        const localWasmPath = path.join(
-          process.cwd(),
-          'node_modules',
-          '@resvg',
-          'resvg-wasm',
-          'index_bg.wasm'
-        );
-        if (fs.existsSync(localWasmPath)) {
-          const buffer = fs.readFileSync(localWasmPath);
-          await initWasm(buffer);
-          return;
-        }
-      } catch (err) {
-        console.warn('Could not load local resvg wasm, falling back to CDN:', err);
-      }
-
-      // 2. Fallback to CDN
-      const cdnUrl = 'https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.4.1/index_bg.wasm';
-      const response = await fetch(cdnUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to load resvg wasm: ${response.status}`);
-      }
-      const wasmBuffer = await response.arrayBuffer();
-      await initWasm(wasmBuffer);
-    })();
-  }
-  return wasmInitPromise;
-}
-
-function escapeXml(unsafe: string): string {
-  return unsafe
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function renderNotesRow(tokens: string[], startY: number, isAmber: boolean): string {
+function renderNotesRow(font: any, tokens: string[], startY: number, isAmber: boolean): { rects: string; paths: string } {
   let x = 80;
-  let items = '';
+  let rects = '';
+  let paths = '';
   const pillBg = isAmber ? 'rgba(245, 158, 11, 0.15)' : 'rgba(99, 102, 241, 0.15)';
   const strokeColor = isAmber ? 'rgba(245, 158, 11, 0.45)' : 'rgba(99, 102, 241, 0.45)';
   const textColor = isAmber ? '#fef3c7' : '#e0e7ff';
 
   for (const t of tokens) {
     if (t.startsWith('|')) {
-      const cleanBar = escapeXml(t.replace(/="[^"]*"/g, ''));
-      items += `<text x="${x + 6}" y="${startY + 34}" fill="#64748b" font-size="24" font-family="sans-serif" font-weight="800">${cleanBar}</text>`;
+      const cleanBar = t.replace(/="[^"]*"/g, '');
+      paths += renderTextPath(font, cleanBar, x + 6, startY + 34, 24, '#64748b', 'left');
       x += 36;
     } else {
-      const width = Math.max(48, t.length * 16 + 24);
-      const cleanNote = escapeXml(t);
-      items += `
+      const textWidth = font.getAdvanceWidth(t, 22);
+      const width = Math.max(50, textWidth + 28);
+      rects += `
         <rect x="${x}" y="${startY}" width="${width}" height="48" rx="10" fill="${pillBg}" stroke="${strokeColor}" stroke-width="1.5" />
-        <text x="${x + width / 2}" y="${startY + 32}" fill="${textColor}" font-size="22" font-family="sans-serif" font-weight="bold" text-anchor="middle">${cleanNote}</text>
       `;
+      paths += renderTextPath(font, t, x + width / 2, startY + 33, 22, textColor, 'center');
       x += width + 12;
     }
   }
-  return items;
+  return { rects, paths };
 }
 
-function buildOgSvg(meta: ExtractedMeta): string {
-  const displayRaag = escapeXml(
-    meta.raag && meta.raag !== 'Indian Classical Music' ? meta.raag : meta.title
-  );
-  const isDifferentTitle =
-    meta.title && meta.raag && !meta.title.toLowerCase().includes(meta.raag.toLowerCase());
-  const escapedTitle = escapeXml(meta.title);
+function buildOgSvgWithFont(font: any, meta: ExtractedMeta): string {
+  const displayRaag = meta.raag && meta.raag !== 'Indian Classical Music' ? meta.raag : meta.title;
 
   let sections = meta.sections;
   if (!sections || sections.length === 0) {
@@ -285,6 +338,63 @@ function buildOgSvg(meta: ExtractedMeta): string {
 
   const sec1 = sections[0];
   const sec2 = sections[1] || null;
+
+  let textPaths = '';
+
+  // 1. Top Header
+  textPaths += renderTextPath(font, 'SPEEDE SARGAM', 80, 61, 12, '#fbbf24');
+  textPaths += renderTextPath(font, 'Interactive Classical Notation', 224, 61, 14, '#94a3b8');
+
+  if (meta.tala) {
+    textPaths += renderTextPath(font, `Tala: ${meta.tala}`, 935, 61, 13, '#e2e8f0', 'center');
+  }
+  if (meta.sa) {
+    textPaths += renderTextPath(font, `Sa = ${meta.sa}`, 1081, 61, 13, '#cbd5e1', 'center');
+  }
+
+  // 2. Raag Hero Title & Subtitle
+  textPaths += renderTextPath(font, displayRaag, 52, 146, 48, '#ffffff');
+
+  const subtitle = meta.cellTitle ? `${meta.cellTitle} • ${meta.title}` : meta.title;
+  if (subtitle && !subtitle.toLowerCase().includes(displayRaag.toLowerCase())) {
+    textPaths += renderTextPath(font, subtitle, 52, 178, 16, '#94a3b8');
+  } else if (meta.cellTitle) {
+    textPaths += renderTextPath(font, meta.cellTitle, 52, 178, 16, '#94a3b8');
+  }
+
+  // 3. Attribute Badges
+  if (meta.thaat) {
+    textPaths += renderTextPath(font, `Thaat: ${meta.thaat}`, 735, 136, 13, '#fef3c7', 'center');
+  }
+  if (meta.vadi) {
+    textPaths += renderTextPath(font, `Vadi: ${meta.vadi}`, 847, 136, 13, '#e0e7ff', 'center');
+  }
+  if (meta.samvadi) {
+    textPaths += renderTextPath(font, `Samvadi: ${meta.samvadi}`, 959, 136, 13, '#f3e8ff', 'center');
+  }
+  if (meta.time) {
+    textPaths += renderTextPath(font, meta.time.replace(/\s*\([^)]*\)/, ''), 1087, 136, 13, '#cbd5e1', 'center');
+  }
+
+  // 4. Section 1 (Aroha / Tan 1)
+  textPaths += renderTextPath(font, sec1.title.toUpperCase(), 80, 248, 13, '#fbbf24');
+  textPaths += renderTextPath(font, meta.cellTitle || 'Music Cell', 1116, 248, 12, '#64748b', 'right');
+  const row1 = renderNotesRow(font, sec1.notes, 266, true);
+  textPaths += row1.paths;
+
+  // 5. Section 2 (Avroha) if present
+  let row2Rects = '';
+  if (sec2) {
+    textPaths += renderTextPath(font, sec2.title.toUpperCase(), 80, 382, 13, '#a5b4fc');
+    const row2 = renderNotesRow(font, sec2.notes, 400, false);
+    row2Rects = row2.rects;
+    textPaths += row2.paths;
+  }
+
+  // 6. Footer
+  const authorText = `By ${meta.author || 'Speede Sargam'}`;
+  textPaths += renderTextPath(font, authorText, 52, 580, 15, '#e2e8f0');
+  textPaths += renderTextPath(font, 'Play & Edit Visualizer • sargam.speede.site', 972, 579, 14, '#ffffff', 'center');
 
   return `
   <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
@@ -313,99 +423,56 @@ function buildOgSvg(meta: ExtractedMeta): string {
     <rect width="1200" height="630" fill="url(#amberGlow)" />
     <rect width="1200" height="630" fill="url(#indigoGlow)" />
     
-    <!-- Top Header: Logo -->
+    <!-- Top Header: Logo Pill -->
     <rect x="52" y="40" width="156" height="32" rx="16" fill="rgba(245, 158, 11, 0.16)" stroke="rgba(245, 158, 11, 0.4)" stroke-width="1" />
     <circle cx="68" cy="56" r="4" fill="#f59e0b" />
-    <text x="80" y="62" fill="#fbbf24" font-size="12" font-family="sans-serif" font-weight="800" letter-spacing="1.5">SPEEDE SARGAM</text>
-    <text x="224" y="62" fill="#94a3b8" font-size="14" font-family="sans-serif" font-weight="500">Interactive Classical Notation</text>
     
-    <!-- Top Header Right Badges -->
+    <!-- Header Right Badges -->
     ${
       meta.tala
-        ? `
-    <rect x="870" y="40" width="130" height="32" rx="8" fill="rgba(255, 255, 255, 0.08)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />
-    <text x="935" y="61" fill="#e2e8f0" font-size="14" font-family="sans-serif" font-weight="600" text-anchor="middle">🥁 ${escapeXml(meta.tala)}</text>
-    `
+        ? '<rect x="870" y="40" width="130" height="32" rx="8" fill="rgba(255, 255, 255, 0.08)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />'
         : ''
     }
-    
     ${
       meta.sa
-        ? `
-    <rect x="1014" y="40" width="134" height="32" rx="8" fill="rgba(255, 255, 255, 0.08)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />
-    <text x="1081" y="61" fill="#cbd5e1" font-size="14" font-family="sans-serif" font-weight="600" text-anchor="middle">🎼 Sa = ${escapeXml(meta.sa)}</text>
-    `
-        : ''
-    }
-
-    <!-- Raag Hero Title -->
-    <text x="52" y="146" fill="#ffffff" font-size="48" font-family="sans-serif" font-weight="900" letter-spacing="-1">${displayRaag}</text>
-    ${
-      isDifferentTitle
-        ? `<text x="52" y="178" fill="#94a3b8" font-size="16" font-family="sans-serif" font-weight="500">${escapedTitle}</text>`
+        ? '<rect x="1014" y="40" width="134" height="32" rx="8" fill="rgba(255, 255, 255, 0.08)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />'
         : ''
     }
     
-    <!-- Classical Attribute Badges -->
+    <!-- Attribute Badges -->
     ${
       meta.thaat
-        ? `
-    <rect x="680" y="116" width="110" height="30" rx="6" fill="rgba(245, 158, 11, 0.12)" stroke="rgba(245, 158, 11, 0.3)" stroke-width="1" />
-    <text x="735" y="136" fill="#fef3c7" font-size="13" font-family="sans-serif" font-weight="600" text-anchor="middle">Thaat: ${escapeXml(meta.thaat)}</text>
-    `
+        ? '<rect x="680" y="116" width="110" height="30" rx="6" fill="rgba(245, 158, 11, 0.12)" stroke="rgba(245, 158, 11, 0.3)" stroke-width="1" />'
         : ''
     }
-
     ${
       meta.vadi
-        ? `
-    <rect x="802" y="116" width="90" height="30" rx="6" fill="rgba(99, 102, 241, 0.12)" stroke="rgba(99, 102, 241, 0.3)" stroke-width="1" />
-    <text x="847" y="136" fill="#e0e7ff" font-size="13" font-family="sans-serif" font-weight="600" text-anchor="middle">Vadi: ${escapeXml(meta.vadi)}</text>
-    `
+        ? '<rect x="802" y="116" width="90" height="30" rx="6" fill="rgba(99, 102, 241, 0.12)" stroke="rgba(99, 102, 241, 0.3)" stroke-width="1" />'
         : ''
     }
-
     ${
       meta.samvadi
-        ? `
-    <rect x="904" y="116" width="110" height="30" rx="6" fill="rgba(168, 85, 247, 0.12)" stroke="rgba(168, 85, 247, 0.3)" stroke-width="1" />
-    <text x="959" y="136" fill="#f3e8ff" font-size="13" font-family="sans-serif" font-weight="600" text-anchor="middle">Samvadi: ${escapeXml(meta.samvadi)}</text>
-    `
+        ? '<rect x="904" y="116" width="110" height="30" rx="6" fill="rgba(168, 85, 247, 0.12)" stroke="rgba(168, 85, 247, 0.3)" stroke-width="1" />'
         : ''
     }
-
     ${
       meta.time
-        ? `
-    <rect x="1026" y="116" width="122" height="30" rx="6" fill="rgba(255, 255, 255, 0.07)" stroke="rgba(255, 255, 255, 0.14)" stroke-width="1" />
-    <text x="1087" y="136" fill="#cbd5e1" font-size="13" font-family="sans-serif" font-weight="600" text-anchor="middle">${escapeXml(meta.time.replace(/\s*\([^)]*\)/, ''))}</text>
-    `
+        ? '<rect x="1026" y="116" width="122" height="30" rx="6" fill="rgba(255, 255, 255, 0.07)" stroke="rgba(255, 255, 255, 0.14)" stroke-width="1" />'
         : ''
     }
-
-    <!-- First Music Cell Preview Card -->
+    
+    <!-- First / Target Music Cell Preview Card -->
     <rect x="52" y="208" width="1096" height="310" rx="16" fill="rgba(255, 255, 255, 0.04)" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1" />
     
-    <!-- Section 1 (Aroha) -->
-    <text x="80" y="248" fill="#fbbf24" font-size="13" font-family="sans-serif" font-weight="700" letter-spacing="1">${escapeXml(sec1.title.toUpperCase())}</text>
-    <text x="1116" y="248" fill="#64748b" font-size="12" font-family="sans-serif" text-anchor="end">First Music Cell</text>
-    ${renderNotesRow(sec1.notes, 266, true)}
+    <!-- Note Pill Rectangles -->
+    ${row1.rects}
+    ${row2Rects}
     
-    <!-- Section 2 (Avroha) if present -->
-    ${
-      sec2
-        ? `
-    <text x="80" y="382" fill="#a5b4fc" font-size="13" font-family="sans-serif" font-weight="700" letter-spacing="1">${escapeXml(sec2.title.toUpperCase())}</text>
-    ${renderNotesRow(sec2.notes, 400, false)}
-    `
-        : ''
-    }
-
-    <!-- Footer Bar -->
-    <text x="52" y="580" fill="#94a3b8" font-size="15" font-family="sans-serif">By <tspan fill="#e2e8f0" font-weight="bold">${escapeXml(meta.author || 'Speede Sargam')}</tspan></text>
-    
+    <!-- CTA Button -->
     <rect x="796" y="554" width="352" height="40" rx="20" fill="url(#ctaGrad)" />
-    <text x="972" y="579" fill="#ffffff" font-size="14" font-family="sans-serif" font-weight="bold" text-anchor="middle">▶ Play &amp; Edit Visualizer • sargam.speede.site</text>
+    
+    <!-- Vector Typography Paths (Crisp text independent of system fonts) -->
+    ${textPaths}
   </svg>
   `;
 }
@@ -417,12 +484,24 @@ export default async function handler(req: any, res: any) {
 
   try {
     let fileId = '';
-    if (req.query?.fileId) {
-      fileId = Array.isArray(req.query.fileId) ? req.query.fileId[0] : req.query.fileId;
-    } else if (req.url) {
+    let cellId = '';
+
+    if (req.query) {
+      if (req.query.fileId) {
+        fileId = Array.isArray(req.query.fileId) ? req.query.fileId[0] : req.query.fileId;
+      }
+      if (req.query.cellId) {
+        cellId = Array.isArray(req.query.cellId) ? req.query.cellId[0] : req.query.cellId;
+      }
+    }
+
+    if (!fileId && req.url) {
       try {
         const parsedUrl = new URL(req.url, origin);
         fileId = parsedUrl.searchParams.get('fileId') || '';
+        if (!cellId) {
+          cellId = parsedUrl.searchParams.get('cellId') || '';
+        }
       } catch {}
     }
 
@@ -445,16 +524,19 @@ export default async function handler(req: any, res: any) {
     if (fileId) {
       try {
         const data = await fetchNotebookFromRegistry(fileId);
-        meta = extractNotebookMeta(data.notebook, data.entry);
+        meta = extractNotebookMeta(data.notebook, data.entry, cellId);
       } catch (e) {
         console.warn(`Could not load registry notebook for fileId ${fileId}:`, e);
       }
     }
 
-    // 1. Build the dynamic SVG from this notebook's metadata and first music cell
-    const svg = buildOgSvg(meta);
+    // 1. Ensure font is loaded for vector glyph path generation
+    const font = await getFont();
 
-    // 2. Render SVG to PNG via resvg WebAssembly
+    // 2. Build vector SVG containing pre-rendered glyph paths
+    const svg = buildOgSvgWithFont(font, meta);
+
+    // 3. Render SVG to PNG via resvg WebAssembly
     try {
       await ensureWasmInitialized();
       const resvg = new Resvg(svg, {
@@ -474,7 +556,7 @@ export default async function handler(req: any, res: any) {
       console.warn('Wasm PNG render failed, serving dynamic SVG directly:', renderErr);
     }
 
-    // 3. Fallback: serve dynamic SVG vector image directly (never fallback to default preview image)
+    // 4. Fallback: serve dynamic SVG vector image directly (never fallback to default preview image)
     res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
     res.setHeader(
       'Cache-Control',
@@ -483,27 +565,11 @@ export default async function handler(req: any, res: any) {
     res.status(200).send(svg);
   } catch (err: any) {
     console.error('Error in og handler:', err);
-    // Dynamic SVG fallback with whatever metadata is available
-    const fallbackSvg = buildOgSvg({
-      title: 'Sargam Notebook',
-      author: '',
-      raag: 'Sargam Notebook',
-      thaat: '',
-      vadi: '',
-      samvadi: '',
-      time: '',
-      tala: 'Tintal(16)',
-      sa: 'C4',
-      tempo: '',
-      cellTitle: '',
-      sections: [],
-      description: 'Interactive Indian Music Notation Notebook',
-    });
     res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
     res.setHeader(
       'Cache-Control',
       'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400'
     );
-    res.status(200).send(fallbackSvg);
+    res.status(200).send('<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="630" fill="#0a0b12"/><text x="100" y="100" fill="white" font-size="40">Speede Sargam</text></svg>');
   }
 }

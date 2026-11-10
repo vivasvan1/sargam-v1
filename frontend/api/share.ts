@@ -38,7 +38,7 @@ async function fetchNotebookFromRegistry(fileId: string): Promise<any> {
   return data;
 }
 
-function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMeta {
+function extractNotebookMeta(notebook: any, entry: any = {}, targetCellId?: string): ExtractedMeta {
   const cells: any[] = notebook?.cells || [];
   const nbMetadata = notebook?.metadata || {};
 
@@ -101,18 +101,39 @@ function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMeta {
     }
   }
 
-  // 3. Extract First Music Cell Details & Sections
-  const musicCell = cells.find((c: any) => c.cell_type === 'music');
+  // 3. Find target cell or first music cell
+  let targetCell = targetCellId ? cells.find((c: any) => c.id === targetCellId) : null;
+  if (!targetCell) {
+    targetCell = cells.find((c: any) => c.cell_type === 'music');
+  }
+
   let tala = '';
   let sa = '';
   let tempo = '';
   let cellTitle = '';
   const sections: MusicSection[] = [];
 
-  if (musicCell) {
-    const lines: string[] = Array.isArray(musicCell.source)
-      ? musicCell.source
-      : (musicCell.source || '').split('\n');
+  // Scan music cells for default tala/sa/tempo
+  for (const c of cells) {
+    if (c.cell_type === 'music') {
+      const lines: string[] = Array.isArray(c.source) ? c.source : (c.source || '').split('\n');
+      for (const rawLine of lines) {
+        const trimmed = rawLine.trim();
+        if ((trimmed.startsWith('@tala ') || trimmed.startsWith('@taal ')) && !tala) {
+          tala = trimmed.replace(/^@(tala|taal)\s+/, '').trim();
+        } else if (trimmed.startsWith('@sa ') && !sa) {
+          sa = trimmed.slice(4).trim();
+        } else if (trimmed.startsWith('@tempo ') && !tempo) {
+          tempo = trimmed.slice(7).trim();
+        }
+      }
+    }
+  }
+
+  if (targetCell) {
+    const lines: string[] = Array.isArray(targetCell.source)
+      ? targetCell.source
+      : (targetCell.source || '').split('\n');
 
     let currentSectionTitle = '';
     const sectionList: { title: string; lines: string[] }[] = [];
@@ -128,7 +149,7 @@ function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMeta {
         sa = trimmed.slice(4).trim();
       } else if (trimmed.startsWith('@tempo ')) {
         tempo = trimmed.slice(7).trim();
-      } else if (trimmed.startsWith('@title ') && !cellTitle) {
+      } else if (trimmed.startsWith('@title ')) {
         cellTitle = trimmed.slice(7).trim();
       } else if (trimmed.startsWith('#') && !trimmed.startsWith('#voice')) {
         const headerTitle = trimmed.replace(/^#+\s*/, '').trim();
@@ -161,6 +182,7 @@ function extractNotebookMeta(notebook: any, entry: any = {}): ExtractedMeta {
 
   const descParts: string[] = [];
   if (raag) descParts.push(raag);
+  if (cellTitle) descParts.push(cellTitle);
   if (thaat) descParts.push(`Thaat: ${thaat}`);
   if (vadi) descParts.push(`Vadi: ${vadi}`);
   if (samvadi) descParts.push(`Samvadi: ${samvadi}`);
@@ -244,31 +266,46 @@ export default async function handler(req: any, res: any) {
 
   try {
     let fileId = '';
-    if (req.query?.fileId) {
-      fileId = Array.isArray(req.query.fileId) ? req.query.fileId[0] : req.query.fileId;
-    } else if (req.url) {
+    let cellId = '';
+
+    if (req.query) {
+      if (req.query.fileId) {
+        fileId = Array.isArray(req.query.fileId) ? req.query.fileId[0] : req.query.fileId;
+      }
+      if (req.query.cellId) {
+        cellId = Array.isArray(req.query.cellId) ? req.query.cellId[0] : req.query.cellId;
+      }
+    }
+
+    if (!fileId && req.url) {
       try {
         const parsedUrl = new URL(req.url, origin);
         fileId = parsedUrl.searchParams.get('fileId') || '';
+        if (!cellId) {
+          cellId = parsedUrl.searchParams.get('cellId') || '';
+        }
       } catch {}
     }
 
     let title = 'Speede Sargam Notebook';
     let raag = '';
+    let cellTitle = '';
     let description =
       'Indian classical music notation notebook. Open to play, edit, and practice interactive swara visualizer.';
     let imageUrl = `${origin}/notebook_preview.jpg`;
     let canonicalUrl = `${origin}/`;
 
     if (fileId) {
-      canonicalUrl = `${origin}/?fileId=${encodeURIComponent(fileId)}`;
-      imageUrl = `${origin}/api/og?fileId=${encodeURIComponent(fileId)}`;
+      const cellParam = cellId ? `&cellId=${encodeURIComponent(cellId)}` : '';
+      canonicalUrl = `${origin}/?fileId=${encodeURIComponent(fileId)}${cellParam}`;
+      imageUrl = `${origin}/api/og?fileId=${encodeURIComponent(fileId)}${cellParam}`;
 
       try {
         const data = await fetchNotebookFromRegistry(fileId);
-        const meta = extractNotebookMeta(data.notebook, data.entry);
+        const meta = extractNotebookMeta(data.notebook, data.entry, cellId);
         title = meta.title;
         raag = meta.raag;
+        cellTitle = meta.cellTitle;
         description = meta.description;
       } catch (err) {
         console.warn(`Could not load registry info for fileId ${fileId}:`, err);
@@ -277,12 +314,16 @@ export default async function handler(req: any, res: any) {
 
     const baseHtml = await getBaseHtml(origin);
 
-    // Desired title format: e.g. "Raag Yaman - Sargam Notebook" or "Raag Brindavani Sarang - Sargam Notebook"
-    const displayTitle = raag && raag !== 'Indian Classical Music'
-      ? `${raag} - Sargam Notebook`
-      : title.toLowerCase().includes('sargam')
-        ? title
-        : `${title} - Sargam Notebook`;
+    // Title generation format:
+    // If cellId is mentioned: (Raag Yaman - Tan 1 - Sargam Notebook)
+    // If no cellId: (Raag Yaman - Sargam Notebook)
+    const displayRaag = raag && raag !== 'Indian Classical Music' ? raag : title;
+    let displayTitle = '';
+    if (cellId && cellTitle) {
+      displayTitle = `${displayRaag} - ${cellTitle} - Sargam Notebook`;
+    } else {
+      displayTitle = `${displayRaag} - Sargam Notebook`;
+    }
 
     const escapedTitle = escapeHtml(displayTitle);
     const escapedDesc = escapeHtml(description);
