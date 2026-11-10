@@ -293,27 +293,46 @@ function extractNotebookMeta(notebook: any, entry: any = {}, targetCellId?: stri
   };
 }
 
-function renderNotesRow(font: any, tokens: string[], startY: number, isAmber: boolean): { rects: string; paths: string } {
-  let x = 80;
+function renderNotesRow(
+  font: any,
+  tokens: string[],
+  startY: number,
+  isAmber: boolean,
+  startX: number = 90
+): { rects: string; paths: string } {
+  let x = startX;
   let rects = '';
   let paths = '';
-  const pillBg = isAmber ? 'rgba(245, 158, 11, 0.15)' : 'rgba(99, 102, 241, 0.15)';
-  const strokeColor = isAmber ? 'rgba(245, 158, 11, 0.45)' : 'rgba(99, 102, 241, 0.45)';
+  const pillBg = isAmber ? 'rgba(245, 158, 11, 0.16)' : 'rgba(99, 102, 241, 0.16)';
+  const strokeColor = isAmber ? 'rgba(245, 158, 11, 0.55)' : 'rgba(99, 102, 241, 0.55)';
   const textColor = isAmber ? '#fef3c7' : '#e0e7ff';
+
+  const count = tokens.length;
+  let fontSize = 46;
+  let pillHeight = 76;
+  let pad = 44;
+  let gap = 20;
+
+  if (count > 9) {
+    fontSize = 38;
+    pillHeight = 64;
+    pad = 32;
+    gap = 14;
+  }
 
   for (const t of tokens) {
     if (t.startsWith('|')) {
       const cleanBar = t.replace(/="[^"]*"/g, '');
-      paths += renderTextPath(font, cleanBar, x + 6, startY + 34, 24, '#64748b', 'left');
-      x += 36;
+      paths += renderTextPath(font, cleanBar, x + 6, startY + (pillHeight * 0.7), fontSize - 4, '#94a3b8', 'left');
+      x += 46;
     } else {
-      const textWidth = font.getAdvanceWidth(t, 22);
-      const width = Math.max(50, textWidth + 28);
+      const textWidth = font.getAdvanceWidth(t, fontSize);
+      const width = Math.max(pillHeight, textWidth + pad);
       rects += `
-        <rect x="${x}" y="${startY}" width="${width}" height="48" rx="10" fill="${pillBg}" stroke="${strokeColor}" stroke-width="1.5" />
+        <rect x="${x}" y="${startY}" width="${width}" height="${pillHeight}" rx="14" fill="${pillBg}" stroke="${strokeColor}" stroke-width="2" />
       `;
-      paths += renderTextPath(font, t, x + width / 2, startY + 33, 22, textColor, 'center');
-      x += width + 12;
+      paths += renderTextPath(font, t, x + width / 2, startY + (pillHeight * 0.69), fontSize, textColor, 'center');
+      x += width + gap;
     }
   }
   return { rects, paths };
@@ -341,60 +360,105 @@ function buildOgSvgWithFont(font: any, meta: ExtractedMeta): string {
 
   let textPaths = '';
 
-  // 1. Top Header
-  textPaths += renderTextPath(font, 'SPEEDE SARGAM', 80, 61, 12, '#fbbf24');
-  textPaths += renderTextPath(font, 'Interactive Classical Notation', 224, 61, 14, '#94a3b8');
-
-  if (meta.tala) {
-    textPaths += renderTextPath(font, `Tala: ${meta.tala}`, 935, 61, 13, '#e2e8f0', 'center');
-  }
-  if (meta.sa) {
-    textPaths += renderTextPath(font, `Sa = ${meta.sa}`, 1081, 61, 13, '#cbd5e1', 'center');
-  }
-
-  // 2. Raag Hero Title & Subtitle
-  textPaths += renderTextPath(font, displayRaag, 52, 146, 48, '#ffffff');
+  // 1. Raag Hero Title & Subtitle (Left Header)
+  textPaths += renderTextPath(font, displayRaag, 60, 96, 54, '#ffffff');
 
   const subtitle = meta.cellTitle ? `${meta.cellTitle} • ${meta.title}` : meta.title;
   if (subtitle && !subtitle.toLowerCase().includes(displayRaag.toLowerCase())) {
-    textPaths += renderTextPath(font, subtitle, 52, 178, 16, '#94a3b8');
+    textPaths += renderTextPath(font, subtitle, 60, 138, 24, '#94a3b8');
   } else if (meta.cellTitle) {
-    textPaths += renderTextPath(font, meta.cellTitle, 52, 178, 16, '#94a3b8');
+    textPaths += renderTextPath(font, meta.cellTitle, 60, 138, 24, '#94a3b8');
+  } else if (meta.title && meta.title !== displayRaag) {
+    textPaths += renderTextPath(font, meta.title, 60, 138, 24, '#94a3b8');
   }
 
-  // 3. Attribute Badges
+  // 2. Badges on Top Right (Classical attributes)
+  const badges: { label: string; textCol: string; bgCol: string; strokeCol: string }[] = [];
   if (meta.thaat) {
-    textPaths += renderTextPath(font, `Thaat: ${meta.thaat}`, 735, 136, 13, '#fef3c7', 'center');
+    badges.push({
+      label: `Thaat: ${meta.thaat}`,
+      textCol: '#fef3c7',
+      bgCol: 'rgba(245, 158, 11, 0.15)',
+      strokeCol: 'rgba(245, 158, 11, 0.4)',
+    });
   }
   if (meta.vadi) {
-    textPaths += renderTextPath(font, `Vadi: ${meta.vadi}`, 847, 136, 13, '#e0e7ff', 'center');
+    badges.push({
+      label: `Vadi: ${meta.vadi}`,
+      textCol: '#e0e7ff',
+      bgCol: 'rgba(99, 102, 241, 0.15)',
+      strokeCol: 'rgba(99, 102, 241, 0.4)',
+    });
   }
   if (meta.samvadi) {
-    textPaths += renderTextPath(font, `Samvadi: ${meta.samvadi}`, 959, 136, 13, '#f3e8ff', 'center');
+    badges.push({
+      label: `Samvadi: ${meta.samvadi}`,
+      textCol: '#f3e8ff',
+      bgCol: 'rgba(168, 85, 247, 0.15)',
+      strokeCol: 'rgba(168, 85, 247, 0.4)',
+    });
   }
   if (meta.time) {
-    textPaths += renderTextPath(font, meta.time.replace(/\s*\([^)]*\)/, ''), 1087, 136, 13, '#cbd5e1', 'center');
+    badges.push({
+      label: meta.time.replace(/\s*\([^)]*\)/, ''),
+      textCol: '#cbd5e1',
+      bgCol: 'rgba(255, 255, 255, 0.08)',
+      strokeCol: 'rgba(255, 255, 255, 0.2)',
+    });
   }
 
-  // 4. Section 1 (Aroha / Tan 1)
-  textPaths += renderTextPath(font, sec1.title.toUpperCase(), 80, 248, 13, '#fbbf24');
-  textPaths += renderTextPath(font, meta.cellTitle || 'Music Cell', 1116, 248, 12, '#64748b', 'right');
-  const row1 = renderNotesRow(font, sec1.notes, 266, true);
-  textPaths += row1.paths;
+  let badgeRects = '';
+  let rightX = 1140;
+  for (let i = badges.length - 1; i >= 0; i--) {
+    const b = badges[i];
+    const textWidth = font.getAdvanceWidth(b.label, 18);
+    const badgeWidth = textWidth + 32;
+    const badgeX = rightX - badgeWidth;
+    badgeRects += `
+    <rect x="${badgeX}" y="60" width="${badgeWidth}" height="42" rx="10" fill="${b.bgCol}" stroke="${b.strokeCol}" stroke-width="1.5" />
+    `;
+    textPaths += renderTextPath(font, b.label, badgeX + badgeWidth / 2, 87, 18, b.textCol, 'center');
+    rightX = badgeX - 12;
+  }
 
-  // 5. Section 2 (Avroha) if present
-  let row2Rects = '';
+  // 3. Notation Card Content
+  let notationRects = '';
+
   if (sec2) {
-    textPaths += renderTextPath(font, sec2.title.toUpperCase(), 80, 382, 13, '#a5b4fc');
-    const row2 = renderNotesRow(font, sec2.notes, 400, false);
-    row2Rects = row2.rects;
-    textPaths += row2.paths;
+    // Two sections (e.g. Aroha & Avroha)
+    textPaths += renderTextPath(font, sec1.title.toUpperCase(), 90, 212, 28, '#fbbf24');
+    const r1 = renderNotesRow(font, sec1.notes, 232, true, 90);
+    notationRects += r1.rects;
+    textPaths += r1.paths;
+
+    textPaths += renderTextPath(font, sec2.title.toUpperCase(), 90, 372, 28, '#a5b4fc');
+    const r2 = renderNotesRow(font, sec2.notes, 392, false, 90);
+    notationRects += r2.rects;
+    textPaths += r2.paths;
+  } else {
+    // Single section (e.g. Tan 1, Drut Gat)
+    const title = (sec1.title || meta.cellTitle || 'Notation').toUpperCase();
+    textPaths += renderTextPath(font, title, 90, 215, 30, '#fbbf24');
+
+    if (sec1.notes.length > 8) {
+      const row1Tokens = sec1.notes.slice(0, 8);
+      const row2Tokens = sec1.notes.slice(8, 16);
+      const r1 = renderNotesRow(font, row1Tokens, 248, true, 90);
+      const r2 = renderNotesRow(font, row2Tokens, 372, false, 90);
+      notationRects += r1.rects + r2.rects;
+      textPaths += r1.paths + r2.paths;
+    } else {
+      const r1 = renderNotesRow(font, sec1.notes, 275, true, 90);
+      notationRects += r1.rects;
+      textPaths += r1.paths;
+    }
   }
 
-  // 6. Footer
-  const authorText = `By ${meta.author || 'Speede Sargam'}`;
-  textPaths += renderTextPath(font, authorText, 52, 580, 15, '#e2e8f0');
-  textPaths += renderTextPath(font, 'Play & Edit Visualizer • sargam.speede.site', 972, 579, 14, '#ffffff', 'center');
+  // 4. Footer
+  if (meta.author) {
+    textPaths += renderTextPath(font, `By ${meta.author}`, 60, 588, 22, '#94a3b8');
+  }
+  textPaths += renderTextPath(font, 'sargam.speede.site', 1140, 588, 24, '#94a3b8', 'right');
 
   return `
   <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
@@ -412,10 +476,6 @@ function buildOgSvgWithFont(font: any, meta: ExtractedMeta): string {
         <stop offset="0%" stop-color="#6366f1" stop-opacity="0.25" />
         <stop offset="100%" stop-color="#6366f1" stop-opacity="0" />
       </radialGradient>
-      <linearGradient id="ctaGrad" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#f59e0b" />
-        <stop offset="100%" stop-color="#ec4899" />
-      </linearGradient>
     </defs>
     
     <!-- Background Canvas -->
@@ -423,53 +483,14 @@ function buildOgSvgWithFont(font: any, meta: ExtractedMeta): string {
     <rect width="1200" height="630" fill="url(#amberGlow)" />
     <rect width="1200" height="630" fill="url(#indigoGlow)" />
     
-    <!-- Top Header: Logo Pill -->
-    <rect x="52" y="40" width="156" height="32" rx="16" fill="rgba(245, 158, 11, 0.16)" stroke="rgba(245, 158, 11, 0.4)" stroke-width="1" />
-    <circle cx="68" cy="56" r="4" fill="#f59e0b" />
-    
-    <!-- Header Right Badges -->
-    ${
-      meta.tala
-        ? '<rect x="870" y="40" width="130" height="32" rx="8" fill="rgba(255, 255, 255, 0.08)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />'
-        : ''
-    }
-    ${
-      meta.sa
-        ? '<rect x="1014" y="40" width="134" height="32" rx="8" fill="rgba(255, 255, 255, 0.08)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />'
-        : ''
-    }
-    
     <!-- Attribute Badges -->
-    ${
-      meta.thaat
-        ? '<rect x="680" y="116" width="110" height="30" rx="6" fill="rgba(245, 158, 11, 0.12)" stroke="rgba(245, 158, 11, 0.3)" stroke-width="1" />'
-        : ''
-    }
-    ${
-      meta.vadi
-        ? '<rect x="802" y="116" width="90" height="30" rx="6" fill="rgba(99, 102, 241, 0.12)" stroke="rgba(99, 102, 241, 0.3)" stroke-width="1" />'
-        : ''
-    }
-    ${
-      meta.samvadi
-        ? '<rect x="904" y="116" width="110" height="30" rx="6" fill="rgba(168, 85, 247, 0.12)" stroke="rgba(168, 85, 247, 0.3)" stroke-width="1" />'
-        : ''
-    }
-    ${
-      meta.time
-        ? '<rect x="1026" y="116" width="122" height="30" rx="6" fill="rgba(255, 255, 255, 0.07)" stroke="rgba(255, 255, 255, 0.14)" stroke-width="1" />'
-        : ''
-    }
+    ${badgeRects}
     
-    <!-- First / Target Music Cell Preview Card -->
-    <rect x="52" y="208" width="1096" height="310" rx="16" fill="rgba(255, 255, 255, 0.04)" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1" />
+    <!-- Notation Card Canvas -->
+    <rect x="60" y="165" width="1080" height="375" rx="18" fill="rgba(255, 255, 255, 0.04)" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1.5" />
     
     <!-- Note Pill Rectangles -->
-    ${row1.rects}
-    ${row2Rects}
-    
-    <!-- CTA Button -->
-    <rect x="796" y="554" width="352" height="40" rx="20" fill="url(#ctaGrad)" />
+    ${notationRects}
     
     <!-- Vector Typography Paths (Crisp text independent of system fonts) -->
     ${textPaths}
