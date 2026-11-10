@@ -1,15 +1,32 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { Resvg, initWasm } from '@resvg/resvg-wasm';
 import { fetchNotebookFromRegistry, extractNotebookMeta, type ExtractedMeta } from './_utils.js';
-
-export const config = {
-  runtime: 'edge',
-};
 
 let wasmInitPromise: Promise<void> | null = null;
 
 async function ensureWasmInitialized(): Promise<void> {
   if (!wasmInitPromise) {
     wasmInitPromise = (async () => {
+      // 1. Try local node_modules path
+      try {
+        const localWasmPath = path.join(
+          process.cwd(),
+          'node_modules',
+          '@resvg',
+          'resvg-wasm',
+          'index_bg.wasm'
+        );
+        if (fs.existsSync(localWasmPath)) {
+          const buffer = fs.readFileSync(localWasmPath);
+          await initWasm(buffer);
+          return;
+        }
+      } catch (err) {
+        console.warn('Could not load local resvg wasm, falling back to CDN:', err);
+      }
+
+      // 2. Fallback to CDN
       const cdnUrl = 'https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.4.1/index_bg.wasm';
       const response = await fetch(cdnUrl);
       if (!response.ok) {

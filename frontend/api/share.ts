@@ -1,8 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { fetchNotebookFromRegistry, extractNotebookMeta } from './_utils.js';
-
-export const config = {
-  runtime: 'edge',
-};
 
 let cachedHtml: string | null = null;
 
@@ -18,6 +16,16 @@ function escapeHtml(str: string): string {
 async function getBaseHtml(origin: string): Promise<string> {
   if (cachedHtml) return cachedHtml;
 
+  // 1. Try local dist/index.html
+  try {
+    const distPath = path.join(process.cwd(), 'dist', 'index.html');
+    if (fs.existsSync(distPath)) {
+      cachedHtml = fs.readFileSync(distPath, 'utf-8');
+      return cachedHtml;
+    }
+  } catch {}
+
+  // 2. Fallback fetch from origin
   try {
     const res = await fetch(`${origin}/index.html`);
     if (res.ok) {
