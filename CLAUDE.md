@@ -111,3 +111,8 @@ Uses **Tone.js** for playback:
 - Music playback uses global `Tone.getTransport()` with scheduled events
 - Parser preserves unknown directives/ornaments for extensibility
 - Theme stored in localStorage as `sargam-theme` (`light`/`dark`)
+
+## Agent Rules
+
+- Every bugfix or error fix must be pushed to `main`.
+- Run `npx tsc --noEmit` only at the end of changes.

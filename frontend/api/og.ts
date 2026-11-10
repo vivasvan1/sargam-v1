@@ -1,14 +1,211 @@
-import React from 'react';
-import { ImageResponse } from '@vercel/og';
+import { Resvg, initWasm } from '@resvg/resvg-wasm';
 import { fetchNotebookFromRegistry, extractNotebookMeta, type ExtractedMeta } from './_utils.js';
 
 export const config = {
   runtime: 'edge',
 };
 
-const h = React.createElement;
+let wasmInitPromise: Promise<void> | null = null;
 
-export default async function handler(req: Request) {
+async function ensureWasmInitialized(): Promise<void> {
+  if (!wasmInitPromise) {
+    wasmInitPromise = (async () => {
+      const cdnUrl = 'https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.4.1/index_bg.wasm';
+      const response = await fetch(cdnUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to load resvg wasm: ${response.status}`);
+      }
+      const wasmBuffer = await response.arrayBuffer();
+      await initWasm(wasmBuffer);
+    })();
+  }
+  return wasmInitPromise;
+}
+
+function escapeXml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function renderNotesRow(tokens: string[], startY: number, isAmber: boolean): string {
+  let x = 80;
+  let items = '';
+  const pillBg = isAmber ? 'rgba(245, 158, 11, 0.15)' : 'rgba(99, 102, 241, 0.15)';
+  const strokeColor = isAmber ? 'rgba(245, 158, 11, 0.45)' : 'rgba(99, 102, 241, 0.45)';
+  const textColor = isAmber ? '#fef3c7' : '#e0e7ff';
+
+  for (const t of tokens) {
+    if (t.startsWith('|')) {
+      const cleanBar = escapeXml(t.replace(/="[^"]*"/g, ''));
+      items += `<text x="${x + 6}" y="${startY + 34}" fill="#64748b" font-size="24" font-family="sans-serif" font-weight="800">${cleanBar}</text>`;
+      x += 36;
+    } else {
+      const width = Math.max(48, t.length * 16 + 24);
+      const cleanNote = escapeXml(t);
+      items += `
+        <rect x="${x}" y="${startY}" width="${width}" height="48" rx="10" fill="${pillBg}" stroke="${strokeColor}" stroke-width="1.5" />
+        <text x="${x + width / 2}" y="${startY + 32}" fill="${textColor}" font-size="22" font-family="sans-serif" font-weight="bold" text-anchor="middle">${cleanNote}</text>
+      `;
+      x += width + 12;
+    }
+  }
+  return items;
+}
+
+function buildOgSvg(meta: ExtractedMeta): string {
+  const displayRaag = escapeXml(
+    meta.raag && meta.raag !== 'Indian Classical Music' ? meta.raag : meta.title
+  );
+  const isDifferentTitle =
+    meta.title && meta.raag && !meta.title.toLowerCase().includes(meta.raag.toLowerCase());
+  const escapedTitle = escapeXml(meta.title);
+
+  let sections = meta.sections;
+  if (!sections || sections.length === 0) {
+    sections = [
+      {
+        title: 'Aroha (Ascent)',
+        notes: ['S', 'R', 'G', 'M', 'P', 'D', 'N', "S'", '||'],
+      },
+      {
+        title: 'Avroha (Descent)',
+        notes: ["S'", 'N', 'D', 'P', 'M', 'G', 'R', 'S', '||'],
+      },
+    ];
+  }
+
+  const sec1 = sections[0];
+  const sec2 = sections[1] || null;
+
+  return `
+  <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#0a0b12" />
+        <stop offset="50%" stop-color="#111322" />
+        <stop offset="100%" stop-color="#1a1730" />
+      </linearGradient>
+      <radialGradient id="amberGlow" cx="10%" cy="15%" r="45%">
+        <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.22" />
+        <stop offset="100%" stop-color="#f59e0b" stop-opacity="0" />
+      </radialGradient>
+      <radialGradient id="indigoGlow" cx="90%" cy="85%" r="50%">
+        <stop offset="0%" stop-color="#6366f1" stop-opacity="0.25" />
+        <stop offset="100%" stop-color="#6366f1" stop-opacity="0" />
+      </radialGradient>
+      <linearGradient id="ctaGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#f59e0b" />
+        <stop offset="100%" stop-color="#ec4899" />
+      </linearGradient>
+    </defs>
+    
+    <!-- Background Canvas -->
+    <rect width="1200" height="630" fill="url(#bg)" />
+    <rect width="1200" height="630" fill="url(#amberGlow)" />
+    <rect width="1200" height="630" fill="url(#indigoGlow)" />
+    
+    <!-- Top Header: Logo -->
+    <rect x="52" y="40" width="156" height="32" rx="16" fill="rgba(245, 158, 11, 0.16)" stroke="rgba(245, 158, 11, 0.4)" stroke-width="1" />
+    <circle cx="68" cy="56" r="4" fill="#f59e0b" />
+    <text x="80" y="62" fill="#fbbf24" font-size="12" font-family="sans-serif" font-weight="800" letter-spacing="1.5">SPEEDE SARGAM</text>
+    <text x="224" y="62" fill="#94a3b8" font-size="14" font-family="sans-serif" font-weight="500">Interactive Classical Notation</text>
+    
+    <!-- Top Header Right Badges -->
+    ${
+      meta.tala
+        ? `
+    <rect x="870" y="40" width="130" height="32" rx="8" fill="rgba(255, 255, 255, 0.08)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />
+    <text x="935" y="61" fill="#e2e8f0" font-size="14" font-family="sans-serif" font-weight="600" text-anchor="middle">🥁 ${escapeXml(meta.tala)}</text>
+    `
+        : ''
+    }
+    
+    ${
+      meta.sa
+        ? `
+    <rect x="1014" y="40" width="134" height="32" rx="8" fill="rgba(255, 255, 255, 0.08)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />
+    <text x="1081" y="61" fill="#cbd5e1" font-size="14" font-family="sans-serif" font-weight="600" text-anchor="middle">🎼 Sa = ${escapeXml(meta.sa)}</text>
+    `
+        : ''
+    }
+
+    <!-- Raag Hero Title -->
+    <text x="52" y="146" fill="#ffffff" font-size="48" font-family="sans-serif" font-weight="900" letter-spacing="-1">${displayRaag}</text>
+    ${
+      isDifferentTitle
+        ? `<text x="52" y="178" fill="#94a3b8" font-size="16" font-family="sans-serif" font-weight="500">${escapedTitle}</text>`
+        : ''
+    }
+    
+    <!-- Classical Attribute Badges -->
+    ${
+      meta.thaat
+        ? `
+    <rect x="680" y="116" width="110" height="30" rx="6" fill="rgba(245, 158, 11, 0.12)" stroke="rgba(245, 158, 11, 0.3)" stroke-width="1" />
+    <text x="735" y="136" fill="#fef3c7" font-size="13" font-family="sans-serif" font-weight="600" text-anchor="middle">Thaat: ${escapeXml(meta.thaat)}</text>
+    `
+        : ''
+    }
+
+    ${
+      meta.vadi
+        ? `
+    <rect x="802" y="116" width="90" height="30" rx="6" fill="rgba(99, 102, 241, 0.12)" stroke="rgba(99, 102, 241, 0.3)" stroke-width="1" />
+    <text x="847" y="136" fill="#e0e7ff" font-size="13" font-family="sans-serif" font-weight="600" text-anchor="middle">Vadi: ${escapeXml(meta.vadi)}</text>
+    `
+        : ''
+    }
+
+    ${
+      meta.samvadi
+        ? `
+    <rect x="904" y="116" width="110" height="30" rx="6" fill="rgba(168, 85, 247, 0.12)" stroke="rgba(168, 85, 247, 0.3)" stroke-width="1" />
+    <text x="959" y="136" fill="#f3e8ff" font-size="13" font-family="sans-serif" font-weight="600" text-anchor="middle">Samvadi: ${escapeXml(meta.samvadi)}</text>
+    `
+        : ''
+    }
+
+    ${
+      meta.time
+        ? `
+    <rect x="1026" y="116" width="122" height="30" rx="6" fill="rgba(255, 255, 255, 0.07)" stroke="rgba(255, 255, 255, 0.14)" stroke-width="1" />
+    <text x="1087" y="136" fill="#cbd5e1" font-size="13" font-family="sans-serif" font-weight="600" text-anchor="middle">${escapeXml(meta.time.replace(/\s*\([^)]*\)/, ''))}</text>
+    `
+        : ''
+    }
+
+    <!-- First Music Cell Preview Card -->
+    <rect x="52" y="208" width="1096" height="310" rx="16" fill="rgba(255, 255, 255, 0.04)" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1" />
+    
+    <!-- Section 1 (Aroha) -->
+    <text x="80" y="248" fill="#fbbf24" font-size="13" font-family="sans-serif" font-weight="700" letter-spacing="1">${escapeXml(sec1.title.toUpperCase())}</text>
+    <text x="1116" y="248" fill="#64748b" font-size="12" font-family="sans-serif" text-anchor="end">First Music Cell</text>
+    ${renderNotesRow(sec1.notes, 266, true)}
+    
+    <!-- Section 2 (Avroha) if present -->
+    ${
+      sec2
+        ? `
+    <text x="80" y="382" fill="#a5b4fc" font-size="13" font-family="sans-serif" font-weight="700" letter-spacing="1">${escapeXml(sec2.title.toUpperCase())}</text>
+    ${renderNotesRow(sec2.notes, 400, false)}
+    `
+        : ''
+    }
+
+    <!-- Footer Bar -->
+    <text x="52" y="580" fill="#94a3b8" font-size="15" font-family="sans-serif">By <tspan fill="#e2e8f0" font-weight="bold">${escapeXml(meta.author || 'Speede Sargam')}</tspan></text>
+    
+    <rect x="796" y="554" width="352" height="40" rx="20" fill="url(#ctaGrad)" />
+    <text x="972" y="579" fill="#ffffff" font-size="14" font-family="sans-serif" font-weight="bold" text-anchor="middle">▶ Play &amp; Edit Visualizer • sargam.speede.site</text>
+  </svg>
+  `;
+}
+
+export default async function handler(req: Request): Promise<Response> {
   try {
     const url = new URL(req.url);
     const fileId = url.searchParams.get('fileId') || '';
@@ -38,463 +235,25 @@ export default async function handler(req: Request) {
       }
     }
 
-    const displayRaag = meta.raag && meta.raag !== 'Indian Classical Music' ? meta.raag : meta.title;
-    const isDifferentTitle =
-      meta.title && meta.raag && !meta.title.toLowerCase().includes(meta.raag.toLowerCase());
+    // 1. Ensure resvg WebAssembly runtime is loaded
+    await ensureWasmInitialized();
 
-    // Prepare music cell sections for preview
-    let sectionsToRender = meta.sections;
-    if (sectionsToRender.length === 0) {
-      sectionsToRender = [
-        {
-          title: 'Aroha (Ascent)',
-          notes: ['S', 'R', 'G', 'M', 'P', 'D', 'N', "S'", '||'],
-        },
-        {
-          title: 'Avroha (Descent)',
-          notes: ["S'", 'N', 'D', 'P', 'M', 'G', 'R', 'S', '||'],
-        },
-      ];
-    }
+    // 2. Generate pristine SVG
+    const svg = buildOgSvg(meta);
 
-    const element = h(
-      'div',
-      {
-        style: {
-          width: '1200px',
-          height: '630px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          backgroundColor: '#0a0b12',
-          backgroundImage:
-            'radial-gradient(circle at 10% 15%, rgba(245, 158, 11, 0.22) 0%, transparent 45%), radial-gradient(circle at 90% 85%, rgba(99, 102, 241, 0.25) 0%, transparent 50%), linear-gradient(135deg, #090a10 0%, #111322 50%, #1a1730 100%)',
-          padding: '44px 52px',
-          fontFamily: 'sans-serif',
-          color: '#ffffff',
-          boxSizing: 'border-box',
-        },
+    // 3. Render SVG directly to PNG
+    const resvg = new Resvg(svg, {
+      fitTo: { mode: 'original' },
+    });
+    const pngData = resvg.render();
+    const pngBuffer = pngData.asPng();
+
+    return new Response(pngBuffer as unknown as BodyInit, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400',
       },
-      // 1. Header Bar
-      h(
-        'div',
-        {
-          style: {
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            width: '100%',
-          },
-        },
-        // Logo & Tagline
-        h(
-          'div',
-          { style: { display: 'flex', alignItems: 'center', gap: '14px' } },
-          h(
-            'div',
-            {
-              style: {
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'rgba(245, 158, 11, 0.16)',
-                border: '1px solid rgba(245, 158, 11, 0.4)',
-                borderRadius: '9999px',
-                padding: '6px 16px',
-              },
-            },
-            h('div', {
-              style: {
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: '#f59e0b',
-              },
-            }),
-            h(
-              'span',
-              {
-                style: {
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  letterSpacing: '1.5px',
-                  color: '#fbbf24',
-                  textTransform: 'uppercase',
-                },
-              },
-              'SPEEDE SARGAM'
-            )
-          ),
-          h(
-            'span',
-            { style: { fontSize: '14px', color: '#94a3b8', fontWeight: 500 } },
-            'Interactive Classical Notation'
-          )
-        ),
-        // Tala & Sa Badges
-        h(
-          'div',
-          { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
-          meta.tala
-            ? h(
-                'div',
-                {
-                  style: {
-                    display: 'flex',
-                    alignItems: 'center',
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '8px',
-                    padding: '6px 14px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: '#e2e8f0',
-                  },
-                },
-                `🥁 ${meta.tala}`
-              )
-            : null,
-          meta.sa
-            ? h(
-                'div',
-                {
-                  style: {
-                    display: 'flex',
-                    alignItems: 'center',
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '8px',
-                    padding: '6px 14px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: '#cbd5e1',
-                  },
-                },
-                `🎼 Sa = ${meta.sa}`
-              )
-            : null,
-          meta.tempo
-            ? h(
-                'div',
-                {
-                  style: {
-                    display: 'flex',
-                    alignItems: 'center',
-                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: '8px',
-                    padding: '6px 12px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: '#94a3b8',
-                  },
-                },
-                `${meta.tempo} BPM`
-              )
-            : null
-        )
-      ),
-
-      // 2. Middle Hero: Raag Title + Attributes + Music Cell Preview
-      h(
-        'div',
-        { style: { display: 'flex', flexDirection: 'column', gap: '18px', width: '100%' } },
-        // Title & Badges Row
-        h(
-          'div',
-          {
-            style: {
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-end',
-              width: '100%',
-            },
-          },
-          h(
-            'div',
-            { style: { display: 'flex', flexDirection: 'column' } },
-            h(
-              'div',
-              {
-                style: {
-                  fontSize: '48px',
-                  fontWeight: 900,
-                  color: '#ffffff',
-                  letterSpacing: '-1px',
-                  lineHeight: '1.1',
-                },
-              },
-              displayRaag
-            ),
-            isDifferentTitle
-              ? h(
-                  'div',
-                  {
-                    style: {
-                      fontSize: '17px',
-                      color: '#94a3b8',
-                      marginTop: '6px',
-                      fontWeight: 500,
-                    },
-                  },
-                  meta.title
-                )
-              : null
-          ),
-          // Classical Attributes Row
-          h(
-            'div',
-            { style: { display: 'flex', gap: '8px' } },
-            meta.thaat
-              ? h(
-                  'div',
-                  {
-                    style: {
-                      display: 'flex',
-                      alignItems: 'center',
-                      backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                      border: '1px solid rgba(245, 158, 11, 0.3)',
-                      borderRadius: '6px',
-                      padding: '5px 12px',
-                      fontSize: '13px',
-                      color: '#fef3c7',
-                      fontWeight: 600,
-                    },
-                  },
-                  `Thaat: ${meta.thaat}`
-                )
-              : null,
-            meta.vadi
-              ? h(
-                  'div',
-                  {
-                    style: {
-                      display: 'flex',
-                      alignItems: 'center',
-                      backgroundColor: 'rgba(99, 102, 241, 0.12)',
-                      border: '1px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: '6px',
-                      padding: '5px 12px',
-                      fontSize: '13px',
-                      color: '#e0e7ff',
-                      fontWeight: 600,
-                    },
-                  },
-                  `Vadi: ${meta.vadi}`
-                )
-              : null,
-            meta.samvadi
-              ? h(
-                  'div',
-                  {
-                    style: {
-                      display: 'flex',
-                      alignItems: 'center',
-                      backgroundColor: 'rgba(168, 85, 247, 0.12)',
-                      border: '1px solid rgba(168, 85, 247, 0.3)',
-                      borderRadius: '6px',
-                      padding: '5px 12px',
-                      fontSize: '13px',
-                      color: '#f3e8ff',
-                      fontWeight: 600,
-                    },
-                  },
-                  `Samvadi: ${meta.samvadi}`
-                )
-              : null,
-            meta.time
-              ? h(
-                  'div',
-                  {
-                    style: {
-                      display: 'flex',
-                      alignItems: 'center',
-                      backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                      border: '1px solid rgba(255, 255, 255, 0.14)',
-                      borderRadius: '6px',
-                      padding: '5px 12px',
-                      fontSize: '13px',
-                      color: '#cbd5e1',
-                      fontWeight: 600,
-                    },
-                  },
-                  meta.time.replace(/\s*\([^)]*\)/, '')
-                )
-              : null
-          )
-        ),
-
-        // Music Cell Notation Card
-        h(
-          'div',
-          {
-            style: {
-              display: 'flex',
-              flexDirection: 'column',
-              backgroundColor: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '16px',
-              padding: '20px 24px',
-              gap: '16px',
-              width: '100%',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-            },
-          },
-          sectionsToRender.slice(0, 2).map((sec, secIdx) => {
-            const isAmberTheme = secIdx === 0;
-            const accentColor = isAmberTheme ? '#fbbf24' : '#a5b4fc';
-            const noteBg = isAmberTheme
-              ? 'rgba(245, 158, 11, 0.14)'
-              : 'rgba(99, 102, 241, 0.14)';
-            const noteBorder = isAmberTheme
-              ? '1.5px solid rgba(245, 158, 11, 0.4)'
-              : '1.5px solid rgba(99, 102, 241, 0.4)';
-            const noteTextColor = isAmberTheme ? '#fef3c7' : '#e0e7ff';
-
-            return h(
-              'div',
-              {
-                key: secIdx,
-                style: { display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' },
-              },
-              // Section Header
-              h(
-                'div',
-                {
-                  style: {
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  },
-                },
-                h(
-                  'span',
-                  {
-                    style: {
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      letterSpacing: '1px',
-                      color: accentColor,
-                      textTransform: 'uppercase',
-                    },
-                  },
-                  sec.title
-                ),
-                h(
-                  'span',
-                  { style: { fontSize: '12px', color: '#64748b' } },
-                  secIdx === 0 ? 'First Music Cell' : ''
-                )
-              ),
-              // Notes Row
-              h(
-                'div',
-                { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
-                sec.notes.map((token, tokenIdx) => {
-                  const isBarLine = token.startsWith('|');
-
-                  if (isBarLine) {
-                    return h(
-                      'div',
-                      {
-                        key: tokenIdx,
-                        style: {
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: '4px 6px',
-                          color: '#64748b',
-                          fontSize: '24px',
-                          fontWeight: 800,
-                          letterSpacing: '-2px',
-                        },
-                      },
-                      token.replace(/="[^"]*"/g, '')
-                    );
-                  }
-
-                  return h(
-                    'div',
-                    {
-                      key: tokenIdx,
-                      style: {
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: noteBg,
-                        border: noteBorder,
-                        borderRadius: '10px',
-                        padding: '8px 16px',
-                        fontSize: '22px',
-                        fontWeight: 800,
-                        color: noteTextColor,
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-                        minWidth: '40px',
-                      },
-                    },
-                    token
-                  );
-                })
-              )
-            );
-          })
-        )
-      ),
-
-      // 3. Footer Bar
-      h(
-        'div',
-        {
-          style: {
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            width: '100%',
-          },
-        },
-        // Author
-        h(
-          'div',
-          { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-          meta.author
-            ? h(
-                'span',
-                { style: { fontSize: '15px', color: '#94a3b8', fontWeight: 500 } },
-                'By ',
-                h('strong', { style: { color: '#e2e8f0' } }, meta.author)
-              )
-            : h(
-                'span',
-                { style: { fontSize: '15px', color: '#94a3b8', fontWeight: 500 } },
-                'Sargam Classical Visualizer'
-              )
-        ),
-        // Play Button CTA
-        h(
-          'div',
-          {
-            style: {
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'linear-gradient(90deg, #f59e0b, #ec4899)',
-              borderRadius: '9999px',
-              padding: '8px 22px',
-              fontSize: '14px',
-              fontWeight: 700,
-              color: '#ffffff',
-              boxShadow: '0 4px 16px rgba(245, 158, 11, 0.3)',
-            },
-          },
-          h('span', null, '▶ Play & Edit Visualizer'),
-          h('span', { style: { opacity: 0.8 } }, '• sargam.speede.site')
-        )
-      )
-    );
-
-    return new ImageResponse(element, {
-      width: 1200,
-      height: 630,
     });
   } catch (err: any) {
     console.error('Error in og handler:', err);
