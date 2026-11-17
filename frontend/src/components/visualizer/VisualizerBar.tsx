@@ -27,15 +27,7 @@ export function VisualizerBar({
 
   const barElement = (
     <div
-      className={cn(
-        'absolute top-0 bottom-0 cursor-pointer pointer-events-auto transition-colors group/bar',
-        '-ml-1.5 pl-1.5 w-3',
-        event.double
-          ? 'border-l-[3px] border-primary/70 hover:border-primary'
-          : hasComment
-            ? 'border-l-2 border-primary/80 hover:border-primary'
-            : 'border-l-2 border-primary/50 hover:border-primary'
-      )}
+      className="absolute top-0 bottom-0 cursor-pointer pointer-events-auto group/bar -translate-x-1/2 w-4 z-10"
       onClick={(e) => {
         e.stopPropagation();
         onSeek?.(event.audioStartTime + 0.001);
@@ -45,14 +37,43 @@ export function VisualizerBar({
         height: '100%',
       }}
     >
-      {hasComment && (
-        <span
-          className="absolute -top-1 left-[-4px] w-2 h-2 rounded-full bg-primary ring-2 ring-background shadow-xs group-hover/bar:scale-125 transition-transform"
-          aria-hidden="true"
+      {/* Visual Bar Line(s) */}
+      {event.double ? (
+        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 flex items-center gap-[3px]">
+          <div
+            className={cn(
+              'w-[2px] h-full transition-colors',
+              hasComment
+                ? 'bg-primary/90 group-hover/bar:bg-primary'
+                : 'bg-primary/70 group-hover/bar:bg-primary'
+            )}
+          />
+          <div
+            className={cn(
+              'w-[1.5px] h-full transition-colors',
+              hasComment
+                ? 'bg-primary/60 group-hover/bar:bg-primary'
+                : 'bg-primary/40 group-hover/bar:bg-primary/70'
+            )}
+          />
+        </div>
+      ) : (
+        <div
+          className={cn(
+            'absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] transition-colors',
+            hasComment
+              ? 'bg-primary/80 group-hover/bar:bg-primary'
+              : 'bg-primary/50 group-hover/bar:bg-primary'
+          )}
         />
       )}
-      {event.double && (
-        <div className="absolute left-[3px] top-0 bottom-0 border-l mr-[2px] border-primary/30 ml-[2px]" />
+
+      {/* Comment Marker Dot */}
+      {hasComment && (
+        <span
+          className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary ring-2 ring-background shadow-xs group-hover/bar:scale-125 transition-transform"
+          aria-hidden="true"
+        />
       )}
     </div>
   );
