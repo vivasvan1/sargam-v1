@@ -11,6 +11,7 @@ import {
   INSTRUMENTS,
 } from '../lib/instruments';
 import type { Instrument } from '../lib/instruments';
+import { SitarSynth } from '../lib/audio/sitar/SitarSynth';
 import { Mixer, type VoiceControl } from './music-cell/Mixer';
 import { Controls } from './music-cell/Controls';
 import { useNotebookSettings } from '../context/NotebookSettingsContext';
@@ -599,6 +600,43 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
     return SA_FREQ * Math.pow(2, semitones / 12);
   };
 
+  // Helper function to parse any swara string (e.g. "P", "Rk", "S'", "D,", "m#") to frequency
+  const parseSwaraStringToFrequency = (
+    swaraStr: string,
+    SA_FREQ: number,
+    scales: Record<string, number>
+  ): number => {
+    let targetSwara = swaraStr.trim();
+    let targetVariant: string | undefined = undefined;
+    let targetOctave = 0;
+
+    const upper = targetSwara.toUpperCase();
+    if (upper.startsWith('SA')) targetSwara = 'S';
+    else if (upper.startsWith('RI')) targetSwara = 'R';
+    else if (upper.startsWith('GA')) targetSwara = 'G';
+    else if (upper.startsWith('MA')) targetSwara = 'M';
+    else if (upper.startsWith('PA')) targetSwara = 'P';
+    else if (upper.startsWith('DHA')) targetSwara = 'D';
+    else if (upper.startsWith('NI')) targetSwara = 'N';
+    else {
+      const firstChar = targetSwara[0]?.toUpperCase();
+      if (firstChar && ['S', 'R', 'G', 'M', 'P', 'D', 'N'].includes(firstChar)) {
+        targetSwara = firstChar;
+      } else {
+        targetSwara = 'S';
+      }
+    }
+
+    if (swaraStr.includes('k') || swaraStr.includes('b')) targetVariant = 'k';
+    else if (swaraStr.includes('t') || swaraStr.includes('#')) targetVariant = 't';
+
+    const octaveUp = (swaraStr.match(/'/g) || []).length;
+    const octaveDown = (swaraStr.match(/,/g) || []).length;
+    targetOctave = octaveUp - octaveDown;
+
+    return swaraToFrequency(targetSwara, targetVariant, targetOctave, SA_FREQ, scales);
+  };
+
   const playMusic = async (
     parsedData: ParsedMusicCell,
     currentControls: Record<string, VoiceControl>,
@@ -792,6 +830,9 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
       const synth = await createInstrument(volControl.instrument || 'synth');
       // Voices MUST be tonal for now
       if (isTonalInstrument(synth)) {
+        if (synth instanceof SitarSynth) {
+          synth.setTarabTuning(SA_FREQ);
+        }
         synth.connect(volumeNode);
       }
 
@@ -802,13 +843,18 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
         (e) => e.type === 'note' && (e as any).swara === '^'
       );
       if (hasChikari) {
-        chikariSynth = await createInstrument('sitar-custom-sampler');
-        if (isTonalInstrument(chikariSynth)) {
-          chikariVolumeNode = new Tone.Volume(
-            volControl.chikariVolume ?? -5
-          ).toDestination();
-          chikariVolumeNode.mute = volControl.chikariMuted ?? false;
-          chikariSynth.connect(chikariVolumeNode);
+        if (synth instanceof SitarSynth) {
+          // SitarSynth has built-in physical chikari drone strings
+          chikariSynth = synth;
+        } else {
+          chikariSynth = await createInstrument('sitar-custom-sampler');
+          if (isTonalInstrument(chikariSynth)) {
+            chikariVolumeNode = new Tone.Volume(
+              volControl.chikariVolume ?? -5
+            ).toDestination();
+            chikariVolumeNode.mute = volControl.chikariMuted ?? false;
+            chikariSynth.connect(chikariVolumeNode);
+          }
         }
       }
 
@@ -859,46 +905,17 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
             const meendOrnament =
               !isChingari &&
               event.ornaments?.find((o) => o.name === 'meend' || o.name === 'slide');
+            const kanOrnament =
+              !isChingari &&
+              event.ornaments?.find((o) => o.name === 'kan');
+            const andolanOrnament =
+              !isChingari &&
+              event.ornaments?.find((o) => o.name === 'andolan');
 
             if (meendOrnament && meendOrnament.params.length > 0) {
               const startFreq = frequencies[0];
-              const targetSwaraStr = meendOrnament.params[0];
-              // ... parsing logic for target swara ...
-              let targetSwara = targetSwaraStr.trim();
-              let targetVariant = undefined;
-              let targetOctave = 0;
-
-              const upper = targetSwara.toUpperCase();
-              if (upper.startsWith('SA')) targetSwara = 'S';
-              else if (upper.startsWith('RI')) targetSwara = 'R';
-              else if (upper.startsWith('GA')) targetSwara = 'G';
-              else if (upper.startsWith('MA')) targetSwara = 'M';
-              else if (upper.startsWith('PA')) targetSwara = 'P';
-              else if (upper.startsWith('DHA')) targetSwara = 'D';
-              else if (upper.startsWith('NI')) targetSwara = 'N';
-              else {
-                const firstChar = targetSwara[0]?.toUpperCase();
-                if (
-                  firstChar &&
-                  ['S', 'R', 'G', 'M', 'P', 'D', 'N'].includes(firstChar)
-                )
-                  targetSwara = firstChar;
-                else targetSwara = 'S';
-              }
-
-              if (targetSwaraStr.includes('k') || targetSwaraStr.includes('b'))
-                targetVariant = 'k';
-              else if (targetSwaraStr.includes('t') || targetSwaraStr.includes('#'))
-                targetVariant = 't';
-
-              const octaveUp = (targetSwaraStr.match(/'/g) || []).length;
-              const octaveDown = (targetSwaraStr.match(/,/g) || []).length;
-              targetOctave = octaveUp - octaveDown;
-
-              const targetFreq = swaraToFrequency(
-                targetSwara,
-                targetVariant,
-                targetOctave,
+              const targetFreq = parseSwaraStringToFrequency(
+                meendOrnament.params[0],
                 SA_FREQ,
                 scales
               );
@@ -932,6 +949,12 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                       isThreePhase = true;
                     }
                   }
+                }
+
+                // If instrument is our pure programmatic SitarSynth, execute seamless physical meend!
+                if (synth instanceof SitarSynth) {
+                  synth.triggerMeend(startFreq, targetFreq, t, startDur, slideDur, endDur);
+                  return;
                 }
 
                 // If it needs a temp synth, create one. It will be a standard Synth (monophonic, tonal)
@@ -981,6 +1004,21 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                   }
                 }
               }, beatsToScheduledTime(currentTimeBeats));
+            } else if (synth instanceof SitarSynth && kanOrnament && kanOrnament.params.length > 0) {
+              const startFreq = frequencies[0];
+              const kanFreq = parseSwaraStringToFrequency(kanOrnament.params[0], SA_FREQ, scales);
+              Tone.getTransport().schedule((t) => {
+                const currentBeatDur = 60 / Tone.getTransport().bpm.value;
+                const durSeconds = durBeats * currentBeatDur;
+                synth.triggerKan(startFreq, kanFreq, t, durSeconds);
+              }, beatsToScheduledTime(currentTimeBeats));
+            } else if (synth instanceof SitarSynth && andolanOrnament) {
+              const startFreq = frequencies[0];
+              Tone.getTransport().schedule((t) => {
+                const currentBeatDur = 60 / Tone.getTransport().bpm.value;
+                const durSeconds = durBeats * currentBeatDur;
+                synth.triggerAndolan(startFreq, t, durSeconds);
+              }, beatsToScheduledTime(currentTimeBeats));
             } else {
               // Normal Note Playback
               const instrument =
@@ -988,29 +1026,19 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                   ? chikariSynth
                   : synth;
 
-              // Debug: print what frequency each swara resolves to, and which
-              // sampler note Tone.js will map it to (nearest sample + pitch shift)
-              frequencies.forEach((f) => {
-                try {
-                  const freqObj = Tone.Frequency(f);
-                  console.log(
-                    `[vocal-debug] voice=${voiceName} inst=${volControl.instrument} ` +
-                      `swara=${event.swara}${event.variant ?? ''}${event.octave > 0 ? "'".repeat(event.octave) : event.octave < 0 ? ",".repeat(-event.octave) : ""} ` +
-                      `SA=${SA_FREQ.toFixed(2)}Hz freq=${f.toFixed(2)}Hz ` +
-                      `note=${freqObj.toNote()} midi=${freqObj.toMidi()}`
-                  );
-                } catch {
-                  console.log(
-                    `[vocal-debug] voice=${voiceName} swara=${event.swara} freq=${f}`
-                  );
-                }
-              });
-
               Tone.getTransport().schedule((t) => {
                 const currentBeatDur = 60 / Tone.getTransport().bpm.value;
                 const durSeconds = durBeats * currentBeatDur;
 
-                if (
+                if (synth instanceof SitarSynth) {
+                  if (isChingari) {
+                    synth.triggerChikari(t, SA_FREQ);
+                  } else {
+                    frequencies.forEach((f) => {
+                      synth.triggerAttackRelease(f, durSeconds, t);
+                    });
+                  }
+                } else if (
                   instrument instanceof Tone.PolySynth ||
                   instrument instanceof Tone.Sampler ||
                   instrument instanceof Tone.MembraneSynth

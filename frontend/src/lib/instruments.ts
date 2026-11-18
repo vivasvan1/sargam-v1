@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { SitarSynth } from './audio/sitar/SitarSynth';
 
 // Publicly available samples from tonejs-instruments and other open sources
 // We use a CDN or raw.githubusercontent for demo purposes.
@@ -11,7 +12,8 @@ export type InstrumentType =
   | 'synth-custom'
   | 'synth-membrane'
   | 'tabla-sampler'
-  | 'vocal-sampler';
+  | 'vocal-sampler'
+  | 'sitar-synth';
 export type InstrumentCategory = 'melody' | 'rhythm';
 
 export interface InstrumentConfig {
@@ -276,6 +278,14 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
     defaultVolume: 0,
     defaultChikariVolume: -20,
   },
+  'sitar-synth': {
+    id: 'sitar-synth',
+    name: 'Sitar (Pure Programmatic Synth)',
+    type: 'sitar-synth',
+    category: 'melody',
+    defaultVolume: -6,
+    defaultChikariVolume: -8,
+  },
   'vocal-sampler': {
     id: 'vocal-sampler',
     name: 'Vocal (Sargam)',
@@ -315,7 +325,8 @@ export const INSTRUMENTS: Record<string, InstrumentConfig> = {
 export type TonalInstrument =
   | Tone.Sampler
   | Tone.PolySynth
-  | Tone.MembraneSynth;
+  | Tone.MembraneSynth
+  | SitarSynth;
 
 // Rhythmic instruments (specifically our Tabla sampler) play pre-defined samples by name
 export interface RhythmicInstrument {
@@ -411,6 +422,11 @@ export async function createInstrument(
       });
     });
     instrumentCache.set(instrumentId, instrument);
+  } else if (config.type === 'sitar-synth') {
+    const sitar = new SitarSynth();
+    await sitar.ready();
+    instrument = sitar;
+    instrumentCache.set(instrumentId, instrument);
   } else {
     const synth = new Tone.PolySynth(Tone.Synth);
     instrument = synth;
@@ -432,6 +448,8 @@ export function disposeInstrument(instrumentId: string): void {
         (cached as any).releaseAll?.();
         cached.dispose();
       } else if (cached instanceof Tone.MembraneSynth) {
+        cached.dispose();
+      } else if (cached instanceof SitarSynth) {
         cached.dispose();
       }
     } catch (_) { /* ignore */ }
