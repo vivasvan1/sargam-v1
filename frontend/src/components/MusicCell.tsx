@@ -428,9 +428,9 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
         setActiveCell(cell.id, () => stopPlayback(false));
         await playMusic(parsedForPlayback, voiceControls, seekTime);
         setIsPlaying(true);
-      } catch (e) {
+      } catch (e: any) {
         console.error(e);
-        toast.error('Could not parse musical notation');
+        toast.error(e?.message || 'Playback failed');
         resolve(false);
       }
     });
