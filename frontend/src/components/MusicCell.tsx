@@ -12,6 +12,7 @@ import {
 } from '../lib/instruments';
 import type { Instrument } from '../lib/instruments';
 import { SitarSynth } from '../lib/audio/sitar/SitarSynth';
+import { playSampleMeend, playSampleKan } from '../lib/audio/meendEngine';
 import { Mixer, type VoiceControl } from './music-cell/Mixer';
 import { Controls } from './music-cell/Controls';
 import { useNotebookSettings } from '../context/NotebookSettingsContext';
@@ -957,6 +958,21 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                   return;
                 }
 
+                // If instrument is sample-based (e.g. Sitar Samples, Flute, Harmonium), execute native detune meend!
+                if (synth instanceof Tone.Sampler) {
+                  playSampleMeend({
+                    sampler: synth,
+                    startFreq,
+                    targetFreq,
+                    time: t,
+                    startDur,
+                    slideDur,
+                    endDur,
+                    destinationNode: volumeNode,
+                  });
+                  return;
+                }
+
                 // If it needs a temp synth, create one. It will be a standard Synth (monophonic, tonal)
                 const meendSynth = needsTempSynth
                   ? new Tone.Synth().connect(volumeNode)
@@ -1004,13 +1020,17 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                   }
                 }
               }, beatsToScheduledTime(currentTimeBeats));
-            } else if (synth instanceof SitarSynth && kanOrnament && kanOrnament.params.length > 0) {
+            } else if (kanOrnament && kanOrnament.params.length > 0) {
               const startFreq = frequencies[0];
               const kanFreq = parseSwaraStringToFrequency(kanOrnament.params[0], SA_FREQ, scales);
               Tone.getTransport().schedule((t) => {
                 const currentBeatDur = 60 / Tone.getTransport().bpm.value;
                 const durSeconds = durBeats * currentBeatDur;
-                synth.triggerKan(startFreq, kanFreq, t, durSeconds);
+                if (synth instanceof SitarSynth) {
+                  synth.triggerKan(startFreq, kanFreq, t, durSeconds);
+                } else if (synth instanceof Tone.Sampler) {
+                  playSampleKan(synth, startFreq, kanFreq, t, durSeconds, volumeNode);
+                }
               }, beatsToScheduledTime(currentTimeBeats));
             } else if (synth instanceof SitarSynth && andolanOrnament) {
               const startFreq = frequencies[0];
