@@ -478,6 +478,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
           } else if (isTonalInstrument(synth)) {
             if (synth instanceof Tone.PolySynth || synth instanceof Tone.Sampler) {
               (synth as any).releaseAll?.();
+            } else if (synth instanceof SitarSynth) {
+              synth.releaseAll();
             }
           }
 
@@ -488,6 +490,8 @@ export function MusicCell({ cell, onChange, onFocus }: MusicCellProps) {
                 chikariSynth instanceof Tone.Sampler
               ) {
                 (chikariSynth as any).releaseAll?.();
+              } else if (chikariSynth instanceof SitarSynth) {
+                chikariSynth.releaseAll();
               }
             }
           }

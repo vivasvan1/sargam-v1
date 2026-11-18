@@ -35,6 +35,7 @@ export class SitarSynth {
   private dcBlocker: BiquadFilterNode | null = null;
   private gourdResonance: BiquadFilterNode | null = null;
   private tabliResonance: BiquadFilterNode | null = null;
+  private fretboardPresence: BiquadFilterNode | null = null;
   private bodyShelf: BiquadFilterNode | null = null;
 
   // 11 Tarab Sympathetic String Resonators
@@ -89,48 +90,58 @@ export class SitarSynth {
           outputChannelCount: [2],
           parameterData: {
             frequency: this.tonicFreq,
-            jawariBuzz: options?.jawariBuzz ?? 0.5,
-            damping: options?.damping ?? 0.995,
+            trigger: 0,
+            chikari: 0,
+            jawariBuzz: options?.jawariBuzz ?? 0.45,
+            damping: options?.damping ?? 0.9975,
           },
         });
       }
 
-      // 3. DC Blocker & Body Acoustic Filters
-      // Highpass at 90 Hz blocks any DC or sub-bass clicks completely
+      // 3. DC Blocker & Body Acoustic Resonances
+      // Highpass at 70 Hz blocks DC without degrading low bass Sa
       this.dcBlocker = toneCtx.createBiquadFilter();
       this.dcBlocker.type = 'highpass';
-      this.dcBlocker.frequency.value = 90;
-      this.dcBlocker.Q.value = 0.7;
+      this.dcBlocker.frequency.value = 70;
+      this.dcBlocker.Q.value = 0.707;
 
-      // ~280 Hz: Warm pumpkin gourd air resonance
+      // ~285 Hz: Warm pumpkin gourd air resonance (Tumba)
       this.gourdResonance = toneCtx.createBiquadFilter();
       this.gourdResonance.type = 'peaking';
-      this.gourdResonance.frequency.value = 280;
-      this.gourdResonance.Q.value = 1.8;
-      this.gourdResonance.gain.value = 3.0;
+      this.gourdResonance.frequency.value = 285;
+      this.gourdResonance.Q.value = 2.0;
+      this.gourdResonance.gain.value = 3.5;
 
-      // ~780 Hz: Tabli cedar wood soundboard resonance
+      // ~740 Hz: Tun/cedar wood soundboard resonance (Tabli)
       this.tabliResonance = toneCtx.createBiquadFilter();
       this.tabliResonance.type = 'peaking';
-      this.tabliResonance.frequency.value = 780;
-      this.tabliResonance.Q.value = 2.0;
-      this.tabliResonance.gain.value = 2.5;
+      this.tabliResonance.frequency.value = 740;
+      this.tabliResonance.Q.value = 2.2;
+      this.tabliResonance.gain.value = 3.0;
 
-      // ~3600 Hz: Smooth acoustic high shelf
+      // ~2400 Hz: Curved brass frets (Parda) acoustic presence
+      this.fretboardPresence = toneCtx.createBiquadFilter();
+      this.fretboardPresence.type = 'peaking';
+      this.fretboardPresence.frequency.value = 2400;
+      this.fretboardPresence.Q.value = 2.0;
+      this.fretboardPresence.gain.value = 2.0;
+
+      // ~4800 Hz: Gentle high shelf removing digital hash
       this.bodyShelf = toneCtx.createBiquadFilter();
       this.bodyShelf.type = 'highshelf';
-      this.bodyShelf.frequency.value = 3600;
-      this.bodyShelf.gain.value = -2.0;
+      this.bodyShelf.frequency.value = 4800;
+      this.bodyShelf.gain.value = -2.5;
 
       if (this.workletNode) {
         this.workletNode.connect(this.dcBlocker);
         this.dcBlocker.connect(this.gourdResonance);
         this.gourdResonance.connect(this.tabliResonance);
-        this.tabliResonance.connect(this.bodyShelf);
+        this.tabliResonance.connect(this.fretboardPresence);
+        this.fretboardPresence.connect(this.bodyShelf);
 
         // Dry gain
         this.dryGain = toneCtx.createGain();
-        this.dryGain.gain.value = 1.0;
+        this.dryGain.gain.value = 0.9;
         this.bodyShelf.connect(this.dryGain);
 
         // 4. Construct 11-String Tarab Sympathetic Resonator Bank
@@ -141,7 +152,7 @@ export class SitarSynth {
         for (let i = 0; i < TARAB_SCALE_RATIOS.length; i++) {
           const filter = toneCtx.createBiquadFilter();
           filter.type = 'bandpass';
-          filter.Q.value = 32.0;
+          filter.Q.value = 30.0;
           filter.frequency.value = this.tonicFreq * TARAB_SCALE_RATIOS[i];
 
           this.bodyShelf.connect(filter);
@@ -187,6 +198,10 @@ export class SitarSynth {
     const baseRatios = scaleRatios || [1.0, 9 / 8, 5 / 4, 4 / 3, 3 / 2, 5 / 3, 15 / 8];
     const now = this.context?.currentTime ?? Tone.now();
 
+    if (this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'setTonic', tonicFreq });
+    }
+
     this.tarabFilters.forEach((filter, index) => {
       let freq = tonicFreq;
       if (index < 7) {
@@ -206,7 +221,7 @@ export class SitarSynth {
   }
 
   /**
-   * Normal Note: Mizrab attack and sustained decay
+   * Normal Note: Mizrab attack and physical string vibration
    */
   public triggerAttack(frequency: number, time?: number, velocity = 0.85): void {
     const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
@@ -219,6 +234,8 @@ export class SitarSynth {
 
     if (!this.workletNode) return;
     const freqParam = this.workletNode.parameters.get('frequency');
+    const trigParam = this.workletNode.parameters.get('trigger');
+
     if (freqParam) {
       try {
         freqParam.cancelScheduledValues(t);
@@ -226,15 +243,28 @@ export class SitarSynth {
       freqParam.setValueAtTime(frequency, t);
     }
 
-    this.workletNode.port.postMessage({
-      type: 'pluck',
-      voice: 0,
-      frequency,
-      velocity,
-    });
+    // Sample-accurate scheduled pluck pulse
+    if (trigParam) {
+      try {
+        trigParam.cancelScheduledValues(t);
+      } catch (e) {}
+      trigParam.setValueAtTime(velocity, t);
+      trigParam.setValueAtTime(0, t + 0.002);
+    }
+
+    // Immediate postMessage fallback if scheduled time is current
+    const currTime = this.context?.currentTime ?? Tone.now();
+    if (t <= currTime + 0.015) {
+      this.workletNode.port.postMessage({
+        type: 'pluck',
+        voice: 0,
+        frequency,
+        velocity,
+      });
+    }
   }
 
-  public triggerRelease(time?: number, duration = 0.08): void {
+  public triggerRelease(time?: number, duration = 0.12): void {
     const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
 
     if (this.useFallback && this.fallbackSynth) {
@@ -250,6 +280,10 @@ export class SitarSynth {
     });
   }
 
+  /**
+   * Plucked string attack: plays note with natural acoustic decay.
+   * Unlike electronic synths, sitar strings are not cut off abruptly with setTimeout timers.
+   */
   public triggerAttackRelease(frequency: number, duration: number, time?: number, velocity = 0.85): void {
     const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
 
@@ -259,13 +293,6 @@ export class SitarSynth {
     }
 
     this.triggerAttack(frequency, t, velocity);
-
-    const releaseTime = t + Math.max(0.05, duration - 0.05);
-    const currTime = this.context?.currentTime ?? Tone.now();
-    const delayMs = Math.max(0, (releaseTime - currTime) * 1000);
-    setTimeout(() => {
-      this.triggerRelease(releaseTime, 0.08);
-    }, delayMs);
   }
 
   /**
@@ -298,33 +325,19 @@ export class SitarSynth {
         freqParam.cancelScheduledValues(t);
       } catch (e) {}
       freqParam.setValueAtTime(startFreq, t);
-      if (startDur > 0) {
-        freqParam.setValueAtTime(startFreq, t + startDur);
-      }
 
-      const safeTarget = Math.max(20, targetFreq);
-      const slideStart = t + startDur;
-      const slideEnd = slideStart + slideDur;
+      const slideStartTime = t + Math.max(0, startDur);
       if (slideDur > 0) {
-        freqParam.exponentialRampToValueAtTime(safeTarget, slideEnd);
-      }
-
-      if (endDur > 0) {
-        freqParam.setValueAtTime(safeTarget, slideEnd + endDur);
+        freqParam.setValueAtTime(startFreq, slideStartTime);
+        freqParam.exponentialRampToValueAtTime(targetFreq, slideStartTime + slideDur);
+      } else {
+        freqParam.setValueAtTime(targetFreq, slideStartTime);
       }
     }
-
-    const totalDuration = startDur + slideDur + endDur;
-    const releaseTime = t + Math.max(0.05, totalDuration - 0.05);
-    const currTime = this.context?.currentTime ?? Tone.now();
-    const delayMs = Math.max(0, (releaseTime - currTime) * 1000);
-    setTimeout(() => {
-      this.triggerRelease(releaseTime, 0.08);
-    }, delayMs);
   }
 
   /**
-   * Kan-Swar (Grace note touch into main swara in 35-50ms)
+   * Kan (Grace note / touch deflection)
    */
   public triggerKan(
     mainFreq: number,
@@ -336,13 +349,15 @@ export class SitarSynth {
     const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
 
     if (this.useFallback && this.fallbackSynth) {
-      this.fallbackSynth.triggerAttackRelease(mainFreq, duration, t, velocity);
+      this.fallbackSynth.triggerAttackRelease(kanFreq, 0.04, t, velocity * 0.9);
+      this.fallbackSynth.triggerAttackRelease(mainFreq, duration - 0.04, t + 0.04, velocity);
       return;
     }
 
     if (!this.workletNode) return;
     const freqParam = this.workletNode.parameters.get('frequency');
 
+    // Pluck at grace note kanFreq
     this.triggerAttack(kanFreq, t, velocity);
 
     if (freqParam) {
@@ -350,16 +365,9 @@ export class SitarSynth {
         freqParam.cancelScheduledValues(t);
       } catch (e) {}
       freqParam.setValueAtTime(kanFreq, t);
-      const kanGlideTime = Math.min(0.045, duration * 0.25);
+      const kanGlideTime = Math.min(0.04, duration * 0.25);
       freqParam.exponentialRampToValueAtTime(mainFreq, t + kanGlideTime);
     }
-
-    const releaseTime = t + Math.max(0.05, duration - 0.05);
-    const currTime = this.context?.currentTime ?? Tone.now();
-    const delayMs = Math.max(0, (releaseTime - currTime) * 1000);
-    setTimeout(() => {
-      this.triggerRelease(releaseTime, 0.08);
-    }, delayMs);
   }
 
   /**
@@ -406,32 +414,48 @@ export class SitarSynth {
         freqParam.exponentialRampToValueAtTime(target, stepTime);
       }
     }
-
-    const releaseTime = t + Math.max(0.05, duration - 0.05);
-    const currTime = this.context?.currentTime ?? Tone.now();
-    const delayMs = Math.max(0, (releaseTime - currTime) * 1000);
-    setTimeout(() => {
-      this.triggerRelease(releaseTime, 0.08);
-    }, delayMs);
   }
 
   /**
    * Chikari Stroke (Rhythmic drone strings Sa', Sa'', Pa)
    */
   public triggerChikari(time?: number, tonicFreq?: number, velocity = 0.85): void {
+    const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
+    const tonic = tonicFreq || this.tonicFreq;
+
     if (this.useFallback && this.fallbackSynth) {
-      const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
-      const tonic = tonicFreq || this.tonicFreq;
       this.fallbackSynth.triggerAttackRelease([tonic * 2, tonic * 4, tonic * 1.5], 0.45, t, velocity);
       return;
     }
 
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({
-      type: 'chikari',
-      tonicFreq: tonicFreq || this.tonicFreq,
-      velocity,
-    });
+    const chikParam = this.workletNode.parameters.get('chikari');
+
+    if (chikParam) {
+      try {
+        chikParam.cancelScheduledValues(t);
+      } catch (e) {}
+      chikParam.setValueAtTime(velocity, t);
+      chikParam.setValueAtTime(0, t + 0.002);
+    }
+
+    const currTime = this.context?.currentTime ?? Tone.now();
+    if (t <= currTime + 0.015) {
+      this.workletNode.port.postMessage({
+        type: 'chikari',
+        tonicFreq: tonic,
+        velocity,
+      });
+    }
+  }
+
+  public releaseAll(): void {
+    if (this.useFallback && this.fallbackSynth) {
+      this.fallbackSynth.releaseAll();
+      return;
+    }
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'releaseAll' });
   }
 
   public connect(destination: any): this {
@@ -475,6 +499,7 @@ export class SitarSynth {
     this.dcBlocker?.disconnect();
     this.gourdResonance?.disconnect();
     this.tabliResonance?.disconnect();
+    this.fretboardPresence?.disconnect();
     this.bodyShelf?.disconnect();
     this.tarabFilters.forEach((f) => f.disconnect());
     this.tarabGain?.disconnect();
