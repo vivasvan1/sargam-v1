@@ -2,8 +2,6 @@ import * as Tone from 'tone';
 import { SITAR_PROCESSOR_NAME, sitarProcessorCode } from './sitarProcessorCode';
 
 // 11 Tarab (Sympathetic Strings) across Mandra (lower) and Madhya (middle) Saptaks:
-// Lower octave: Sa, Re, Ga, Ma, Pa, Dha, Ni
-// Middle octave: Sa, Re, Ga, Ma
 const TARAB_SCALE_RATIOS = [
   0.5,        // Sa (lower)
   9 / 16,     // Re (lower)
@@ -33,22 +31,21 @@ export class SitarSynth {
   private isReady = false;
   private readyPromise: Promise<void>;
 
-  // 5-Band Tumba Gourd & Tabli Wood Acoustic Formant Filters
-  private helmholtzResonance: BiquadFilterNode | null = null;
+  // Body acoustic filters
+  private dcBlocker: BiquadFilterNode | null = null;
+  private gourdResonance: BiquadFilterNode | null = null;
   private tabliResonance: BiquadFilterNode | null = null;
-  private woodCavityResonance: BiquadFilterNode | null = null;
-  private neckTransmission: BiquadFilterNode | null = null;
   private bodyShelf: BiquadFilterNode | null = null;
 
   // 11 Tarab Sympathetic String Resonators
   private tarabFilters: BiquadFilterNode[] = [];
   private tarabGain: GainNode | null = null;
 
-  // Master and Dry Gains
+  // Gains
   private dryGain: GainNode | null = null;
   private outputGain: GainNode | null = null;
 
-  // Procedural Fallback Synth (Plucked string with comb filter)
+  // Fallback Synth
   private fallbackSynth: Tone.PolySynth | null = null;
   private useFallback = false;
 
@@ -92,69 +89,59 @@ export class SitarSynth {
           outputChannelCount: [2],
           parameterData: {
             frequency: this.tonicFreq,
-            jawariBuzz: options?.jawariBuzz ?? 0.45,
-            damping: options?.damping ?? 0.996,
+            jawariBuzz: options?.jawariBuzz ?? 0.5,
+            damping: options?.damping ?? 0.995,
           },
         });
       }
 
-      // 3. Construct 5-Band Tumba Gourd & Tabli Wood Acoustic Formant Filters
-      // ~185 Hz: Deep Helmholtz air cavity resonance of the round dried pumpkin gourd
-      this.helmholtzResonance = toneCtx.createBiquadFilter();
-      this.helmholtzResonance.type = 'peaking';
-      this.helmholtzResonance.frequency.value = 185;
-      this.helmholtzResonance.Q.value = 2.4;
-      this.helmholtzResonance.gain.value = 5.5;
+      // 3. DC Blocker & Body Acoustic Filters
+      // Highpass at 90 Hz blocks any DC or sub-bass clicks completely
+      this.dcBlocker = toneCtx.createBiquadFilter();
+      this.dcBlocker.type = 'highpass';
+      this.dcBlocker.frequency.value = 90;
+      this.dcBlocker.Q.value = 0.7;
 
-      // ~290 Hz: Tabli wood soundboard plate flexural resonance
+      // ~280 Hz: Warm pumpkin gourd air resonance
+      this.gourdResonance = toneCtx.createBiquadFilter();
+      this.gourdResonance.type = 'peaking';
+      this.gourdResonance.frequency.value = 280;
+      this.gourdResonance.Q.value = 1.8;
+      this.gourdResonance.gain.value = 3.0;
+
+      // ~780 Hz: Tabli cedar wood soundboard resonance
       this.tabliResonance = toneCtx.createBiquadFilter();
       this.tabliResonance.type = 'peaking';
-      this.tabliResonance.frequency.value = 290;
-      this.tabliResonance.Q.value = 2.2;
-      this.tabliResonance.gain.value = 4.5;
+      this.tabliResonance.frequency.value = 780;
+      this.tabliResonance.Q.value = 2.0;
+      this.tabliResonance.gain.value = 2.5;
 
-      // ~750 Hz: Hollow cedar wood cavity resonance
-      this.woodCavityResonance = toneCtx.createBiquadFilter();
-      this.woodCavityResonance.type = 'peaking';
-      this.woodCavityResonance.frequency.value = 750;
-      this.woodCavityResonance.Q.value = 2.8;
-      this.woodCavityResonance.gain.value = 3.5;
-
-      // ~1450 Hz: Neck (dandi) acoustic transmission
-      this.neckTransmission = toneCtx.createBiquadFilter();
-      this.neckTransmission.type = 'peaking';
-      this.neckTransmission.frequency.value = 1450;
-      this.neckTransmission.Q.value = 3.2;
-      this.neckTransmission.gain.value = 3.0;
-
-      // ~3400 Hz: High-frequency wood acoustic absorption
+      // ~3600 Hz: Smooth acoustic high shelf
       this.bodyShelf = toneCtx.createBiquadFilter();
       this.bodyShelf.type = 'highshelf';
-      this.bodyShelf.frequency.value = 3400;
-      this.bodyShelf.gain.value = -4.0;
+      this.bodyShelf.frequency.value = 3600;
+      this.bodyShelf.gain.value = -2.0;
 
       if (this.workletNode) {
-        // Chain the body formant network
-        this.workletNode.connect(this.helmholtzResonance);
-        this.helmholtzResonance.connect(this.tabliResonance);
-        this.tabliResonance.connect(this.woodCavityResonance);
-        this.woodCavityResonance.connect(this.neckTransmission);
-        this.neckTransmission.connect(this.bodyShelf);
+        this.workletNode.connect(this.dcBlocker);
+        this.dcBlocker.connect(this.gourdResonance);
+        this.gourdResonance.connect(this.tabliResonance);
+        this.tabliResonance.connect(this.bodyShelf);
 
         // Dry gain
         this.dryGain = toneCtx.createGain();
-        this.dryGain.gain.value = 0.85;
+        this.dryGain.gain.value = 1.0;
         this.bodyShelf.connect(this.dryGain);
 
         // 4. Construct 11-String Tarab Sympathetic Resonator Bank
         this.tarabGain = toneCtx.createGain();
-        this.tarabGain.gain.value = options?.tarabLevel ?? 0.28;
+        this.tarabGain.gain.value = options?.tarabLevel ?? 0.22;
 
         this.tarabFilters = [];
         for (let i = 0; i < TARAB_SCALE_RATIOS.length; i++) {
           const filter = toneCtx.createBiquadFilter();
           filter.type = 'bandpass';
-          filter.Q.value = 36.0; // High Q for bright, bell-like sympathetic ringing
+          filter.Q.value = 32.0;
           filter.frequency.value = this.tonicFreq * TARAB_SCALE_RATIOS[i];
 
           this.bodyShelf.connect(filter);
@@ -173,16 +160,15 @@ export class SitarSynth {
         throw new Error('createAudioWorkletNode returned null');
       }
     } catch (err) {
-      console.warn('[SitarSynth] AudioWorklet initialization note:', err);
+      console.warn('[SitarSynth] AudioWorklet not available, falling back:', err);
       this.useFallback = true;
-      // High-order plucked synth with bright metallic decay
       this.fallbackSynth = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'sawtooth' },
+        oscillator: { type: 'triangle' },
         envelope: {
-          attack: 0.005,
-          decay: 2.5,
-          sustain: 0.08,
-          release: 0.9,
+          attack: 0.012,
+          decay: 2.2,
+          sustain: 0.12,
+          release: 0.8,
         },
       });
       this.isReady = true;
@@ -222,7 +208,7 @@ export class SitarSynth {
   /**
    * Normal Note: Mizrab attack and sustained decay
    */
-  public triggerAttack(frequency: number, time?: number, velocity = 0.88): void {
+  public triggerAttack(frequency: number, time?: number, velocity = 0.85): void {
     const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
     this.currentFrequency = frequency;
 
@@ -264,7 +250,7 @@ export class SitarSynth {
     });
   }
 
-  public triggerAttackRelease(frequency: number, duration: number, time?: number, velocity = 0.88): void {
+  public triggerAttackRelease(frequency: number, duration: number, time?: number, velocity = 0.85): void {
     const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
 
     if (this.useFallback && this.fallbackSynth) {
@@ -292,7 +278,7 @@ export class SitarSynth {
     startDur: number,
     slideDur: number,
     endDur: number,
-    velocity = 0.92
+    velocity = 0.9
   ): void {
     const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
 
@@ -345,7 +331,7 @@ export class SitarSynth {
     kanFreq: number,
     time: number,
     duration: number,
-    velocity = 0.88
+    velocity = 0.85
   ): void {
     const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
 
@@ -385,7 +371,7 @@ export class SitarSynth {
     duration: number,
     depthCents = 30,
     rateHz = 2.5,
-    velocity = 0.85
+    velocity = 0.8
   ): void {
     const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
 
@@ -432,7 +418,7 @@ export class SitarSynth {
   /**
    * Chikari Stroke (Rhythmic drone strings Sa', Sa'', Pa)
    */
-  public triggerChikari(time?: number, tonicFreq?: number, velocity = 0.88): void {
+  public triggerChikari(time?: number, tonicFreq?: number, velocity = 0.85): void {
     if (this.useFallback && this.fallbackSynth) {
       const t = time !== undefined ? time : (this.context?.currentTime ?? Tone.now());
       const tonic = tonicFreq || this.tonicFreq;
@@ -486,10 +472,9 @@ export class SitarSynth {
       this.workletNode.disconnect();
       this.workletNode = null;
     }
-    this.helmholtzResonance?.disconnect();
+    this.dcBlocker?.disconnect();
+    this.gourdResonance?.disconnect();
     this.tabliResonance?.disconnect();
-    this.woodCavityResonance?.disconnect();
-    this.neckTransmission?.disconnect();
     this.bodyShelf?.disconnect();
     this.tarabFilters.forEach((f) => f.disconnect());
     this.tarabGain?.disconnect();
