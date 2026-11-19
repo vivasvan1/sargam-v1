@@ -424,12 +424,15 @@ export class SitarSynth {
     const tonic = tonicFreq || this.tonicFreq;
 
     if (this.useFallback && this.fallbackSynth) {
-      this.fallbackSynth.triggerAttackRelease([tonic * 2, tonic * 4, tonic * 1.5], 0.45, t, velocity);
+      this.fallbackSynth.triggerAttackRelease([tonic * 1.5, tonic * 2, tonic * 4], 0.7, t, velocity);
       return;
     }
 
     if (!this.workletNode) return;
     const chikParam = this.workletNode.parameters.get('chikari');
+
+    // Ensure processor knows current tonic
+    this.workletNode.port.postMessage({ type: 'setTonic', tonicFreq: tonic });
 
     if (chikParam) {
       try {

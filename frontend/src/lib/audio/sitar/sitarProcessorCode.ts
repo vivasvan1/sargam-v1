@@ -3,14 +3,18 @@
  *
  * Mathematically verified stable dual-coupled physical model of an Indian sitar:
  * 1. Zero-Mean Mizrab Pluck (bipolar physical string displacement + metallic wire scrape + 3.2kHz ring).
- * 2. Sample-accurate AudioParam triggering ('trigger' and 'chikari' AudioParams) with sample-level precision.
- * 3. Dual Coupled Waveguides:
+ * 2. Natural Staggered Chikari Rake:
+ *    - 3-string acoustic swipe: Pa (0ms), Sa' (~22ms), Sa'' (~44ms).
+ *    - High-tension open steel strings resting on bone mogara (chota jawari) with bright sizzle.
+ *    - Extended singing sustain (loop gain 0.9984 - 0.9991, ringing for 2-3 seconds).
+ * 3. Sample-accurate AudioParam triggering ('trigger' and 'chikari' AudioParams).
+ * 4. Dual Coupled Waveguides:
  *    - Vertical string: tuned to fundamental, coupled to bridge non-linearity.
  *    - Horizontal string: slightly detuned (~0.22%) for singing acoustic 'jhumka' shimmer.
  *    - Cross-coupling matrix strictly energy-preserving (contracting mapping, zero DC).
- * 4. Dynamic Jawari Bridge Buzz: quadratic harmonic tap derived from curved bridge contact.
- * 5. Peak Follower Lifetime: voice naturally rings and decays with zero premature cutoff.
- * 6. Multi-voice support for Baj tar (main melody string) and 3 Chikari drone strings.
+ * 5. Dynamic Jawari Bridge Buzz: quadratic harmonic tap derived from curved bridge contact.
+ * 6. Peak Follower Lifetime: voice naturally rings and decays with zero premature cutoff.
+ * 7. Multi-voice support for Baj tar (main melody string) and 3 Chikari drone strings.
  */
 
 export const SITAR_PROCESSOR_NAME = 'sitar-string-processor';
@@ -68,7 +72,11 @@ class SitarStringProcessor extends AudioWorkletProcessor {
     this.prevChikari = 0;
     this.tonicFreq = 293.66;
 
-    // 4 Voices: 0 = main melody string (Baj tar), 1 = Chikari 1 (Sa'), 2 = Chikari 2 (Sa''), 3 = Chikari 3 (Pa)
+    // 4 Voices:
+    // 0 = Baj tar (main melody string)
+    // 1 = Chikari Pa (fifth drone, 1.5 * Sa)
+    // 2 = Chikari Sa' (octave drone, 2.0 * Sa)
+    // 3 = Chikari Sa'' (high octave shimmer drone, 4.0 * Sa)
     this.voices = [];
     for (let v = 0; v < 4; v++) {
       this.voices.push({
@@ -81,6 +89,7 @@ class SitarStringProcessor extends AudioWorkletProcessor {
         active: false,
         isChikari: v > 0,
         chikariFreq: 293.66 * 2,
+        delayRemaining: 0,
         releaseGain: 1.0,
         isReleasing: false,
         releaseRate: 0.001,
@@ -106,7 +115,7 @@ class SitarStringProcessor extends AudioWorkletProcessor {
       this.pluckVoice(vIdx, freq, velocity);
     } else if (data.type === 'chikari') {
       const tonic = data.tonicFreq || this.tonicFreq;
-      const velocity = data.velocity || 0.85;
+      const velocity = data.velocity || 0.9;
       this.triggerChikariVoices(tonic, velocity);
     } else if (data.type === 'release') {
       const vIdx = data.voice || 0;
@@ -142,15 +151,13 @@ class SitarStringProcessor extends AudioWorkletProcessor {
     voice.peakEnv = velocity;
     voice.filterStateV = 0;
     voice.filterStateH = 0;
+    voice.delayRemaining = 0;
 
     if (vIdx > 0) {
       voice.chikariFreq = freq;
     }
 
-    // Authentic Mizrab pluck excitation:
-    // 1. Fundamental sine pulse (string motion)
-    // 2. High-frequency wire plectrum scrape (micro-transients)
-    // 3. Metallic ring transient (~3.2 kHz wire ping)
+    // Authentic Mizrab pluck excitation on Baj tar:
     const excSamples = Math.min(1024, Math.floor(0.016 * this.sampleRate));
     voice.excitationLength = excSamples;
     voice.excitationPos = 0;
@@ -170,10 +177,18 @@ class SitarStringProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /**
+   * Natural Staggered Chikari Rake:
+   * Real sitarists sweep the mizrab across the drone strings:
+   * - Voice 1: Pa (1.5 * Sa) struck first at t = 0ms
+   * - Voice 2: Sa' (2.0 * Sa) struck at t = 22ms
+   * - Voice 3: Sa'' (4.0 * Sa) struck at t = 44ms with slight wire shimmer
+   */
   triggerChikariVoices(tonic, velocity) {
-    this.pluckChikariVoice(1, tonic * 2, velocity, 0);
-    this.pluckChikariVoice(2, tonic * 4, velocity * 0.85, 0.007);
-    this.pluckChikariVoice(3, tonic * 1.5, velocity * 0.9, 0.014);
+    const t = tonic || this.tonicFreq || 293.66;
+    this.pluckChikariVoice(1, t * 1.5, velocity * 0.88, 0.0);
+    this.pluckChikariVoice(2, t * 2.0, velocity * 0.94, 0.022);
+    this.pluckChikariVoice(3, t * 4.0 * 1.0025, velocity * 1.0, 0.044);
   }
 
   pluckChikariVoice(vIdx, freq, velocity, delaySec) {
@@ -188,27 +203,25 @@ class SitarStringProcessor extends AudioWorkletProcessor {
     voice.peakEnv = velocity;
     voice.filterStateV = 0;
     voice.filterStateH = 0;
+    voice.delayRemaining = Math.round(delaySec * this.sampleRate);
 
-    const delaySamples = Math.floor(delaySec * this.sampleRate);
-    const excSamples = Math.min(1024, Math.floor(0.014 * this.sampleRate) + delaySamples);
+    // Pure chikari wire excitation (high metallic ring + wire scrape + fundamental):
+    const excSamples = Math.min(1024, Math.floor(0.012 * this.sampleRate));
     voice.excitationLength = excSamples;
     voice.excitationPos = 0;
 
     for (let n = 0; n < excSamples; n++) {
-      if (n < delaySamples) {
-        voice.excitationBufferV[n] = 0;
-        voice.excitationBufferH[n] = 0;
-      } else {
-        const k = n - delaySamples;
-        const t = k / (excSamples - delaySamples);
-        const envelope = Math.sin(Math.PI * t);
-        const sine = Math.sin((2 * Math.PI * freq * k) / this.sampleRate);
-        const click = (Math.random() * 2 - 1) * Math.exp(-k / (0.002 * this.sampleRate));
+      const t = n / excSamples;
+      const envelope = Math.sin(Math.PI * t);
+      const sine = Math.sin((2 * Math.PI * freq * n) / this.sampleRate);
+      const wireClick = (Math.random() * 2 - 1) * Math.exp(-n / (0.0016 * this.sampleRate));
+      const wirePing = Math.sin((2 * Math.PI * 4800 * n) / this.sampleRate) * Math.exp(-n / (0.0035 * this.sampleRate));
 
-        const val = (sine * 0.65 + click * 0.35) * envelope * velocity * 0.8;
-        voice.excitationBufferV[n] = val;
-        voice.excitationBufferH[n] = val * 0.75;
-      }
+      const valV = (sine * 0.46 + wireClick * 0.34 + wirePing * 0.22) * envelope * velocity * 0.92;
+      const valH = (sine * 0.62 + wireClick * 0.24 + wirePing * 0.16) * envelope * velocity * 0.80;
+
+      voice.excitationBufferV[n] = valV;
+      voice.excitationBufferH[n] = valH;
     }
   }
 
@@ -230,7 +243,7 @@ class SitarStringProcessor extends AudioWorkletProcessor {
     const baseDamping = dampingParam ? dampingParam[0] : 0.9975;
 
     for (let i = 0; i < blockSize; i++) {
-      // 1. Check for sample-accurate pluck trigger (AudioParam rising edge)
+      // 1. Check for sample-accurate main string pluck
       if (trigParam) {
         const trigVal = trigParam.length > 1 ? trigParam[i] : trigParam[0];
         if (trigVal > 0.05 && this.prevTrigger <= 0.05) {
@@ -240,7 +253,7 @@ class SitarStringProcessor extends AudioWorkletProcessor {
         this.prevTrigger = trigVal;
       }
 
-      // 2. Check for sample-accurate chikari trigger
+      // 2. Check for sample-accurate chikari rake trigger
       if (chikParam) {
         const chikVal = chikParam.length > 1 ? chikParam[i] : chikParam[0];
         if (chikVal > 0.05 && this.prevChikari <= 0.05) {
@@ -255,6 +268,12 @@ class SitarStringProcessor extends AudioWorkletProcessor {
       for (let v = 0; v < this.voices.length; v++) {
         const voice = this.voices[v];
         if (!voice.active) continue;
+
+        // Count down pending rake delay
+        if (voice.delayRemaining > 0) {
+          voice.delayRemaining--;
+          continue;
+        }
 
         let f = voice.isChikari ? voice.chikariFreq : (freqParam.length > 1 ? freqParam[i] : freqParam[0]);
         if (f < 20) f = 20;
@@ -291,9 +310,11 @@ class SitarStringProcessor extends AudioWorkletProcessor {
         const c3H = 0.5 * (voice.ringBufferH[r3H] - voice.ringBufferH[r0H]) + 1.5 * (voice.ringBufferH[r1H] - voice.ringBufferH[r2H]);
         const delH = ((c3H * dFracH + c2H) * dFracH + c1H) * dFracH + c0H;
 
-        // Karplus-Strong string lowpass damping (S = 0.14)
-        const loopGainV = voice.isChikari ? Math.min(0.993, baseDamping) : Math.min(0.9972, baseDamping);
-        const loopGainH = voice.isChikari ? Math.min(0.995, baseDamping) : Math.min(0.9985, baseDamping);
+        // Karplus-Strong string lowpass damping:
+        // Baj tar: warm fretted damping.
+        // Chikari: high-tension open steel wire resting on bone mogara with long singing sustain.
+        const loopGainV = voice.isChikari ? 0.9984 : Math.min(0.9972, baseDamping);
+        const loopGainH = voice.isChikari ? 0.9991 : Math.min(0.9985, baseDamping);
 
         const filtV = loopGainV * (0.86 * delV + 0.14 * voice.filterStateV);
         voice.filterStateV = delV;
@@ -322,9 +343,9 @@ class SitarStringProcessor extends AudioWorkletProcessor {
         voice.ringBufferH[voice.writePos] = coupledH + excH;
         voice.writePos = (voice.writePos + 1) & this.mask;
 
-        // Peak follower envelope tracker (never prematurely terminates on zero-crossings)
+        // Peak follower envelope tracker
         const absVal = Math.abs(coupledV);
-        voice.peakEnv = Math.max(absVal, voice.peakEnv * 0.9998);
+        voice.peakEnv = Math.max(absVal, voice.peakEnv * (voice.isChikari ? 0.99988 : 0.9998));
 
         // Natural decay termination only when energy has genuinely depleted
         if (voice.isReleasing) {
@@ -338,12 +359,13 @@ class SitarStringProcessor extends AudioWorkletProcessor {
         }
 
         // Jawari bridge output tap:
-        // Asymmetric non-linear bridge buzz (blooms with amplitude, mellows into singing sustain)
-        const buzzAmt = (voice.isChikari ? baseJawari * 1.3 : baseJawari) * (0.6 + 0.4 * voice.peakEnv);
-        const jawariTap = coupledV + buzzAmt * Math.abs(coupledV) * coupledV + 0.5 * coupledH;
+        // Chikari strings graze the steep bone mogara bridge, creating a sharp silvery buzz
+        const buzzAmt = voice.isChikari ? baseJawari * 1.5 : baseJawari;
+        const dynamicBuzz = buzzAmt * (0.6 + 0.4 * voice.peakEnv);
+        const jawariTap = coupledV + dynamicBuzz * Math.abs(coupledV) * coupledV + 0.55 * coupledH;
 
         const voiceOut = jawariTap * voice.releaseGain;
-        mixedSample += voice.isChikari ? voiceOut * 0.65 : voiceOut;
+        mixedSample += voice.isChikari ? voiceOut * 0.75 : voiceOut;
       }
 
       left[i] = mixedSample;
