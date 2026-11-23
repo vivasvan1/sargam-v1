@@ -32,7 +32,7 @@ export class PYinPitchDetector {
     this.sampleRate = options.sampleRate;
     this.frameSize = options.frameSize || 2048;
     this.hopSize = options.hopSize || 512;
-    const minFreq = options.minFrequency || 65;
+    const minFreq = options.minFrequency || 80;
     const maxFreq = options.maxFrequency || 1200;
     this.minPeriod = Math.max(2, Math.floor(this.sampleRate / maxFreq));
     this.maxPeriod = Math.min(
@@ -82,21 +82,23 @@ export class PYinPitchDetector {
         continue;
       }
 
-      // 2. Difference function & CMNDF
-      const diff = new Float32Array(halfSize);
-      for (let tau = 0; tau < halfSize; tau++) {
+      // 2. Difference function & CMNDF (bounded to maxPeriod to double throughput)
+      const maxTau = Math.min(halfSize, this.maxPeriod + 2);
+      const diff = new Float32Array(maxTau);
+      for (let tau = 0; tau < maxTau; tau++) {
         let d = 0;
+        const oTau = offset + tau;
         for (let j = 0; j < halfSize; j++) {
-          const delta = channelData[offset + j] - channelData[offset + j + tau];
+          const delta = channelData[offset + j] - channelData[oTau + j];
           d += delta * delta;
         }
         diff[tau] = d;
       }
 
-      const cmnd = new Float32Array(halfSize);
+      const cmnd = new Float32Array(maxTau);
       cmnd[0] = 1;
       let runningSum = 0;
-      for (let tau = 1; tau < halfSize; tau++) {
+      for (let tau = 1; tau < maxTau; tau++) {
         runningSum += diff[tau];
         cmnd[tau] = runningSum > 0 ? (diff[tau] * tau) / runningSum : 1;
       }
@@ -134,8 +136,21 @@ export class PYinPitchDetector {
 
       for (const th of THRESHOLDS) {
         // Find first dip below threshold (standard YIN rule)
-        const chosen = dips.find((d) => d.val < th);
+        let chosen = dips.find((d) => d.val < th);
         if (chosen) {
+          // Check for subharmonic octave doubling/quadrupling alias:
+          // If chosen.tau has an equivalent dip near tau/2 or tau/4 with reasonable CMND,
+          // prefer the smaller fundamental period (higher octave) to prevent subharmonic locking.
+          const halfTau = Math.round(chosen.tau / 2);
+          const quarterTau = Math.round(chosen.tau / 4);
+          const subDip = dips.find(
+            (d) =>
+              (Math.abs(d.tau - halfTau) <= 3 && d.val < 0.38) ||
+              (Math.abs(d.tau - quarterTau) <= 3 && d.val < 0.38)
+          );
+          if (subDip) {
+            chosen = subDip;
+          }
           votes.set(chosen.tau, (votes.get(chosen.tau) || 0) + 1);
         }
       }
@@ -147,8 +162,18 @@ export class PYinPitchDetector {
           globalMinDip = d;
         }
       }
-      if (globalMinDip && !votes.has(globalMinDip.tau)) {
-        votes.set(globalMinDip.tau, 1);
+      if (globalMinDip) {
+        const halfTau = Math.round(globalMinDip.tau / 2);
+        const quarterTau = Math.round(globalMinDip.tau / 4);
+        const subDip = dips.find(
+          (d) =>
+            (Math.abs(d.tau - halfTau) <= 3 && d.val < 0.38) ||
+            (Math.abs(d.tau - quarterTau) <= 3 && d.val < 0.38)
+        );
+        const effectiveDip = subDip || globalMinDip;
+        if (!votes.has(effectiveDip.tau)) {
+          votes.set(effectiveDip.tau, 1);
+        }
       }
 
       for (const [dipTau, count] of votes.entries()) {
@@ -164,19 +189,25 @@ export class PYinPitchDetector {
       }
 
       // Beam Search Pruning: Retain top 3 most probable voiced candidates per frame (K <= 4 total)
-      // Reduces Viterbi transitions from 144 to <= 16 (10x faster execution without loss of optimality)
       candidates.sort((a, b) => b.weight - a.weight);
       const topCandidates = candidates.slice(0, 3);
 
-      // Add unvoiced candidate state
-      // If CMND dips are shallow or RMS is low, unvoiced gets higher relative weight
+      // Bayesian Voicing Probability Formulation (Mauch & Dixon)
+      // Voiced probability pVoiced is derived from best dip depth and signal energy
       const bestVal = topCandidates.length > 0 ? topCandidates[0].cmndValue : 1.0;
-      const unvoicedWeight = Math.max(0.08, bestVal * 1.15 - (rms > 0.03 ? 0.35 : 0));
+      const pVoiced = Math.max(0.02, Math.min(0.98, (1.0 - bestVal) * (rms > 0.01 ? 1.0 : rms / 0.01)));
+      const pUnvoiced = 1.0 - pVoiced;
+
+      const sumVoicedWeights = topCandidates.reduce((s, c) => s + c.weight, 0);
+      for (const c of topCandidates) {
+        c.weight = sumVoicedWeights > 0 ? pVoiced * (c.weight / sumVoicedWeights) : pVoiced / topCandidates.length;
+      }
+
       topCandidates.push({
         frequency: 0,
         period: 0,
         cmndValue: bestVal,
-        weight: unvoicedWeight,
+        weight: pUnvoiced,
         isVoiced: false,
       });
 
