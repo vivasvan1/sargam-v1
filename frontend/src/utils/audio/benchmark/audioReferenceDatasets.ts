@@ -368,3 +368,69 @@ export function createRealSitarBenchmark(wavPath?: string): GroundTruthDataset {
     sampleRate,
   };
 }
+
+/**
+ * Benchmark Dataset 4: Real performance from the Saraga Hindustani dataset.
+ * Reads .ctonic.txt, .pitch.txt, and converts .mp3.mp3 to mono Float32 audio samples.
+ */
+export function loadSaragaBenchmark(
+  ragaDir: string,
+  trackName: string,
+  maxDurationSec = 60
+): GroundTruthDataset {
+  const ctonicPath = path.join(ragaDir, `${trackName}.ctonic.txt`);
+  const pitchPath = path.join(ragaDir, `${trackName}.pitch.txt`);
+  const mp3Path = path.join(ragaDir, `${trackName}.mp3.mp3`);
+
+  if (!fs.existsSync(ctonicPath) || !fs.existsSync(pitchPath) || !fs.existsSync(mp3Path)) {
+    throw new Error(`Missing Saraga files in ${ragaDir}`);
+  }
+
+  // 1. Ground truth Sa tonic frequency
+  const saFreq = parseFloat(fs.readFileSync(ctonicPath, 'utf8').trim());
+
+  // 2. Ground truth pitch track (time-aligned f0)
+  const pitchCsv = fs.readFileSync(pitchPath, 'utf8');
+  let pitchTrack = parseSaragaPitchTrackCsv(pitchCsv);
+  if (maxDurationSec > 0) {
+    pitchTrack = pitchTrack.filter((f) => f.timestamp <= maxDurationSec);
+  }
+
+  // 3. Audio conversion via afconvert
+  const tempWav = path.join('/tmp', `saraga_${Date.now()}_${Math.random().toString(36).substring(7)}.wav`);
+  try {
+    const { execSync } = require('child_process');
+    execSync(`afconvert -f WAVE -d LEF32@44100 "${mp3Path}" "${tempWav}"`);
+    const wavResult = loadWavFile(tempWav);
+    let samples = wavResult.samples;
+    const sampleRate = wavResult.sampleRate;
+
+    if (maxDurationSec > 0) {
+      const maxSamples = Math.floor(maxDurationSec * sampleRate);
+      if (samples.length > maxSamples) {
+        samples = samples.subarray(0, maxSamples);
+      }
+    }
+    const duration = samples.length / sampleRate;
+
+    return {
+      name: `Saraga: ${trackName} (${duration.toFixed(1)}s Real Performance)`,
+      instrument: 'vocal',
+      saPitch: 'Sa',
+      saFrequency: saFreq,
+      durationSeconds: duration,
+      notes: [],
+      pitchTrack,
+      audioSamples: samples,
+      sampleRate,
+    };
+  } finally {
+    if (fs.existsSync(tempWav)) {
+      try {
+        fs.unlinkSync(tempWav);
+      } catch {
+        // ignore cleanup error
+      }
+    }
+  }
+}

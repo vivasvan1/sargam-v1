@@ -101,11 +101,18 @@ export class PYinPitchDetector {
         cmnd[tau] = runningSum > 0 ? (diff[tau] * tau) / runningSum : 1;
       }
 
-      // 3. Find all local valleys (minima) in the search range
-      const candidates: PYinCandidate[] = [];
+      // 3. Extract candidates using pYIN threshold distribution (Mauch & Dixon)
+      // Find all local minima (dips) in the CMNDF
+      interface LocalDip {
+        tau: number;
+        betterTau: number;
+        val: number;
+        freq: number;
+      }
+      const dips: LocalDip[] = [];
 
       for (let tau = this.minPeriod + 1; tau < this.maxPeriod - 1; tau++) {
-        if (cmnd[tau] < cmnd[tau - 1] && cmnd[tau] < cmnd[tau + 1]) {
+        if (cmnd[tau] < cmnd[tau - 1] && cmnd[tau] < cmnd[tau + 1] && cmnd[tau] < 0.6) {
           // Sub-sample parabolic interpolation
           const s0 = cmnd[tau - 1];
           const s1 = cmnd[tau];
@@ -117,25 +124,43 @@ export class PYinPitchDetector {
           }
 
           const freq = this.sampleRate / betterTau;
-          const val = cmnd[tau];
-
-          // Sitar overtone check: if this valley is around half frequency of an earlier candidate,
-          // check if this is subharmonic doubling from jawari
-          let sitarBonus = 0;
-          if (val < 0.25) {
-            sitarBonus += 0.2;
-          }
-
-          // Observation weight: lower cmnd gives higher weight
-          const weight = Math.max(0, 1 - val) + sitarBonus;
-          candidates.push({
-            frequency: freq,
-            period: betterTau,
-            cmndValue: val,
-            weight,
-            isVoiced: true,
-          });
+          dips.push({ tau, betterTau, val: cmnd[tau], freq });
         }
+      }
+
+      const candidates: PYinCandidate[] = [];
+      const THRESHOLDS = [0.03, 0.06, 0.09, 0.12, 0.15, 0.18, 0.22, 0.26, 0.30, 0.35, 0.42];
+      const votes = new Map<number, number>();
+
+      for (const th of THRESHOLDS) {
+        // Find first dip below threshold (standard YIN rule)
+        const chosen = dips.find((d) => d.val < th);
+        if (chosen) {
+          votes.set(chosen.tau, (votes.get(chosen.tau) || 0) + 1);
+        }
+      }
+
+      // Also ensure the global minimum dip is represented
+      let globalMinDip: LocalDip | null = null;
+      for (const d of dips) {
+        if (!globalMinDip || d.val < globalMinDip.val) {
+          globalMinDip = d;
+        }
+      }
+      if (globalMinDip && !votes.has(globalMinDip.tau)) {
+        votes.set(globalMinDip.tau, 1);
+      }
+
+      for (const [dipTau, count] of votes.entries()) {
+        const dip = dips.find((d) => d.tau === dipTau)!;
+        const weight = (count / THRESHOLDS.length) * (1 - dip.val);
+        candidates.push({
+          frequency: dip.freq,
+          period: dip.betterTau,
+          cmndValue: dip.val,
+          weight: Math.max(1e-3, weight),
+          isVoiced: true,
+        });
       }
 
       // Add unvoiced candidate state
