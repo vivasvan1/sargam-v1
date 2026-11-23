@@ -34,6 +34,9 @@ import {
 } from '@/utils/audio/sargamTranscriber';
 import { RAGA_PRESETS } from '@/utils/audio/raga/ragaDefinitions';
 import { PitchContourVisualizer } from './PitchContourVisualizer';
+import { NoteInspector } from './NoteInspector';
+import { recalculateTranscriptionFromEvents } from '@/utils/audio/noteSynchronizer';
+import type { TranscribedNoteEvent } from '@/utils/audio/types';
 
 interface Step3TranscribeProps {
   audioBuffer: AudioBuffer;
@@ -66,6 +69,15 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
   // Playback Cursor & Position Tracking
   const [playbackTime, setPlaybackTime] = useState<number>(0);
   const playStartTimeRef = useRef<number>(0);
+
+  // Selected Note for Interactive Editing
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const sliceSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+  const selectedNote = useMemo(() => {
+    if (!result || !selectedNoteId) return null;
+    return result.events.find((n) => n.id === selectedNoteId) || null;
+  }, [result, selectedNoteId]);
 
   // Search & Replace state
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,6 +216,13 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
   };
 
   const stopOriginalAudio = () => {
+    if (sliceSourceRef.current) {
+      try {
+        sliceSourceRef.current.stop();
+        sliceSourceRef.current.disconnect();
+      } catch (e) {}
+      sliceSourceRef.current = null;
+    }
     if (originalSourceRef.current) {
       try {
         originalSourceRef.current.stop();
@@ -218,6 +237,131 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
       audioCtxRef.current = null;
     }
     setIsPlayingOriginal(false);
+  };
+
+  // Interactive Auditioning of an isolated note or time region
+  const handleAuditionSlice = (startSec: number, endSec: number) => {
+    stopOriginalAudio();
+    stopSynthPlayback();
+
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    audioCtxRef.current = ctx;
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ctx.destination);
+    const dur = Math.max(0.05, endSec - startSec);
+    source.start(0, startSec, dur);
+    sliceSourceRef.current = source;
+    source.onended = () => {
+      sliceSourceRef.current = null;
+    };
+  };
+
+  const handleAuditionSynth = (note: TranscribedNoteEvent) => {
+    Tone.start();
+    if (!synthRef.current) {
+      synthRef.current = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.2 },
+      }).toDestination();
+      synthRef.current.volume.value = -6;
+    }
+
+    const swaraSemitones: Record<string, number> = {
+      S: 0, r: 1, R: 2, g: 3, G: 4, m: 5, Mt: 6, P: 7, d: 8, D: 9, n: 10, N: 11,
+    };
+    const semitones = (swaraSemitones[note.swara] || 0) + note.octave * 12;
+    const freq = saFrequency * Math.pow(2, semitones / 12);
+    const now = Tone.now();
+
+    if (note.ornament?.type === 'meend' && note.ornament.targetSwara) {
+      const targetSemitones =
+        (swaraSemitones[note.ornament.targetSwara] || 0) + note.octave * 12;
+      const targetFreq = saFrequency * Math.pow(2, targetSemitones / 12);
+      synthRef.current.set({ portamento: note.durationSeconds * 0.75 });
+      synthRef.current.triggerAttackRelease(freq, note.durationSeconds, now);
+      setTimeout(() => {
+        try {
+          synthRef.current?.triggerAttackRelease(
+            targetFreq,
+            note.durationSeconds * 0.4,
+            now + note.durationSeconds * 0.5
+          );
+        } catch (e) {}
+      }, 10);
+    } else {
+      synthRef.current.set({ portamento: 0 });
+      synthRef.current.triggerAttackRelease(freq, note.durationSeconds, now);
+    }
+  };
+
+  // Two-way synchronization when note events are edited
+  const handleNotesChange = (updatedEvents: TranscribedNoteEvent[]) => {
+    if (!result) return;
+    const newRes = recalculateTranscriptionFromEvents(
+      updatedEvents,
+      result.contour,
+      saPitch,
+      saFrequency,
+      {
+        bpm,
+        talaId,
+        pickupBeat,
+        gridResolution,
+        ragaId,
+        algorithm,
+      }
+    );
+    setResult(newRes);
+    setSargamCode(newRes.sargamCode);
+  };
+
+  const handleUpdateNote = (updated: TranscribedNoteEvent) => {
+    if (!result) return;
+    const updatedEvents = result.events.map((n) => (n.id === updated.id ? updated : n));
+    handleNotesChange(updatedEvents);
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    if (!result) return;
+    const updatedEvents = result.events.filter((n) => n.id !== noteId);
+    setSelectedNoteId(null);
+    handleNotesChange(updatedEvents);
+    toast.success('Note removed');
+  };
+
+  const handleSplitNote = (noteId: string) => {
+    if (!result) return;
+    const target = result.events.find((n) => n.id === noteId);
+    if (!target) return;
+
+    const midTime = (target.startTime + target.endTime) / 2;
+    const note1: TranscribedNoteEvent = {
+      ...target,
+      id: `note-${Date.now()}-1`,
+      endTime: Number(midTime.toFixed(3)),
+      durationSeconds: Number((midTime - target.startTime).toFixed(3)),
+      manuallyEdited: true,
+    };
+    const note2: TranscribedNoteEvent = {
+      ...target,
+      id: `note-${Date.now()}-2`,
+      startTime: Number(midTime.toFixed(3)),
+      durationSeconds: Number((target.endTime - midTime).toFixed(3)),
+      manuallyEdited: true,
+    };
+
+    const idx = result.events.findIndex((n) => n.id === noteId);
+    const updatedEvents = [
+      ...result.events.slice(0, idx),
+      note1,
+      note2,
+      ...result.events.slice(idx + 1),
+    ];
+
+    setSelectedNoteId(note1.id);
+    handleNotesChange(updatedEvents);
+    toast.success('Note split in half');
   };
 
   // Play Synthesized Sargam via Tone.js (Vocal / Flute sustained synth)
@@ -689,7 +833,25 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
             saFrequency={saFrequency}
             currentTime={playbackTime}
             isPlaying={isPlayingOriginal || isPlayingSynth}
+            selectedNoteId={selectedNoteId}
+            onSelectNote={(n) => setSelectedNoteId(n ? n.id : null)}
+            onNotesChange={handleNotesChange}
             onSeek={handleSeek}
+            onAuditionSlice={handleAuditionSlice}
+          />
+        )}
+
+        {/* Interactive Note Inspector (when a note is selected) */}
+        {selectedNote && (
+          <NoteInspector
+            note={selectedNote}
+            raga={result?.raga}
+            onUpdateNote={handleUpdateNote}
+            onDeleteNote={handleDeleteNote}
+            onSplitNote={handleSplitNote}
+            onAuditionSlice={handleAuditionSlice}
+            onAuditionSynth={handleAuditionSynth}
+            onClose={() => setSelectedNoteId(null)}
           />
         )}
 

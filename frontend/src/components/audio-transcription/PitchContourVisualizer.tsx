@@ -11,7 +11,11 @@ interface PitchContourVisualizerProps {
   saFrequency: number;
   currentTime?: number;
   isPlaying?: boolean;
+  selectedNoteId?: string | null;
+  onSelectNote?: (note: TranscribedNoteEvent | null) => void;
+  onNotesChange?: (updatedNotes: TranscribedNoteEvent[]) => void;
   onSeek?: (timeSec: number) => void;
+  onAuditionSlice?: (startSec: number, endSec: number) => void;
   className?: string;
 }
 
@@ -43,7 +47,11 @@ export const PitchContourVisualizer: React.FC<PitchContourVisualizerProps> = ({
   saFrequency,
   currentTime = 0,
   isPlaying = false,
+  selectedNoteId = null,
+  onSelectNote,
+  onNotesChange,
   onSeek,
+  onAuditionSlice,
   className = '',
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -53,6 +61,16 @@ export const PitchContourVisualizer: React.FC<PitchContourVisualizerProps> = ({
   const [scrollOffsetSec, setScrollOffsetSec] = useState<number>(0);
   const [hoveredNote, setHoveredNote] = useState<TranscribedNoteEvent | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+
+  // Drag state for adjusting note boundaries
+  const [dragState, setDragState] = useState<{
+    noteId: string;
+    edge: 'start' | 'end';
+    origStartTime: number;
+    origEndTime: number;
+  } | null>(null);
+
+  const [cursorStyle, setCursorStyle] = useState<string>('crosshair');
 
   // Time boundaries
   const totalDuration = useMemo(() => {
@@ -177,25 +195,55 @@ export const PitchContourVisualizer: React.FC<PitchContourVisualizerProps> = ({
       const x2 = Math.min(width, timeToX(note.endTime));
       const y = centsToY(note.centsFromSa);
       const noteW = Math.max(4, x2 - x1);
-      const noteH = 18;
+      const noteH = 20;
 
+      const isSelected = selectedNoteId === note.id;
       const isMeend = !!note.ornament && note.ornament.type === 'meend';
+
+      if (isSelected) {
+        // Selection glowing outline
+        ctx.save();
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.roundRect(x1 - 1, y - noteH / 2 - 1, noteW + 2, noteH + 2, 5);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // Note pill background
-      ctx.fillStyle = isMeend
-        ? 'rgba(168, 85, 247, 0.28)' // purple for meend
-        : 'rgba(59, 130, 246, 0.25)'; // blue for stable swara
-      ctx.strokeStyle = isMeend ? '#c084fc' : '#60a5fa';
-      ctx.lineWidth = 1.2;
+      ctx.fillStyle = isSelected
+        ? 'rgba(56, 189, 248, 0.45)'
+        : isMeend
+        ? 'rgba(168, 85, 247, 0.28)'
+        : 'rgba(59, 130, 246, 0.25)';
+      ctx.strokeStyle = isSelected
+        ? '#38bdf8'
+        : isMeend
+        ? '#c084fc'
+        : '#60a5fa';
+      ctx.lineWidth = isSelected ? 2.0 : 1.2;
 
       ctx.beginPath();
       ctx.roundRect(x1, y - noteH / 2, noteW, noteH, 4);
       ctx.fill();
       ctx.stroke();
 
+      // Drag handles on left and right edge if selected or hovered
+      if (isSelected || hoveredNote?.id === note.id) {
+        ctx.fillStyle = '#ffffff';
+        // Left resize handle
+        ctx.fillRect(x1 + 1, y - noteH / 2 + 4, 2, noteH - 8);
+        // Right resize handle
+        ctx.fillRect(x2 - 3, y - noteH / 2 + 4, 2, noteH - 8);
+      }
+
       // Swara Text label inside pill if space permits
       if (noteW > 14) {
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px system-ui, sans-serif';
+        ctx.font = isSelected ? 'bold 11px system-ui, sans-serif' : 'bold 10px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const label = isMeend
@@ -265,6 +313,8 @@ export const PitchContourVisualizer: React.FC<PitchContourVisualizerProps> = ({
   }, [
     contour,
     notes,
+    selectedNoteId,
+    hoveredNote,
     zoomLevel,
     scrollOffsetSec,
     totalDuration,
@@ -288,24 +338,8 @@ export const PitchContourVisualizer: React.FC<PitchContourVisualizerProps> = ({
     };
   }, [renderCanvas, isPlaying]);
 
-  // Click to seek
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !onSeek) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const leftMargin = 50;
-    const graphWidth = rect.width - leftMargin;
-
-    if (x >= leftMargin) {
-      const visibleDuration = totalDuration / zoomLevel;
-      const clickedTime = scrollOffsetSec + ((x - leftMargin) / graphWidth) * visibleDuration;
-      onSeek(Math.max(0, Math.min(totalDuration, clickedTime)));
-    }
-  };
-
-  // Hover detection for notes
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Mouse interaction: select, drag boundary, seek
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -314,19 +348,147 @@ export const PitchContourVisualizer: React.FC<PitchContourVisualizerProps> = ({
     const leftMargin = 50;
     const graphWidth = rect.width - leftMargin;
 
+    if (mouseX < leftMargin) return;
+
     const visibleDuration = totalDuration / zoomLevel;
-    const hoverTime = scrollOffsetSec + ((mouseX - leftMargin) / graphWidth) * visibleDuration;
+    const clickTime = scrollOffsetSec + ((mouseX - leftMargin) / graphWidth) * visibleDuration;
 
-    const match = notes.find(
-      (n) => hoverTime >= n.startTime && hoverTime <= n.endTime
-    );
+    // Check if clicked near edge of any note
+    for (const note of notes) {
+      const x1 = leftMargin + ((note.startTime - scrollOffsetSec) / visibleDuration) * graphWidth;
+      const x2 = leftMargin + ((note.endTime - scrollOffsetSec) / visibleDuration) * graphWidth;
+      const clamped = Math.max(minCents, Math.min(maxCents, note.centsFromSa));
+      const norm = (maxCents - clamped) / centsRange;
+      const y = norm * (rect.height - 30) + 10;
 
-    if (match) {
-      setHoveredNote(match);
-      setHoverPos({ x: e.clientX, y: e.clientY });
-    } else {
-      setHoveredNote(null);
-      setHoverPos(null);
+      if (Math.abs(mouseY - y) <= 16) {
+        // Check left edge (±7px)
+        if (Math.abs(mouseX - x1) <= 7) {
+          setDragState({
+            noteId: note.id,
+            edge: 'start',
+            origStartTime: note.startTime,
+            origEndTime: note.endTime,
+          });
+          onSelectNote?.(note);
+          return;
+        }
+        // Check right edge (±7px)
+        if (Math.abs(mouseX - x2) <= 7) {
+          setDragState({
+            noteId: note.id,
+            edge: 'end',
+            origStartTime: note.startTime,
+            origEndTime: note.endTime,
+          });
+          onSelectNote?.(note);
+          return;
+        }
+        // Check inside note body
+        if (mouseX >= x1 && mouseX <= x2) {
+          onSelectNote?.(note);
+          return;
+        }
+      }
+    }
+
+    // Clicked empty background
+    onSelectNote?.(null);
+    onSeek?.(Math.max(0, Math.min(totalDuration, clickTime)));
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const leftMargin = 50;
+    const graphWidth = rect.width - leftMargin;
+    const visibleDuration = totalDuration / zoomLevel;
+
+    if (dragState) {
+      // Actively dragging an edge!
+      const currTime = scrollOffsetSec + ((mouseX - leftMargin) / graphWidth) * visibleDuration;
+      const targetNote = notes.find((n) => n.id === dragState.noteId);
+      if (targetNote && onNotesChange) {
+        const updated = notes.map((n) => {
+          if (n.id !== dragState.noteId) return n;
+          if (dragState.edge === 'start') {
+            const newStart = Math.min(n.endTime - 0.05, Math.max(0, currTime));
+            return {
+              ...n,
+              startTime: Number(newStart.toFixed(3)),
+              durationSeconds: Number((n.endTime - newStart).toFixed(3)),
+              manuallyEdited: true,
+            };
+          } else {
+            const newEnd = Math.max(n.startTime + 0.05, Math.min(totalDuration, currTime));
+            return {
+              ...n,
+              endTime: Number(newEnd.toFixed(3)),
+              durationSeconds: Number((newEnd - n.startTime).toFixed(3)),
+              manuallyEdited: true,
+            };
+          }
+        });
+        onNotesChange(updated);
+      }
+      return;
+    }
+
+    // Hover detection & cursor styling
+    if (mouseX >= leftMargin) {
+      let isNearEdge = false;
+      let matchedNote: TranscribedNoteEvent | null = null;
+
+      for (const note of notes) {
+        const x1 = leftMargin + ((note.startTime - scrollOffsetSec) / visibleDuration) * graphWidth;
+        const x2 = leftMargin + ((note.endTime - scrollOffsetSec) / visibleDuration) * graphWidth;
+        const clamped = Math.max(minCents, Math.min(maxCents, note.centsFromSa));
+        const norm = (maxCents - clamped) / centsRange;
+        const y = norm * (rect.height - 30) + 10;
+
+        if (Math.abs(mouseY - y) <= 16) {
+          if (Math.abs(mouseX - x1) <= 7 || Math.abs(mouseX - x2) <= 7) {
+            isNearEdge = true;
+            matchedNote = note;
+            break;
+          }
+          if (mouseX >= x1 && mouseX <= x2) {
+            matchedNote = note;
+            break;
+          }
+        }
+      }
+
+      if (isNearEdge) {
+        setCursorStyle('col-resize');
+      } else if (matchedNote) {
+        setCursorStyle('pointer');
+      } else {
+        setCursorStyle('crosshair');
+      }
+
+      if (matchedNote) {
+        setHoveredNote(matchedNote);
+        setHoverPos({ x: e.clientX, y: e.clientY });
+      } else {
+        setHoveredNote(null);
+        setHoverPos(null);
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (dragState) {
+      setDragState(null);
+    }
+  };
+
+  const handleDoubleClick = () => {
+    if (hoveredNote && onAuditionSlice) {
+      onAuditionSlice(hoveredNote.startTime, hoveredNote.endTime);
     }
   };
 
@@ -386,12 +548,18 @@ export const PitchContourVisualizer: React.FC<PitchContourVisualizerProps> = ({
       </div>
 
       {/* Main Canvas */}
-      <div className="relative w-full h-56 sm:h-64 cursor-crosshair">
+      <div className="relative w-full h-56 sm:h-64">
         <canvas
           ref={canvasRef}
-          onClick={handleCanvasClick}
+          onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
-          onMouseLeave={() => setHoveredNote(null)}
+          onMouseUp={handleMouseUp}
+          onDoubleClick={handleDoubleClick}
+          onMouseLeave={() => {
+            setHoveredNote(null);
+            if (dragState) setDragState(null);
+          }}
+          style={{ cursor: cursorStyle }}
           className="w-full h-full block"
         />
 
