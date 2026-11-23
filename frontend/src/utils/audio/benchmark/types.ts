@@ -18,6 +18,12 @@ export interface GroundTruthNote {
   isOrnamenteed?: boolean; // meend / glide
 }
 
+export interface SaragaPhraseAnnotation {
+  startTime: number;
+  duration: number;
+  phrase: string; // e.g. "NDS", "MDN", "NRG"
+}
+
 export interface GroundTruthDataset {
   name: string;
   instrument: 'sitar' | 'vocal' | 'flute' | 'harmonium' | 'synthetic';
@@ -26,6 +32,7 @@ export interface GroundTruthDataset {
   durationSeconds: number;
   pitchTrack: GroundTruthPitchFrame[];
   notes: GroundTruthNote[];
+  phrases?: SaragaPhraseAnnotation[];
   audioSamples?: Float32Array;
   sampleRate?: number;
 }
@@ -34,11 +41,14 @@ export interface BenchmarkMetrics {
   totalVoicedFrames: number;
   totalUnvoicedFrames: number;
   
-  // Pitch accuracy
+  // MIREX Pitch & Voicing Standards
   medianCentsError: number; // Median absolute error in cents on correctly voiced frames
-  rawPitchAccuracy: number; // % of voiced frames with pitch within ±50 cents of ground truth
-  overallPitchAccuracy: number; // % of frames with correct voicing AND pitch within ±50 cents
-  octaveErrorRate: number; // % of voiced frames misclassified by approximately ±1200 or ±2400 cents (octave halving/doubling)
+  rawPitchAccuracy: number; // RPA: % of voiced frames with pitch within ±50 cents of ground truth
+  rawChromaAccuracy: number; // RCA: % of voiced frames with pitch within ±50 cents modulo octave
+  overallPitchAccuracy: number; // OA: % of frames with correct voicing AND pitch within ±50 cents
+  voicingRecall: number; // VR: % of ground truth voiced frames correctly identified as voiced
+  voicingFalseAlarm: number; // VFA: % of ground truth unvoiced frames falsely identified as voiced
+  octaveErrorRate: number; // OCR: % of voiced frames misclassified by approximately ±1200 or ±2400 cents
   
   // Note segmentation & transcription accuracy
   notePrecision: number; // detected notes matching ground truth / total detected
@@ -46,6 +56,7 @@ export interface BenchmarkMetrics {
   noteF1: number; // harmonic mean of precision & recall
   onsetMedianErrorMs: number; // median error in milliseconds for matched onsets
   swaraLabelAccuracy: number; // % of matched notes with exact matching swara and octave
+  phraseAccuracy?: number; // % sequence similarity matching Saraga manual phrase transcriptions
 }
 
 export interface BenchmarkComparisonResult {

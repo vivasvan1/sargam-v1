@@ -86,14 +86,20 @@ for (const t of testTracks) {
 
   const pyinMetrics = evaluatePitchAndNotes(dataset, pyinFrames, []);
 
-  // Comparison Table
-  console.log('| Performance / Accuracy Metric        | Baseline YIN     | Improved pYIN    | Delta / Improvement |');
-  console.log('|--------------------------------------|------------------|------------------|---------------------|');
-  console.log(`| Execution Time                       | ${yinDurationMs.toFixed(1)} ms (${yinRtf}x RT)`.padEnd(39) + `| ${pyinDurationMs.toFixed(1)} ms (${pyinRtf}x RT)`.padEnd(19) + `| ${Number(pyinDurationMs) <= Number(yinDurationMs) ? 'Faster' : 'Accurate'} |`);
-  console.log(`| Raw Pitch Accuracy (within 50 cents) | ${(yinMetrics.rawPitchAccuracy.toFixed(2) + '%').padEnd(17)}| ${(pyinMetrics.rawPitchAccuracy.toFixed(2) + '%').padEnd(17)}| ${formatGain(pyinMetrics.rawPitchAccuracy - yinMetrics.rawPitchAccuracy)} |`);
-  console.log(`| Overall Pitch Accuracy (Voiced + F0) | ${(yinMetrics.overallPitchAccuracy.toFixed(2) + '%').padEnd(17)}| ${(pyinMetrics.overallPitchAccuracy.toFixed(2) + '%').padEnd(17)}| ${formatGain(pyinMetrics.overallPitchAccuracy - yinMetrics.overallPitchAccuracy)} |`);
-  console.log(`| Median Cents Error                   | ${(yinMetrics.medianCentsError.toFixed(2) + 'c').padEnd(17)}| ${(pyinMetrics.medianCentsError.toFixed(2) + 'c').padEnd(17)}| ${formatGain(yinMetrics.medianCentsError - pyinMetrics.medianCentsError, 'c lower')} |`);
-  console.log(`| Octave Confusion Error Rate          | ${(yinMetrics.octaveErrorRate.toFixed(2) + '%').padEnd(17)}| ${(pyinMetrics.octaveErrorRate.toFixed(2) + '%').padEnd(17)}| ${formatGain(yinMetrics.octaveErrorRate - pyinMetrics.octaveErrorRate, '% lower')} |`);
+  // Comparison Table with International MIREX Standards
+  console.log('| Metric (MIREX / Indian MIR Standards) | Baseline YIN     | Improved pYIN    | Delta / Improvement |');
+  console.log('|---------------------------------------|------------------|------------------|---------------------|');
+  console.log(`| Execution Latency                     | ${yinDurationMs.toFixed(1)} ms (${yinRtf}x RT)`.padEnd(40) + `| ${pyinDurationMs.toFixed(1)} ms (${pyinRtf}x RT)`.padEnd(19) + `| ${Number(pyinDurationMs) <= Number(yinDurationMs) ? 'Faster' : 'Accurate'} |`);
+  console.log(`| Raw Pitch Accuracy (RPA, within 50c)  | ${(yinMetrics.rawPitchAccuracy.toFixed(2) + '%').padEnd(17)}| ${(pyinMetrics.rawPitchAccuracy.toFixed(2) + '%').padEnd(17)}| ${formatGain(pyinMetrics.rawPitchAccuracy - yinMetrics.rawPitchAccuracy)} |`);
+  console.log(`| Raw Chroma Accuracy (RCA, mod octave) | ${(yinMetrics.rawChromaAccuracy.toFixed(2) + '%').padEnd(17)}| ${(pyinMetrics.rawChromaAccuracy.toFixed(2) + '%').padEnd(17)}| ${formatGain(pyinMetrics.rawChromaAccuracy - yinMetrics.rawChromaAccuracy)} |`);
+  console.log(`| Overall Accuracy (OA, Voicing + F0)   | ${(yinMetrics.overallPitchAccuracy.toFixed(2) + '%').padEnd(17)}| ${(pyinMetrics.overallPitchAccuracy.toFixed(2) + '%').padEnd(17)}| ${formatGain(pyinMetrics.overallPitchAccuracy - yinMetrics.overallPitchAccuracy)} |`);
+  console.log(`| Voicing Recall (VR, true voiced %)    | ${(yinMetrics.voicingRecall.toFixed(2) + '%').padEnd(17)}| ${(pyinMetrics.voicingRecall.toFixed(2) + '%').padEnd(17)}| ${formatGain(pyinMetrics.voicingRecall - yinMetrics.voicingRecall)} |`);
+  console.log(`| Voicing False Alarm (VFA, drone noise)| ${(yinMetrics.voicingFalseAlarm.toFixed(2) + '%').padEnd(17)}| ${(pyinMetrics.voicingFalseAlarm.toFixed(2) + '%').padEnd(17)}| ${formatGain(yinMetrics.voicingFalseAlarm - pyinMetrics.voicingFalseAlarm, '% lower')} |`);
+  console.log(`| Median Cents Error (MCE)              | ${(yinMetrics.medianCentsError.toFixed(2) + 'c').padEnd(17)}| ${(pyinMetrics.medianCentsError.toFixed(2) + 'c').padEnd(17)}| ${formatGain(yinMetrics.medianCentsError - pyinMetrics.medianCentsError, 'c lower')} |`);
+  console.log(`| Octave Confusion Error Rate (OCR)     | ${(yinMetrics.octaveErrorRate.toFixed(2) + '%').padEnd(17)}| ${(pyinMetrics.octaveErrorRate.toFixed(2) + '%').padEnd(17)}| ${formatGain(yinMetrics.octaveErrorRate - pyinMetrics.octaveErrorRate, '% lower')} |`);
+  if (dataset.phrases && dataset.phrases.length > 0) {
+    console.log(`| Ground Truth Annotated Phrases        | ${dataset.phrases.map((p) => p.phrase).join(', ')}`);
+  }
   console.log('--------------------------------------------------------------------------------\n');
 }
 

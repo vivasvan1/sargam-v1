@@ -21,8 +21,11 @@ export function evaluatePitchAndNotes(
   const truthFrames = groundTruth.pitchTrack;
   let totalVoiced = 0;
   let totalUnvoiced = 0;
+  let detectedVoicedWhenVoiced = 0;
+  let detectedVoicedWhenUnvoiced = 0;
   let correctVoicingAndPitch = 0;
   let voicedWithin50Cents = 0;
+  let voicedWithin50Chroma = 0;
   let octaveErrors = 0;
   const centsErrors: number[] = [];
 
@@ -35,6 +38,7 @@ export function evaluatePitchAndNotes(
     if (truthVoiced) {
       totalVoiced++;
       if (detVoiced && detFrame) {
+        detectedVoicedWhenVoiced++;
         const centsDiff = 1200 * Math.log2(detFrame.frequency / tFrame.frequency);
         const absCents = Math.abs(centsDiff);
         centsErrors.push(absCents);
@@ -42,6 +46,13 @@ export function evaluatePitchAndNotes(
         if (absCents <= 50) {
           voicedWithin50Cents++;
           correctVoicingAndPitch++;
+        }
+
+        // MIREX Raw Chroma Accuracy: correct modulo octave
+        const chromaDiff = absCents % 1200;
+        const minChromaDist = Math.min(chromaDiff, 1200 - chromaDiff);
+        if (minChromaDist <= 50) {
+          voicedWithin50Chroma++;
         }
 
         // Check if error is roughly 1 or 2 octaves (octave doubling/halving)
@@ -56,6 +67,8 @@ export function evaluatePitchAndNotes(
       totalUnvoiced++;
       if (!detVoiced) {
         correctVoicingAndPitch++;
+      } else {
+        detectedVoicedWhenUnvoiced++;
       }
     }
   }
@@ -63,8 +76,11 @@ export function evaluatePitchAndNotes(
   centsErrors.sort((a, b) => a - b);
   const medianCents = centsErrors.length > 0 ? centsErrors[Math.floor(centsErrors.length / 2)] : 0;
   const rawPitchAccuracy = totalVoiced > 0 ? (voicedWithin50Cents / totalVoiced) * 100 : 0;
+  const rawChromaAccuracy = totalVoiced > 0 ? (voicedWithin50Chroma / totalVoiced) * 100 : 0;
   const totalFrames = truthFrames.length || 1;
   const overallPitchAccuracy = (correctVoicingAndPitch / totalFrames) * 100;
+  const voicingRecall = totalVoiced > 0 ? (detectedVoicedWhenVoiced / totalVoiced) * 100 : 100;
+  const voicingFalseAlarm = totalUnvoiced > 0 ? (detectedVoicedWhenUnvoiced / totalUnvoiced) * 100 : 0;
   const octaveErrorRate = totalVoiced > 0 ? (octaveErrors / totalVoiced) * 100 : 0;
 
   // Evaluate Note Segmentation and Swara Recognition
@@ -117,7 +133,10 @@ export function evaluatePitchAndNotes(
     totalUnvoicedFrames: totalUnvoiced,
     medianCentsError: Number(medianCents.toFixed(2)),
     rawPitchAccuracy: Number(rawPitchAccuracy.toFixed(2)),
+    rawChromaAccuracy: Number(rawChromaAccuracy.toFixed(2)),
     overallPitchAccuracy: Number(overallPitchAccuracy.toFixed(2)),
+    voicingRecall: Number(voicingRecall.toFixed(2)),
+    voicingFalseAlarm: Number(voicingFalseAlarm.toFixed(2)),
     octaveErrorRate: Number(octaveErrorRate.toFixed(2)),
     notePrecision: Number(notePrecision.toFixed(3)),
     noteRecall: Number(noteRecall.toFixed(3)),

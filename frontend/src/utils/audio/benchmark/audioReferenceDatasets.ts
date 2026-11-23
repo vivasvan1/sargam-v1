@@ -396,7 +396,25 @@ export function loadSaragaBenchmark(
     pitchTrack = pitchTrack.filter((f) => f.timestamp <= maxDurationSec);
   }
 
-  // 3. Audio conversion via afconvert
+  // 3. Ground truth manual phrase solfège annotations if available
+  const phrasesPath = path.join(ragaDir, `${trackName}.mphrases-manual.txt`);
+  const phrases = [];
+  if (fs.existsSync(phrasesPath)) {
+    const pLines = fs.readFileSync(phrasesPath, 'utf8').trim().split('\n');
+    for (const pl of pLines) {
+      const parts = pl.trim().split(/\t+/);
+      if (parts.length >= 4) {
+        const startTime = parseFloat(parts[0]);
+        const duration = parseFloat(parts[2]);
+        const phrase = parts[3].trim();
+        if (maxDurationSec <= 0 || startTime <= maxDurationSec) {
+          phrases.push({ startTime, duration, phrase });
+        }
+      }
+    }
+  }
+
+  // 4. Audio conversion via afconvert
   const tempWav = path.join('/tmp', `saraga_${Date.now()}_${Math.random().toString(36).substring(7)}.wav`);
   try {
     const { execSync } = require('child_process');
@@ -421,6 +439,7 @@ export function loadSaragaBenchmark(
       durationSeconds: duration,
       notes: [],
       pitchTrack,
+      phrases,
       audioSamples: samples,
       sampleRate,
     };
