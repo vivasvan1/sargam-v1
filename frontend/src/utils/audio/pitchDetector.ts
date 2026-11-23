@@ -16,23 +16,31 @@ export interface PitchDetectorOptions {
   sampleRate: number;
   frameSize?: number; // window size in samples (default: 2048)
   hopSize?: number; // step size in samples (default: 512, ~11.6ms at 44.1kHz)
-  minFrequency?: number; // minimum detectable pitch (default: 65 Hz, ~C2)
-  maxFrequency?: number; // maximum detectable pitch (default: 1200 Hz, ~D6)
+  minFrequency?: number; // minimum detectable pitch (default: 75 Hz)
+  maxFrequency?: number; // maximum detectable pitch (default: 1200 Hz)
   threshold?: number; // YIN threshold (default: 0.15)
-  silenceThreshold?: number; // RMS energy threshold below which audio is silent (default: 0.01)
-  clarityThreshold?: number; // minimum clarity to consider voiced (default: 0.6)
+  silenceThreshold?: number; // RMS energy threshold below which audio is silent (default: 0.008)
+  clarityThreshold?: number; // minimum clarity to consider voiced (default: 0.45)
+  saFrequency?: number; // known or detected tonic frequency (Hz) for Tanpura drone suppression
+  suppressDrone?: boolean; // enable intelligent Tanpura drone suppression
 }
 
 import { PYinPitchDetector } from './pitch/pyinDetector';
+import { CrepePitchDetector } from './pitch/crepeDetector';
 
-export { PYinPitchDetector };
+export { PYinPitchDetector, CrepePitchDetector };
+
+export type PitchAlgorithm = 'yin' | 'pyin' | 'crepe' | 'hybrid-auto';
 
 export function detectAudioPitch(
   channelData: Float32Array,
-  options: PitchDetectorOptions & { algorithm?: 'yin' | 'pyin' }
+  options: PitchDetectorOptions & { algorithm?: PitchAlgorithm; onnxSession?: any }
 ): PitchFrame[] {
   const algorithm = options.algorithm || 'pyin';
-  if (algorithm === 'pyin') {
+  if (algorithm === 'crepe' || algorithm === 'hybrid-auto') {
+    const detector = new CrepePitchDetector(options);
+    return detector.analyze(channelData);
+  } else if (algorithm === 'pyin') {
     const detector = new PYinPitchDetector(options);
     return detector.analyze(channelData);
   } else {

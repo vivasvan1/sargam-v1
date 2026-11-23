@@ -244,6 +244,8 @@ async function runBenchmark() {
       hopSize: 512,
       clarityThreshold: 0.40,
       silenceThreshold: 0.005,
+      saFrequency: dataset.saFrequency,
+      suppressDrone: true,
     });
     const pyinStart = performance.now();
     const pyinFrames = pyin.analyze(samples);
@@ -348,7 +350,10 @@ async function runBenchmark() {
   console.log(`Generating PDF Report via ReportLab...`);
   try {
     const pythonScript = path.resolve(process.cwd(), 'scripts/generate_benchmark_pdf.py');
-    execSync(`python3 "${pythonScript}" "${jsonTempPath}" "${pdfOutputPath}"`, { stdio: 'inherit' });
+    const pyBin = fs.existsSync('/opt/homebrew/bin/python3.14')
+      ? '/opt/homebrew/bin/python3.14'
+      : 'python3';
+    execSync(`"${pyBin}" "${pythonScript}" "${jsonTempPath}" "${pdfOutputPath}"`, { stdio: 'inherit' });
     console.log(`\nPDF Report successfully saved to: ${pdfOutputPath}`);
   } catch (err) {
     console.error('Failed to generate PDF:', err);

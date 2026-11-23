@@ -213,6 +213,8 @@ export function transcribeAudioToSargam(
     threshold: 0.15,
     clarityThreshold: options.clarityThreshold || defaultClarity,
     silenceThreshold: options.silenceThreshold || defaultSilence,
+    saFrequency,
+    suppressDrone: true,
     algorithm,
   });
 

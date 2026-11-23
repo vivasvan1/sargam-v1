@@ -1,21 +1,25 @@
 /**
- * Probabilistic YIN (pYIN) Pitch Tracking Algorithm.
+ * Probabilistic YIN (pYIN) Pitch Tracking Algorithm with Harmonic Product Spectrum (HPS) Fusion.
  * Implemented in pure TypeScript for fast, cross-platform browser & Node execution.
  *
- * Key advantages over standard YIN:
- * 1. Multi-candidate peak extraction from the CMNDF (not greedy first-valley).
- * 2. Viterbi dynamic programming trellis smoothing over consecutive frames.
- * 3. Probabilistic voiced/unvoiced classification.
- * 4. Specific octave-error penalization and sitar harmonic correction.
+ * SOTA Enhancements:
+ * 1. Multi-candidate CMNDF peak extraction with sub-sample parabolic refinement.
+ * 2. Harmonic Product Spectrum (HPS) cross-validation: suppresses subharmonics & octave doubling.
+ * 3. Intelligent Tanpura Drone Suppression: rejects static background drone harmonics during pauses.
+ * 4. Bayesian voiced/unvoiced likelihood modeling with energy and spectral clarity scaling.
+ * 5. Viterbi dynamic programming trellis decoding with Indian music glide (meend) tolerance.
+ * 6. Hysteresis post-filtering for continuous phrasing without dropout flutter.
  */
 
 import type { PitchFrame, PitchDetectorOptions } from '../pitchDetector';
+import { FastFFT } from './fastFft';
 
 export interface PYinCandidate {
   frequency: number; // 0 for unvoiced
   period: number;
   cmndValue: number;
-  weight: number; // log likelihood / observation score
+  hpsScore: number;
+  weight: number; // posterior score / emission weight
   isVoiced: boolean;
 }
 
@@ -23,28 +27,36 @@ export class PYinPitchDetector {
   private sampleRate: number;
   private frameSize: number;
   private hopSize: number;
+  private minFreq: number;
+  private maxFreq: number;
   private minPeriod: number;
   private maxPeriod: number;
   private silenceThreshold: number;
   private clarityThreshold: number;
+  private saFrequency?: number;
+  private suppressDrone: boolean;
+  private fft: FastFFT;
 
   constructor(options: PitchDetectorOptions) {
     this.sampleRate = options.sampleRate;
     this.frameSize = options.frameSize || 2048;
     this.hopSize = options.hopSize || 512;
-    const minFreq = options.minFrequency || 80;
-    const maxFreq = options.maxFrequency || 1200;
-    this.minPeriod = Math.max(2, Math.floor(this.sampleRate / maxFreq));
+    this.minFreq = options.minFrequency || 75;
+    this.maxFreq = options.maxFrequency || 1200;
+    this.minPeriod = Math.max(2, Math.floor(this.sampleRate / this.maxFreq));
     this.maxPeriod = Math.min(
       Math.floor(this.frameSize / 2),
-      Math.floor(this.sampleRate / minFreq)
+      Math.floor(this.sampleRate / this.minFreq)
     );
-    this.silenceThreshold = options.silenceThreshold || 0.008;
+    this.silenceThreshold = options.silenceThreshold || 0.007;
     this.clarityThreshold = options.clarityThreshold || 0.45;
+    this.saFrequency = options.saFrequency;
+    this.suppressDrone = options.suppressDrone ?? true;
+    this.fft = new FastFFT(this.frameSize);
   }
 
   /**
-   * Analyzes an entire audio channel using pYIN multi-candidate Viterbi decoding.
+   * Analyzes an entire audio channel using pYIN + HPS multi-candidate Viterbi decoding.
    */
   public analyze(channelData: Float32Array): PitchFrame[] {
     const totalSamples = channelData.length;
@@ -55,6 +67,34 @@ export class PYinPitchDetector {
     const frameRms: number[] = [];
     const frameTimes: number[] = [];
 
+    // Pre-calculate drone frequencies if Sa is known
+    const droneFrequencies: number[] = [];
+    if (this.suppressDrone && this.saFrequency && this.saFrequency > 40) {
+      const sa = this.saFrequency;
+      droneFrequencies.push(sa, sa * 0.5, sa * 2.0); // Sa octaves
+      droneFrequencies.push(sa * 1.5, sa * 0.75); // Pa (fifth)
+      droneFrequencies.push(sa * (4 / 3), sa * (2 / 3)); // Ma (fourth, e.g. Marwa/Bhairav)
+    }
+
+    // Measure baseline minimum energy across early frames to calibrate tanpura noise floor
+    let noiseFloorRms = 0.015;
+    let initialCount = 0;
+    for (
+      let off = 0;
+      off + this.frameSize <= totalSamples && initialCount < 30;
+      off += this.hopSize, initialCount++
+    ) {
+      let sumSq = 0;
+      for (let i = 0; i < this.frameSize; i++) {
+        const v = channelData[off + i] || 0;
+        sumSq += v * v;
+      }
+      const r = Math.sqrt(sumSq / this.frameSize);
+      if (r < noiseFloorRms) noiseFloorRms = Math.max(0.003, r);
+    }
+
+    const frameBuffer = new Float32Array(this.frameSize);
+
     for (let offset = 0; offset + this.frameSize <= totalSamples; offset += this.hopSize) {
       const time = (offset + this.frameSize / 2) / this.sampleRate;
       frameTimes.push(time);
@@ -63,6 +103,7 @@ export class PYinPitchDetector {
       let sumSquares = 0;
       for (let i = 0; i < this.frameSize; i++) {
         const val = channelData[offset + i] || 0;
+        frameBuffer[i] = val;
         sumSquares += val * val;
       }
       const rms = Math.sqrt(sumSquares / this.frameSize);
@@ -75,6 +116,7 @@ export class PYinPitchDetector {
             frequency: 0,
             period: 0,
             cmndValue: 1.0,
+            hpsScore: 0.0,
             weight: 0.0,
             isVoiced: false,
           },
@@ -82,7 +124,18 @@ export class PYinPitchDetector {
         continue;
       }
 
-      // 2. Difference function & CMNDF (bounded to maxPeriod to double throughput)
+      // 2. Frequency-domain analysis: FastFFT & HPS
+      const magSpectrum = this.fft.computeMagnitude(frameBuffer);
+      const hps = this.fft.computeHPS(magSpectrum, 4);
+
+      let maxHps = 1e-6;
+      const minBin = Math.floor((this.minFreq * this.frameSize) / this.sampleRate);
+      const maxBin = Math.min(hps.length - 1, Math.ceil((this.maxFreq * this.frameSize) / this.sampleRate));
+      for (let k = minBin; k <= maxBin; k++) {
+        if (hps[k] > maxHps) maxHps = hps[k];
+      }
+
+      // 3. Difference function & CMNDF (bounded to maxPeriod)
       const maxTau = Math.min(halfSize, this.maxPeriod + 2);
       const diff = new Float32Array(maxTau);
       for (let tau = 0; tau < maxTau; tau++) {
@@ -103,18 +156,18 @@ export class PYinPitchDetector {
         cmnd[tau] = runningSum > 0 ? (diff[tau] * tau) / runningSum : 1;
       }
 
-      // 3. Extract candidates using pYIN threshold distribution (Mauch & Dixon)
-      // Find all local minima (dips) in the CMNDF
+      // 4. Extract candidate dips in CMNDF with sub-sample parabolic interpolation
       interface LocalDip {
         tau: number;
         betterTau: number;
         val: number;
         freq: number;
+        hpsRel: number;
       }
       const dips: LocalDip[] = [];
 
       for (let tau = this.minPeriod + 1; tau < this.maxPeriod - 1; tau++) {
-        if (cmnd[tau] < cmnd[tau - 1] && cmnd[tau] < cmnd[tau + 1] && cmnd[tau] < 0.6) {
+        if (cmnd[tau] < cmnd[tau - 1] && cmnd[tau] < cmnd[tau + 1] && cmnd[tau] < 0.65) {
           // Sub-sample parabolic interpolation
           const s0 = cmnd[tau - 1];
           const s1 = cmnd[tau];
@@ -126,7 +179,10 @@ export class PYinPitchDetector {
           }
 
           const freq = this.sampleRate / betterTau;
-          dips.push({ tau, betterTau, val: cmnd[tau], freq });
+          const hpsScore = this.fft.getHpsScore(hps, freq, this.sampleRate);
+          const hpsRel = maxHps > 0 ? hpsScore / maxHps : 0;
+
+          dips.push({ tau, betterTau, val: cmnd[tau], freq, hpsRel });
         }
       }
 
@@ -135,27 +191,26 @@ export class PYinPitchDetector {
       const votes = new Map<number, number>();
 
       for (const th of THRESHOLDS) {
-        // Find first dip below threshold (standard YIN rule)
         let chosen = dips.find((d) => d.val < th);
         if (chosen) {
-          // Check for subharmonic octave doubling/quadrupling alias:
-          // If chosen.tau has an equivalent dip near tau/2 or tau/4 with reasonable CMND,
-          // prefer the smaller fundamental period (higher octave) to prevent subharmonic locking.
+          // Subharmonic and octave verification using HPS:
+          // If chosen.tau has an equivalent dip near tau/2 or tau/4 with strong HPS energy,
+          // prefer the higher fundamental frequency (shorter period) to suppress subharmonics
           const halfTau = Math.round(chosen.tau / 2);
           const quarterTau = Math.round(chosen.tau / 4);
           const subDip = dips.find(
             (d) =>
-              (Math.abs(d.tau - halfTau) <= 3 && d.val < 0.38) ||
-              (Math.abs(d.tau - quarterTau) <= 3 && d.val < 0.38)
+              (Math.abs(d.tau - halfTau) <= 3 && (d.val < 0.38 || d.hpsRel > chosen.hpsRel * 1.5)) ||
+              (Math.abs(d.tau - quarterTau) <= 3 && (d.val < 0.38 || d.hpsRel > chosen.hpsRel * 1.5))
           );
-          if (subDip) {
+          if (subDip && subDip.hpsRel >= 0.2) {
             chosen = subDip;
           }
           votes.set(chosen.tau, (votes.get(chosen.tau) || 0) + 1);
         }
       }
 
-      // Also ensure the global minimum dip is represented
+      // Also ensure the global minimum dip and global HPS peak are represented
       let globalMinDip: LocalDip | null = null;
       for (const d of dips) {
         if (!globalMinDip || d.val < globalMinDip.val) {
@@ -164,13 +219,10 @@ export class PYinPitchDetector {
       }
       if (globalMinDip) {
         const halfTau = Math.round(globalMinDip.tau / 2);
-        const quarterTau = Math.round(globalMinDip.tau / 4);
         const subDip = dips.find(
-          (d) =>
-            (Math.abs(d.tau - halfTau) <= 3 && d.val < 0.38) ||
-            (Math.abs(d.tau - quarterTau) <= 3 && d.val < 0.38)
+          (d) => Math.abs(d.tau - halfTau) <= 3 && (d.val < 0.38 || d.hpsRel > globalMinDip!.hpsRel * 1.5)
         );
-        const effectiveDip = subDip || globalMinDip;
+        const effectiveDip = subDip && subDip.hpsRel >= 0.2 ? subDip : globalMinDip;
         if (!votes.has(effectiveDip.tau)) {
           votes.set(effectiveDip.tau, 1);
         }
@@ -178,24 +230,51 @@ export class PYinPitchDetector {
 
       for (const [dipTau, count] of votes.entries()) {
         const dip = dips.find((d) => d.tau === dipTau)!;
-        const weight = (count / THRESHOLDS.length) * (1 - dip.val);
+        // Joint likelihood: CMND depth + HPS spectral agreement
+        const hpsBonus = 0.5 + 0.5 * dip.hpsRel;
+        const weight = (count / THRESHOLDS.length) * (1 - dip.val) * hpsBonus;
         candidates.push({
           frequency: dip.freq,
           period: dip.betterTau,
           cmndValue: dip.val,
-          weight: Math.max(1e-3, weight),
+          hpsScore: dip.hpsRel,
+          weight: Math.max(1e-4, weight),
           isVoiced: true,
         });
       }
 
-      // Beam Search Pruning: Retain top 3 most probable voiced candidates per frame (K <= 4 total)
+      // Beam Search Pruning: Retain top 3 most probable voiced candidates per frame
       candidates.sort((a, b) => b.weight - a.weight);
       const topCandidates = candidates.slice(0, 3);
 
-      // Bayesian Voicing Probability Formulation (Mauch & Dixon)
-      // Voiced probability pVoiced is derived from best dip depth and signal energy
+      // 5. Intelligent Tanpura Drone Suppression
+      let isDroneBleed = false;
+      if (droneFrequencies.length > 0 && topCandidates.length > 0) {
+        const bestFreq = topCandidates[0].frequency;
+        for (const droneF of droneFrequencies) {
+          const centsDiff = Math.abs(1200 * Math.log2(bestFreq / droneF));
+          // If candidate perfectly matches a static tanpura drone string (within 28 cents)
+          // and frame energy is near or below the background drone floor, it is drone bleed!
+          if (centsDiff <= 28 && rms <= noiseFloorRms * 1.8) {
+            isDroneBleed = true;
+            break;
+          }
+        }
+      }
+
+      // 6. Bayesian Voicing Probability Formulation
       const bestVal = topCandidates.length > 0 ? topCandidates[0].cmndValue : 1.0;
-      const pVoiced = Math.max(0.02, Math.min(0.98, (1.0 - bestVal) * (rms > 0.01 ? 1.0 : rms / 0.01)));
+      const bestHps = topCandidates.length > 0 ? topCandidates[0].hpsScore : 0.0;
+
+      let pVoiced: number;
+      if (isDroneBleed) {
+        // De-bias drone bleed during vocal pauses
+        pVoiced = 0.02;
+      } else {
+        const clarityScore = (1.0 - bestVal) * (0.6 + 0.4 * bestHps);
+        const energyScaling = rms > 0.012 ? 1.0 : rms / 0.012;
+        pVoiced = Math.max(0.01, Math.min(0.99, clarityScore * energyScaling));
+      }
       const pUnvoiced = 1.0 - pVoiced;
 
       const sumVoicedWeights = topCandidates.reduce((s, c) => s + c.weight, 0);
@@ -207,6 +286,7 @@ export class PYinPitchDetector {
         frequency: 0,
         period: 0,
         cmndValue: bestVal,
+        hpsScore: 0.0,
         weight: pUnvoiced,
         isVoiced: false,
       });
@@ -217,7 +297,6 @@ export class PYinPitchDetector {
     if (frameCandidates.length === 0) return [];
 
     // Step 2: Viterbi Trellis Search
-    // State values: dp[frameIndex][candidateIndex] = minimum accumulated cost
     const numFrames = frameCandidates.length;
     const dp: number[][] = [];
     const backpointers: number[][] = [];
@@ -290,7 +369,7 @@ export class PYinPitchDetector {
       });
     }
 
-    // Step 5: Voicing Hysteresis (suppress isolated 1-frame spikes and fill isolated dropouts)
+    // Step 5: Voicing Hysteresis
     const outputFrames: PitchFrame[] = rawFrames.map((f) => ({ ...f }));
     for (let t = 1; t < numFrames - 1; t++) {
       const prev = rawFrames[t - 1];
@@ -305,7 +384,7 @@ export class PYinPitchDetector {
       // Fill isolated 1-frame dropout in continuous singing
       else if (prev.isVoiced && !curr.isVoiced && next.isVoiced) {
         const centsBetween = Math.abs(1200 * Math.log2(next.frequency / prev.frequency));
-        if (centsBetween < 150) {
+        if (centsBetween < 160) {
           outputFrames[t].isVoiced = true;
           outputFrames[t].frequency = (prev.frequency + next.frequency) / 2;
           outputFrames[t].clarity = (prev.clarity + next.clarity) / 2;
@@ -323,12 +402,12 @@ export class PYinPitchDetector {
   private computeTransitionCost(c1: PYinCandidate, c2: PYinCandidate): number {
     // Both unvoiced: smooth transition
     if (!c1.isVoiced && !c2.isVoiced) {
-      return 0.1;
+      return 0.05;
     }
 
     // Voiced <-> Unvoiced transition
     if (c1.isVoiced !== c2.isVoiced) {
-      return 1.8; // Voicing change penalty
+      return 1.6; // Voicing change penalty
     }
 
     // Both voiced: measure pitch continuity in cents
@@ -337,17 +416,17 @@ export class PYinPitchDetector {
 
     // Smooth continuous change (e.g. within ±80 cents per frame, normal for meend)
     if (centsJump <= 80) {
-      return (centsJump / 80) * 0.4;
+      return (centsJump / 80) * 0.35;
     }
 
     // Octave jump penalty (1200 ± 60 cents or 2400 ± 60 cents)
     const isOctaveJump =
       Math.abs(centsJump - 1200) < 60 || Math.abs(centsJump - 2400) < 60;
     if (isOctaveJump) {
-      return 3.5; // High penalty against octave flipping
+      return 4.5; // High penalty against octave flipping
     }
 
     // Larger pitch leaps
-    return 1.0 + (centsJump / 1200) * 2.5;
+    return 0.9 + (centsJump / 1200) * 2.8;
   }
 }

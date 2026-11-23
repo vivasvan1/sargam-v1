@@ -63,7 +63,7 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
   const [talaId, setTalaId] = useState<string>('tintal');
   const [pickupBeat, setPickupBeat] = useState<number>(12); // Default Beat 12 for Tintal
   const [gridResolution, setGridResolution] = useState<0.5 | 0.25>(0.5);
-  const [algorithm, setAlgorithm] = useState<'pyin' | 'yin'>('pyin');
+  const [algorithm, setAlgorithm] = useState<'pyin' | 'yin' | 'crepe' | 'hybrid-auto'>('pyin');
   const [ragaId, setRagaId] = useState<string>('none');
   const [enableRagaCorrection, setEnableRagaCorrection] = useState<boolean>(true);
 
@@ -716,10 +716,16 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="pyin" className="text-xs">
-                  pYIN (Probabilistic)
+                  pYIN + HPS Fusion (DSP, Real-time)
+                </SelectItem>
+                <SelectItem value="crepe" className="text-xs">
+                  Neural AI (CREPE Deep Learning)
+                </SelectItem>
+                <SelectItem value="hybrid-auto" className="text-xs">
+                  Hybrid Auto (Neural + DSP)
                 </SelectItem>
                 <SelectItem value="yin" className="text-xs">
-                  Standard YIN
+                  Standard YIN (Baseline)
                 </SelectItem>
               </SelectContent>
             </Select>

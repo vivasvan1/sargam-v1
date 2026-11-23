@@ -246,76 +246,101 @@ export function parseSaragaPitchTrackCsv(csvContent: string): GroundTruthPitchFr
 
 /**
  * Reads a standard RIFF/WAVE file (IEEE Float or 16-bit PCM) into a mono Float32Array.
+ * Optimized with windowed file streaming to avoid reading hundreds of megabytes into memory.
  */
-export function loadWavFile(filePath: string): { samples: Float32Array; sampleRate: number } {
-  const buffer = fs.readFileSync(filePath);
+export function loadWavFile(
+  filePath: string,
+  startSec = 0,
+  durationSec = -1
+): { samples: Float32Array; sampleRate: number } {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    // Read first 64KB to parse RIFF / fmt / data headers (handles large FLLR chunks)
+    const headerBuf = Buffer.alloc(65536);
+    const bytesRead = fs.readSync(fd, headerBuf, 0, 65536, 0);
 
-  // Validate RIFF header
-  const riff = buffer.toString('ascii', 0, 4);
-  const wave = buffer.toString('ascii', 8, 12);
-  if (riff !== 'RIFF' || wave !== 'WAVE') {
-    throw new Error(`Invalid WAV file: ${filePath}`);
-  }
-
-  let offset = 12;
-  let audioFormat = 1;
-  let numChannels = 1;
-  let sampleRate = 44100;
-  let bitsPerSample = 16;
-  let dataOffset = -1;
-  let dataSize = 0;
-
-  while (offset < buffer.length - 8) {
-    const chunkId = buffer.toString('ascii', offset, offset + 4);
-    const chunkSize = buffer.readUInt32LE(offset + 4);
-    offset += 8;
-
-    if (chunkId === 'fmt ') {
-      audioFormat = buffer.readUInt16LE(offset);
-      numChannels = buffer.readUInt16LE(offset + 2);
-      sampleRate = buffer.readUInt32LE(offset + 4);
-      bitsPerSample = buffer.readUInt16LE(offset + 14);
-    } else if (chunkId === 'data') {
-      dataOffset = offset;
-      dataSize = chunkSize;
-      break;
+    const riff = headerBuf.toString('ascii', 0, 4);
+    const wave = headerBuf.toString('ascii', 8, 12);
+    if (riff !== 'RIFF' || wave !== 'WAVE') {
+      throw new Error(`Invalid WAV file: ${filePath}`);
     }
-    offset += chunkSize;
-  }
 
-  if (dataOffset === -1) {
-    throw new Error(`No data chunk found in WAV file: ${filePath}`);
-  }
+    let offset = 12;
+    let audioFormat = 1;
+    let numChannels = 1;
+    let sampleRate = 44100;
+    let bitsPerSample = 16;
+    let dataOffset = -1;
+    let dataSize = 0;
 
-  const bytesPerSample = bitsPerSample / 8;
-  const numFrames = Math.floor(dataSize / (numChannels * bytesPerSample));
-  const monoSamples = new Float32Array(numFrames);
+    while (offset < bytesRead - 8) {
+      const chunkId = headerBuf.toString('ascii', offset, offset + 4);
+      const chunkSize = headerBuf.readUInt32LE(offset + 4);
+      offset += 8;
 
-  if (audioFormat === 3) {
-    // IEEE Float 32-bit
-    for (let i = 0; i < numFrames; i++) {
-      let sum = 0;
-      for (let ch = 0; ch < numChannels; ch++) {
-        const bytePos = dataOffset + (i * numChannels + ch) * 4;
-        sum += buffer.readFloatLE(bytePos);
+      if (chunkId === 'fmt ') {
+        audioFormat = headerBuf.readUInt16LE(offset);
+        numChannels = headerBuf.readUInt16LE(offset + 2);
+        sampleRate = headerBuf.readUInt32LE(offset + 4);
+        bitsPerSample = headerBuf.readUInt16LE(offset + 14);
+        offset += chunkSize;
+      } else if (chunkId === 'data') {
+        dataOffset = offset;
+        dataSize = chunkSize;
+        break;
+      } else {
+        offset += chunkSize;
       }
-      monoSamples[i] = sum / numChannels;
     }
-  } else if (audioFormat === 1) {
-    // PCM 16-bit
-    for (let i = 0; i < numFrames; i++) {
-      let sum = 0;
-      for (let ch = 0; ch < numChannels; ch++) {
-        const bytePos = dataOffset + (i * numChannels + ch) * 2;
-        sum += buffer.readInt16LE(bytePos) / 32768.0;
-      }
-      monoSamples[i] = sum / numChannels;
-    }
-  } else {
-    throw new Error(`Unsupported WAV audio format ${audioFormat}`);
-  }
 
-  return { samples: monoSamples, sampleRate };
+    if (dataOffset === -1) {
+      throw new Error(`No data chunk found in WAV header: ${filePath}`);
+    }
+
+    const bytesPerSample = bitsPerSample / 8;
+    const bytesPerFrame = numChannels * bytesPerSample;
+    const totalFrames = Math.floor(dataSize / bytesPerFrame);
+
+    const startFrame = Math.max(0, Math.min(totalFrames, Math.floor(startSec * sampleRate)));
+    const targetFrames =
+      durationSec > 0
+        ? Math.min(Math.floor(durationSec * sampleRate), totalFrames - startFrame)
+        : totalFrames - startFrame;
+
+    const readBytes = targetFrames * bytesPerFrame;
+    const audioBuf = Buffer.alloc(readBytes);
+    fs.readSync(fd, audioBuf, 0, readBytes, dataOffset + startFrame * bytesPerFrame);
+
+    const monoSamples = new Float32Array(targetFrames);
+
+    if (audioFormat === 3) {
+      // IEEE Float 32-bit
+      for (let i = 0; i < targetFrames; i++) {
+        let sum = 0;
+        for (let ch = 0; ch < numChannels; ch++) {
+          const bytePos = (i * numChannels + ch) * 4;
+          sum += audioBuf.readFloatLE(bytePos);
+        }
+        monoSamples[i] = sum / numChannels;
+      }
+    } else if (audioFormat === 1) {
+      // PCM 16-bit
+      for (let i = 0; i < targetFrames; i++) {
+        let sum = 0;
+        for (let ch = 0; ch < numChannels; ch++) {
+          const bytePos = (i * numChannels + ch) * 2;
+          sum += audioBuf.readInt16LE(bytePos) / 32768.0;
+        }
+        monoSamples[i] = sum / numChannels;
+      }
+    } else {
+      throw new Error(`Unsupported WAV audio format ${audioFormat}`);
+    }
+
+    return { samples: monoSamples, sampleRate };
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 /**
@@ -391,9 +416,50 @@ export function loadSaragaBenchmark(
 
   // 2. Ground truth pitch track (time-aligned f0)
   const pitchCsv = fs.readFileSync(pitchPath, 'utf8');
-  let pitchTrack = parseSaragaPitchTrackCsv(pitchCsv);
-  if (maxDurationSec > 0) {
-    pitchTrack = pitchTrack.filter((f) => f.timestamp <= maxDurationSec);
+  const lines = pitchCsv.split('\n');
+
+  // Find first sustained vocal singing (frequency > 20 Hz for at least 3 consecutive frames)
+  let firstVoicedTime = 0;
+  let voicedCount = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (!l || l.startsWith('#')) continue;
+    const parts = l.split(/[\s,]+/);
+    if (parts.length >= 2) {
+      const f = parseFloat(parts[1]);
+      if (f > 20) {
+        voicedCount++;
+        if (voicedCount >= 3) {
+          firstVoicedTime = parseFloat(parts[0]);
+          break;
+        }
+      } else {
+        voicedCount = 0;
+      }
+    }
+  }
+
+  // Start benchmark 0.5s before the first vocal onset (or 0 if vocal starts within first 2.0s)
+  const startTime = firstVoicedTime > 2.0 ? Math.max(0, firstVoicedTime - 0.5) : 0;
+  const endTime = maxDurationSec > 0 ? startTime + maxDurationSec : Infinity;
+
+  // Slice and re-zero pitch track to benchmark segment
+  const pitchTrack: GroundTruthPitchFrame[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (!l || l.startsWith('#')) continue;
+    const parts = l.split(/[\s,]+/);
+    if (parts.length >= 2) {
+      const ts = parseFloat(parts[0]);
+      if (ts >= startTime && ts <= endTime) {
+        pitchTrack.push({
+          timestamp: ts - startTime,
+          frequency: parseFloat(parts[1]),
+        });
+      } else if (ts > endTime) {
+        break; // Stop parsing remaining megabytes
+      }
+    }
   }
 
   // 3. Ground truth manual phrase solfège annotations if available
@@ -404,31 +470,25 @@ export function loadSaragaBenchmark(
     for (const pl of pLines) {
       const parts = pl.trim().split(/\t+/);
       if (parts.length >= 4) {
-        const startTime = parseFloat(parts[0]);
+        const pStart = parseFloat(parts[0]);
         const duration = parseFloat(parts[2]);
         const phrase = parts[3].trim();
-        if (maxDurationSec <= 0 || startTime <= maxDurationSec) {
-          phrases.push({ startTime, duration, phrase });
+        if (pStart >= startTime && (maxDurationSec <= 0 || pStart <= endTime)) {
+          phrases.push({ startTime: pStart - startTime, duration, phrase });
         }
       }
     }
   }
 
-  // 4. Audio conversion via afconvert
+  // 4. Sample-accurate audio conversion via afconvert & windowed WAV reading
   const tempWav = path.join('/tmp', `saraga_${Date.now()}_${Math.random().toString(36).substring(7)}.wav`);
   try {
     const { execSync } = require('child_process');
     execSync(`afconvert -f WAVE -d LEF32@44100 "${mp3Path}" "${tempWav}"`);
-    const wavResult = loadWavFile(tempWav);
-    let samples = wavResult.samples;
-    const sampleRate = wavResult.sampleRate;
 
-    if (maxDurationSec > 0) {
-      const maxSamples = Math.floor(maxDurationSec * sampleRate);
-      if (samples.length > maxSamples) {
-        samples = samples.subarray(0, maxSamples);
-      }
-    }
+    const wavResult = loadWavFile(tempWav, startTime, maxDurationSec);
+    const samples = wavResult.samples;
+    const sampleRate = wavResult.sampleRate;
     const duration = samples.length / sampleRate;
 
     return {
