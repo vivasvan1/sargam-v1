@@ -31,6 +31,7 @@ import {
   type TranscriptionResult,
   type TranscribedNote,
 } from '@/utils/audio/sargamTranscriber';
+import { PitchContourVisualizer } from './PitchContourVisualizer';
 
 interface Step3TranscribeProps {
   audioBuffer: AudioBuffer;
@@ -51,11 +52,16 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
   const [talaId, setTalaId] = useState<string>('tintal');
   const [pickupBeat, setPickupBeat] = useState<number>(12); // Default Beat 12 for Tintal
   const [gridResolution, setGridResolution] = useState<0.5 | 0.25>(0.5);
+  const [algorithm, setAlgorithm] = useState<'pyin' | 'yin'>('pyin');
 
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [result, setResult] = useState<TranscriptionResult | null>(null);
   const [sargamCode, setSargamCode] = useState<string>('');
   const [copied, setCopied] = useState(false);
+
+  // Playback Cursor & Position Tracking
+  const [playbackTime, setPlaybackTime] = useState<number>(0);
+  const playStartTimeRef = useRef<number>(0);
 
   // Search & Replace state
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,6 +96,33 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
     };
   }, []);
 
+  // Track real-time playback position across original audio or synthesized playback
+  useEffect(() => {
+    let animId: number;
+    if (isPlayingOriginal && audioCtxRef.current) {
+      const update = () => {
+        if (audioCtxRef.current) {
+          const elapsed = audioCtxRef.current.currentTime - playStartTimeRef.current;
+          setPlaybackTime(elapsed);
+          animId = requestAnimationFrame(update);
+        }
+      };
+      animId = requestAnimationFrame(update);
+    } else if (isPlayingSynth) {
+      const update = () => {
+        setPlaybackTime(Tone.getTransport().seconds);
+        animId = requestAnimationFrame(update);
+      };
+      animId = requestAnimationFrame(update);
+    } else {
+      setPlaybackTime(0);
+    }
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, [isPlayingOriginal, isPlayingSynth]);
+
   const runTranscription = () => {
     setIsTranscribing(true);
     stopOriginalAudio();
@@ -108,6 +141,7 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
             talaId,
             pickupBeat,
             gridResolution,
+            algorithm,
           }
         );
         setResult(res);
@@ -129,11 +163,35 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
       stopSynthPlayback();
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioCtxRef.current = ctx;
+      playStartTimeRef.current = ctx.currentTime;
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(ctx.destination);
-      source.onended = () => setIsPlayingOriginal(false);
+      source.onended = () => {
+        setIsPlayingOriginal(false);
+        setPlaybackTime(0);
+      };
       source.start(0);
+      originalSourceRef.current = source;
+      setIsPlayingOriginal(true);
+    }
+  };
+
+  const handleSeek = (timeSec: number) => {
+    setPlaybackTime(timeSec);
+    if (isPlayingOriginal) {
+      stopOriginalAudio();
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioCtxRef.current = ctx;
+      playStartTimeRef.current = ctx.currentTime - timeSec;
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      source.onended = () => {
+        setIsPlayingOriginal(false);
+        setPlaybackTime(0);
+      };
+      source.start(0, Math.min(audioBuffer.duration, timeSec));
       originalSourceRef.current = source;
       setIsPlayingOriginal(true);
     }
@@ -355,8 +413,25 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
           </div>
         </div>
 
-        {/* Settings Grid: 4 columns on sm/md/lg screens */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Settings Grid: 5 columns on sm/md/lg screens */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">Pitch Algorithm</label>
+            <Select value={algorithm} onValueChange={(val: any) => setAlgorithm(val)}>
+              <SelectTrigger className="w-full h-9 text-xs">
+                <SelectValue placeholder="Algorithm" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pyin" className="text-xs">
+                  pYIN (Probabilistic - Sitar / Classical)
+                </SelectItem>
+                <SelectItem value="yin" className="text-xs">
+                  Standard YIN
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-1">
             <label className="text-[11px] font-medium text-muted-foreground">Tala (Rhythmic Cycle)</label>
             <Select value={talaId} onValueChange={setTalaId}>
@@ -520,6 +595,19 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
             </Button>
           </div>
         </div>
+
+        {/* Synchronized Continuous Pitch Contour & Note Event Visualizer */}
+        {result && result.contour && result.contour.length > 0 && (
+          <PitchContourVisualizer
+            contour={result.contour}
+            notes={result.events || []}
+            saPitch={saPitch}
+            saFrequency={saFrequency}
+            currentTime={playbackTime}
+            isPlaying={isPlayingOriginal || isPlayingSynth}
+            onSeek={handleSeek}
+          />
+        )}
 
         {/* Search & Replace Toolbar */}
         <div className="bg-muted/40 border border-border/80 rounded-lg p-2.5 space-y-2">

@@ -3,16 +3,15 @@
  * High-fidelity, beat-grid synchronized Indian Classical notation generator.
  */
 
-import { YinPitchDetector, type PitchFrame } from './pitchDetector';
+import { YinPitchDetector, detectAudioPitch, type PitchFrame } from './pitchDetector';
+import { segmentNotesFromContour } from './noteSegmenter';
+import type {
+  ContinuousPitchContour,
+  TranscribedNoteEvent,
+  TalaConfig,
+} from './types';
 
-export interface TalaConfig {
-  id: string;
-  name: string;
-  displayName: string;
-  beats: number;
-  vibhags: number[];
-  pattern?: string;
-}
+export type { TalaConfig };
 
 export const TALA_PRESETS: Record<string, TalaConfig> = {
   tintal: {
@@ -92,17 +91,21 @@ export interface TranscriptionOptions {
   initialSilenceSec?: number; // seconds of initial silence to skip
   clarityThreshold?: number;
   silenceThreshold?: number;
+  algorithm?: 'yin' | 'pyin'; // Pitch detection algorithm (default: 'pyin')
 }
 
 export interface TranscriptionResult {
   sargamCode: string;
   notes: TranscribedNote[];
+  events: TranscribedNoteEvent[];
+  contour: ContinuousPitchContour;
   bpm: number;
   saPitch: string;
   saFrequency: number;
   tala: TalaConfig;
   totalDurationSeconds: number;
   totalDurationBeats: number;
+  algorithm: 'yin' | 'pyin';
 }
 
 const SWARA_TABLE = [
@@ -183,28 +186,36 @@ export function transcribeAudioToSargam(
   const beatSec = 60 / bpm;
   const subBeatSec = beatSec * gridResolution;
 
-  // 1. Analyze audio pitch frames with YIN
-  const pitchDetector = new YinPitchDetector({
+  // 1. Analyze audio pitch frames with pYIN / YIN
+  const algorithm = options.algorithm || 'pyin';
+  const frames: PitchFrame[] = detectAudioPitch(samples, {
     sampleRate,
     frameSize: 2048,
     hopSize: 512,
     threshold: 0.15,
     clarityThreshold: options.clarityThreshold || 0.45,
     silenceThreshold: options.silenceThreshold || 0.008,
+    algorithm,
   });
 
-  const frames: PitchFrame[] = pitchDetector.analyze(samples);
+  const { notes: noteEvents, contour } = segmentNotesFromContour(frames, {
+    saFrequency,
+    minNoteDurationSec: 0.08,
+  });
 
   if (frames.length === 0) {
     return {
       sargamCode: `@sa ${saPitch}\n@tempo ${bpm}\n_ ||`,
       notes: [],
+      events: [],
+      contour: [],
       bpm,
       saPitch,
       saFrequency,
       tala,
       totalDurationSeconds: 0,
       totalDurationBeats: 0,
+      algorithm,
     };
   }
 
@@ -371,12 +382,15 @@ export function transcribeAudioToSargam(
     return {
       sargamCode: [...headerLines, '', '_ ||'].join('\n'),
       notes: [],
+      events: noteEvents,
+      contour,
       bpm,
       saPitch,
       saFrequency,
       tala,
       totalDurationSeconds: 0,
       totalDurationBeats: 0,
+      algorithm,
     };
   }
 
@@ -439,11 +453,14 @@ export function transcribeAudioToSargam(
   return {
     sargamCode,
     notes,
+    events: noteEvents,
+    contour,
     bpm,
     saPitch,
     saFrequency,
     tala,
     totalDurationSeconds,
     totalDurationBeats,
+    algorithm,
   };
 }

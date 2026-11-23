@@ -23,9 +23,23 @@ export interface PitchDetectorOptions {
   clarityThreshold?: number; // minimum clarity to consider voiced (default: 0.6)
 }
 
-/**
- * Standard YIN algorithm implementation for monophonic pitch detection.
- */
+import { PYinPitchDetector } from './pitch/pyinDetector';
+
+export { PYinPitchDetector };
+
+export function detectAudioPitch(
+  channelData: Float32Array,
+  options: PitchDetectorOptions & { algorithm?: 'yin' | 'pyin' }
+): PitchFrame[] {
+  const algorithm = options.algorithm || 'pyin';
+  if (algorithm === 'pyin') {
+    const detector = new PYinPitchDetector(options);
+    return detector.analyze(channelData);
+  } else {
+    const detector = new YinPitchDetector(options);
+    return detector.analyze(channelData);
+  }
+}
 export class YinPitchDetector {
   private sampleRate: number;
   private frameSize: number;
