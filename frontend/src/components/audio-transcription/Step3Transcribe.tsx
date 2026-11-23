@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
   transcribeAudioToSargam,
@@ -31,6 +32,7 @@ import {
   type TranscriptionResult,
   type TranscribedNote,
 } from '@/utils/audio/sargamTranscriber';
+import { RAGA_PRESETS } from '@/utils/audio/raga/ragaDefinitions';
 import { PitchContourVisualizer } from './PitchContourVisualizer';
 
 interface Step3TranscribeProps {
@@ -53,6 +55,8 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
   const [pickupBeat, setPickupBeat] = useState<number>(12); // Default Beat 12 for Tintal
   const [gridResolution, setGridResolution] = useState<0.5 | 0.25>(0.5);
   const [algorithm, setAlgorithm] = useState<'pyin' | 'yin'>('pyin');
+  const [ragaId, setRagaId] = useState<string>('none');
+  const [enableRagaCorrection, setEnableRagaCorrection] = useState<boolean>(true);
 
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [result, setResult] = useState<TranscriptionResult | null>(null);
@@ -142,6 +146,8 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
             pickupBeat,
             gridResolution,
             algorithm,
+            ragaId,
+            enableRagaCorrection,
           }
         );
         setResult(res);
@@ -266,10 +272,38 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
           const freq = saFrequency * Math.pow(2, semitones / 12);
           const durSec = note.durationBeats * beatSec;
 
-          const evId = Tone.getTransport().schedule((time) => {
-            synthRef.current?.triggerAttackRelease(freq, durSec * 0.95, time);
-          }, currentBeatOffset * beatSec);
-          eventIds.push(evId);
+          // Check if token has +meend(Target) for portamento slide
+          const meendMatch = note.token.match(/\+meend\(([^)]+)\)/);
+          const targetSwara = meendMatch ? meendMatch[1] : null;
+
+          if (targetSwara && swaraSemitones[targetSwara] !== undefined) {
+            const targetSemitones =
+              (swaraSemitones[targetSwara] || 0) + (note.octave || 0) * 12;
+            const targetFreq = saFrequency * Math.pow(2, targetSemitones / 12);
+
+            const evId = Tone.getTransport().schedule((time) => {
+              const synth = synthRef.current;
+              if (synth) {
+                synth.set({ portamento: durSec * 0.75 });
+                synth.triggerAttackRelease(freq, durSec * 0.95, time);
+                // Trigger portamento slide toward target
+                setTimeout(() => {
+                  try {
+                    synth.triggerAttackRelease(targetFreq, durSec * 0.3, time + durSec * 0.5);
+                  } catch (e) {}
+                }, 10);
+              }
+            }, currentBeatOffset * beatSec);
+            eventIds.push(evId);
+          } else {
+            const evId = Tone.getTransport().schedule((time) => {
+              if (synthRef.current) {
+                synthRef.current.set({ portamento: 0 });
+              }
+              synthRef.current?.triggerAttackRelease(freq, durSec * 0.95, time);
+            }, currentBeatOffset * beatSec);
+            eventIds.push(evId);
+          }
         }
         currentBeatOffset += note.durationBeats;
       }
@@ -407,9 +441,59 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
             <Badge variant="outline" className="font-mono text-primary font-bold text-xs">
               Fixed Sa: {saPitch} ({saFrequency} Hz)
             </Badge>
+            {ragaId !== 'none' && (
+              <Badge variant="secondary" className="text-xs font-medium border border-primary/20">
+                {RAGA_PRESETS[ragaId]?.name}
+              </Badge>
+            )}
             <Badge variant="secondary" className="text-xs font-medium">
-              Style: Vocal / Flute (Sustained Melody)
+              Style: Sitar / Vocal (Indian Classical)
             </Badge>
+          </div>
+        </div>
+
+        {/* Row 1: Raga & Musical Context */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-2.5 rounded-lg bg-muted/30 border border-border/60">
+          <div className="sm:col-span-2 space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-medium text-muted-foreground">
+                Raga Scale Context (Optional - Filters Spurious Varjit Notes)
+              </label>
+              {ragaId !== 'none' && RAGA_PRESETS[ragaId]?.aaroh && (
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  Aaroh: {RAGA_PRESETS[ragaId].aaroh}
+                </span>
+              )}
+            </div>
+            <Select value={ragaId} onValueChange={setRagaId}>
+              <SelectTrigger className="w-full h-9 text-xs">
+                <SelectValue placeholder="Select Raga" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.values(RAGA_PRESETS).map((r) => (
+                  <SelectItem key={r.id} value={r.id} className="text-xs">
+                    {r.displayName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-1 sm:pt-4">
+            <div className="text-right">
+              <label htmlFor="raga-toggle" className="text-xs font-medium cursor-pointer block">
+                Raga Note Correction
+              </label>
+              <span className="text-[10px] text-muted-foreground">
+                {ragaId === 'none' ? 'Disabled for Chromatic' : 'Active'}
+              </span>
+            </div>
+            <Switch
+              id="raga-toggle"
+              checked={enableRagaCorrection}
+              onCheckedChange={setEnableRagaCorrection}
+              disabled={ragaId === 'none'}
+            />
           </div>
         </div>
 

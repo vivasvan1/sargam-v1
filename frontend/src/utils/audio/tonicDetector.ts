@@ -4,6 +4,17 @@
  * with Hindustani/Carnatic drone harmonic templates (Sa-Pa and Sa-Ma profiles).
  */
 
+export interface SaCandidate {
+  note: string; // e.g. "D"
+  octave: number; // e.g. 4
+  pitch: string; // e.g. "D4"
+  frequency: number; // Hz, e.g. 293.66
+  centsOffset: number; // tuning deviation from A440, in cents (-50 to +50)
+  confidence: number; // 0 to 1
+  score: number;
+  reason: string; // e.g. "Primary Tonic", "5th (Pa) Harmonic Ambiguity"
+}
+
 export interface DetectedSa {
   note: string; // e.g. "C#"
   octave: number; // e.g. 4
@@ -12,6 +23,7 @@ export interface DetectedSa {
   centsOffset: number; // tuning deviation from A440, in cents (-50 to +50)
   confidence: number; // 0 to 1
   chroma: number[]; // 12-bin normalized pitch class profile [C, C#, D, D#, E, F, F#, G, G#, A, A#, B]
+  candidates: SaCandidate[]; // Ranked top candidate tonics
 }
 
 export const NOTE_NAMES = [
@@ -154,7 +166,8 @@ export function computeChromagram(
 }
 
 /**
- * Detects the most probable Indian Classical Sa (Tonic) from an AudioBuffer or Float32Array.
+ * Detects the most probable Indian Classical Sa (Tonic) and ranks top candidates
+ * from an AudioBuffer or Float32Array.
  */
 export function detectSaFromAudio(
   channelData: Float32Array,
@@ -162,61 +175,87 @@ export function detectSaFromAudio(
 ): DetectedSa {
   const { chroma, dominantFrequencies } = computeChromagram(channelData, sampleRate);
 
-  // Score candidate pitch classes against Indian Classical drone profile:
+  // Score all 12 candidate pitch classes against Indian Classical drone profile:
   // Sa (1.0), Pa (Sa + 7, 0.75), Ma (Sa + 5, 0.35)
-  let bestPitchClass = 0; // Default C
-  let highestScore = -1;
-  const scores = new Float64Array(12);
+  const candidateScores: {
+    pitchClass: number;
+    score: number;
+  }[] = [];
 
   for (let sa = 0; sa < 12; sa++) {
     const pa = (sa + 7) % 12;
     const ma = (sa + 5) % 12;
-    // Score combines Sa prominence with fifth (Pa) or fourth (Ma) harmonic reinforcement
     const score = chroma[sa] * 1.0 + chroma[pa] * 0.75 + chroma[ma] * 0.3;
-    scores[sa] = score;
-
-    if (score > highestScore) {
-      highestScore = score;
-      bestPitchClass = sa;
-    }
+    candidateScores.push({ pitchClass: sa, score });
   }
 
-  // Determine dominant octave (usually 3 or 4 for Hindustani/Carnatic Sa)
-  // Check dominant frequencies that map to bestPitchClass
-  let octave = 4; // default C4/D4 range (female / harmonium standard)
-  const candidateOctaves: Record<number, number> = { 3: 0, 4: 0, 5: 0 };
+  // Sort candidate pitch classes by score descending
+  candidateScores.sort((a, b) => b.score - a.score);
 
-  dominantFrequencies.forEach((freq) => {
-    const { note, octave: oct } = frequencyToNote(freq);
-    if (note === NOTE_NAMES[bestPitchClass] && (oct === 3 || oct === 4 || oct === 5)) {
-      candidateOctaves[oct] = (candidateOctaves[oct] || 0) + 1;
+  const maxScore = candidateScores[0]?.score || 1;
+  const bestPitchClass = candidateScores[0]?.pitchClass ?? 2; // Default D
+
+  // Build candidate objects for top 4
+  const candidates: SaCandidate[] = candidateScores.slice(0, 4).map((cand, rank) => {
+    const pc = cand.pitchClass;
+    const note = NOTE_NAMES[pc];
+
+    // Determine octave based on dominant frequencies matching this pitch class
+    const matchingFreqs: { freq: number; oct: number; cents: number }[] = [];
+    dominantFrequencies.forEach((freq) => {
+      const info = frequencyToNote(freq);
+      if (info.note === note && (info.octave === 3 || info.octave === 4 || info.octave === 5)) {
+        matchingFreqs.push({ freq, oct: info.octave, cents: info.centsOffset });
+      }
+    });
+
+    const oct3Count = matchingFreqs.filter((m) => m.oct === 3).length;
+    const oct4Count = matchingFreqs.filter((m) => m.oct === 4).length;
+    const octave = oct3Count > oct4Count ? 3 : 4;
+
+    // Estimate fine tuning cents offset from dominant peak
+    let centsOffset = 0;
+    if (matchingFreqs.length > 0) {
+      centsOffset = matchingFreqs[0].cents;
     }
+
+    const freq = noteToFrequency(note, octave, centsOffset);
+    const confidence = Math.max(0.2, Math.min(0.98, cand.score / (maxScore || 1)));
+
+    // Categorize reason
+    let reason = 'Candidate Tonic';
+    if (rank === 0) {
+      reason = 'Primary Tonic (Highest Drone Correlation)';
+    } else if (pc === (bestPitchClass + 7) % 12) {
+      reason = '5th (Pa) Harmonic Ambiguity';
+    } else if (pc === (bestPitchClass + 5) % 12) {
+      reason = '4th (Ma) Harmonic Ambiguity';
+    } else if (pc === (bestPitchClass + 12 - 7) % 12) {
+      reason = 'Sub-dominant (Mandra Pa) Match';
+    }
+
+    return {
+      note,
+      octave,
+      pitch: `${note}${octave}`,
+      frequency: Math.round(freq * 100) / 100,
+      centsOffset,
+      confidence: Math.round(confidence * 100) / 100,
+      score: Math.round(cand.score * 100) / 100,
+      reason,
+    };
   });
 
-  if (candidateOctaves[3] > candidateOctaves[4]) {
-    octave = 3; // male vocal / sitar kharaj range
-  } else {
-    octave = 4;
-  }
-
-  // Calculate confidence based on difference between top score and runner-up
-  const sortedScores = [...scores].sort((a, b) => b - a);
-  const runnerUp = sortedScores[1] || 0;
-  const confidence =
-    sortedScores[0] > 0
-      ? Math.min(0.98, Math.max(0.4, (sortedScores[0] - runnerUp) / sortedScores[0] + 0.3))
-      : 0.5;
-
-  const note = NOTE_NAMES[bestPitchClass];
-  const standardFreq = noteToFrequency(note, octave, 0);
+  const bestCandidate = candidates[0];
 
   return {
-    note,
-    octave,
-    pitch: `${note}${octave}`,
-    frequency: Math.round(standardFreq * 100) / 100,
-    centsOffset: 0,
-    confidence: Math.round(confidence * 100) / 100,
+    note: bestCandidate.note,
+    octave: bestCandidate.octave,
+    pitch: bestCandidate.pitch,
+    frequency: bestCandidate.frequency,
+    centsOffset: bestCandidate.centsOffset,
+    confidence: bestCandidate.confidence,
     chroma,
+    candidates,
   };
 }

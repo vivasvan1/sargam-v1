@@ -5,13 +5,15 @@
 
 import { YinPitchDetector, detectAudioPitch, type PitchFrame } from './pitchDetector';
 import { segmentNotesFromContour } from './noteSegmenter';
+import { RAGA_PRESETS, type RagaDefinition } from './raga/ragaDefinitions';
+import { applyRagaCorrection } from './raga/ragaScorer';
 import type {
   ContinuousPitchContour,
   TranscribedNoteEvent,
   TalaConfig,
 } from './types';
 
-export type { TalaConfig };
+export type { TalaConfig, RagaDefinition };
 
 export const TALA_PRESETS: Record<string, TalaConfig> = {
   tintal: {
@@ -92,6 +94,8 @@ export interface TranscriptionOptions {
   clarityThreshold?: number;
   silenceThreshold?: number;
   algorithm?: 'yin' | 'pyin'; // Pitch detection algorithm (default: 'pyin')
+  ragaId?: string; // e.g. 'none', 'yaman', 'bhupali', 'durga'
+  enableRagaCorrection?: boolean;
 }
 
 export interface TranscriptionResult {
@@ -103,6 +107,7 @@ export interface TranscriptionResult {
   saPitch: string;
   saFrequency: number;
   tala: TalaConfig;
+  raga: RagaDefinition;
   totalDurationSeconds: number;
   totalDurationBeats: number;
   algorithm: 'yin' | 'pyin';
@@ -186,6 +191,9 @@ export function transcribeAudioToSargam(
   const beatSec = 60 / bpm;
   const subBeatSec = beatSec * gridResolution;
 
+  const ragaKey = options.ragaId && RAGA_PRESETS[options.ragaId] ? options.ragaId : 'none';
+  const raga = RAGA_PRESETS[ragaKey];
+
   // 1. Analyze audio pitch frames with pYIN / YIN
   const algorithm = options.algorithm || 'pyin';
   const frames: PitchFrame[] = detectAudioPitch(samples, {
@@ -198,10 +206,16 @@ export function transcribeAudioToSargam(
     algorithm,
   });
 
-  const { notes: noteEvents, contour } = segmentNotesFromContour(frames, {
+  const { notes: rawEvents, contour } = segmentNotesFromContour(frames, {
     saFrequency,
     minNoteDurationSec: 0.08,
   });
+
+  // Apply optional Raga-aware scoring & varjit note correction
+  const noteEvents =
+    options.enableRagaCorrection && raga.id !== 'none'
+      ? applyRagaCorrection(rawEvents, raga, saFrequency)
+      : rawEvents;
 
   if (frames.length === 0) {
     return {
@@ -213,6 +227,7 @@ export function transcribeAudioToSargam(
       saPitch,
       saFrequency,
       tala,
+      raga,
       totalDurationSeconds: 0,
       totalDurationBeats: 0,
       algorithm,
@@ -345,7 +360,7 @@ export function transcribeAudioToSargam(
     });
   }
 
-  // 4. Convert slots into tokens with explicit durations (:0.5, :0.25)
+  // 4. Convert slots into tokens with explicit durations (:0.5, :0.25) and ornaments
   const notes: TranscribedNote[] = [];
 
   for (let s = 0; s < slots.length; s++) {
@@ -354,14 +369,33 @@ export function transcribeAudioToSargam(
       continue;
     }
 
+    const slotStart = audioStartTime + s * subBeatSec;
+    const slotEnd = slotStart + subBeatSec;
+
+    // Check if any segmented event overlaps and has a meend or kan ornament
+    const matchedEvent = noteEvents.find(
+      (ev) =>
+        (slotStart >= ev.startTime - 0.05 && slotStart < ev.endTime) ||
+        (ev.startTime >= slotStart && ev.startTime < slotEnd)
+    );
+
+    let ornamentSuffix = '';
+    if (matchedEvent && matchedEvent.ornament) {
+      if (matchedEvent.ornament.type === 'meend' && matchedEvent.ornament.targetSwara) {
+        ornamentSuffix = `+meend(${matchedEvent.ornament.targetSwara})`;
+      } else if (matchedEvent.ornament.type === 'kan' && matchedEvent.ornament.targetSwara) {
+        ornamentSuffix = `+kan(${matchedEvent.ornament.targetSwara})`;
+      }
+    }
+
     const swaraStr = formatSwaraWithOctave(slot.swara, slot.octave);
     notes.push({
       type: 'note',
       swara: slot.swara,
       octave: slot.octave,
-      token: `${swaraStr}:${slot.duration}`,
-      startTime: audioStartTime + s * subBeatSec,
-      endTime: audioStartTime + (s + 1) * subBeatSec,
+      token: `${swaraStr}:${slot.duration}${ornamentSuffix}`,
+      startTime: slotStart,
+      endTime: slotEnd,
       durationBeats: slot.duration,
     });
   }
@@ -376,6 +410,10 @@ export function transcribeAudioToSargam(
     }
   }
 
+  if (raga.id !== 'none') {
+    headerLines.push(`@raga ${raga.name}`);
+  }
+
   headerLines.push(`@tempo ${bpm}`);
 
   if (notes.length === 0) {
@@ -388,6 +426,7 @@ export function transcribeAudioToSargam(
       saPitch,
       saFrequency,
       tala,
+      raga,
       totalDurationSeconds: 0,
       totalDurationBeats: 0,
       algorithm,
@@ -459,6 +498,7 @@ export function transcribeAudioToSargam(
     saPitch,
     saFrequency,
     tala,
+    raga,
     totalDurationSeconds,
     totalDurationBeats,
     algorithm,

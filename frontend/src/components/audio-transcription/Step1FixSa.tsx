@@ -405,7 +405,7 @@ export const Step1FixSa: React.FC<Step1FixSaProps> = ({
               Analyzing audio harmonics and detecting tonic (Sa)...
             </div>
           ) : detectedSa ? (
-            <div className="border border-primary/30 rounded-xl p-4 bg-primary/5 space-y-2">
+            <div className="border border-primary/30 rounded-xl p-4 bg-primary/5 space-y-2.5">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary shrink-0" />
@@ -413,11 +413,65 @@ export const Step1FixSa: React.FC<Step1FixSaProps> = ({
                   <Badge variant="default" className="text-xs font-bold px-2 py-0.5">
                     {detectedSa.pitch} ({detectedSa.frequency} Hz)
                   </Badge>
+                  {detectedSa.centsOffset !== 0 && (
+                    <span className="text-[11px] text-muted-foreground font-mono">
+                      ({detectedSa.centsOffset > 0 ? `+${detectedSa.centsOffset}` : detectedSa.centsOffset}c)
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs text-muted-foreground">
                   Confidence: {Math.round(detectedSa.confidence * 100)}%
                 </span>
               </div>
+
+              {/* Ranked Tonic Candidates */}
+              {detectedSa.candidates && detectedSa.candidates.length > 0 && (
+                <div className="pt-2 border-t border-primary/20 space-y-1.5">
+                  <div className="text-[11px] font-medium text-muted-foreground">
+                    Ranked Tonic Candidates (click to select):
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {detectedSa.candidates.map((cand, idx) => {
+                      const isSelected = selectedNote === cand.note && selectedOctave === cand.octave;
+                      return (
+                        <button
+                          key={`${cand.pitch}-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            setSelectedNote(cand.note);
+                            setSelectedOctave(cand.octave);
+                            setCentsOffset(cand.centsOffset);
+                          }}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer border ${
+                            isSelected
+                              ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
+                              : 'bg-background hover:bg-muted border-border text-foreground'
+                          }`}
+                        >
+                          <span className="font-bold">{cand.pitch}</span>
+                          <span className="text-[10px] opacity-80">({Math.round(cand.confidence * 100)}%)</span>
+                          {idx === 0 && (
+                            <span className="text-[9px] px-1 py-0.2 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded">
+                              Top Match
+                            </span>
+                          )}
+                          {cand.reason.includes('5th') && (
+                            <span className="text-[9px] px-1 py-0.2 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded">
+                              Pa 5th
+                            </span>
+                          )}
+                          {cand.reason.includes('4th') && (
+                            <span className="text-[9px] px-1 py-0.2 bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded">
+                              Ma 4th
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <p className="text-xs text-muted-foreground">
                 In Indian Classical Music, all notes are relative to <strong>Sa</strong>.
                 Play the reference drone below while listening to the audio to check unison.
