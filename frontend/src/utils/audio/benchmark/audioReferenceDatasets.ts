@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import type { GroundTruthDataset, GroundTruthPitchFrame, GroundTruthNote } from './types';
 import { noteToFrequency } from '../tonicDetector';
 
@@ -240,4 +242,129 @@ export function parseSaragaPitchTrackCsv(csvContent: string): GroundTruthPitchFr
   }
 
   return frames;
+}
+
+/**
+ * Reads a standard RIFF/WAVE file (IEEE Float or 16-bit PCM) into a mono Float32Array.
+ */
+export function loadWavFile(filePath: string): { samples: Float32Array; sampleRate: number } {
+  const buffer = fs.readFileSync(filePath);
+
+  // Validate RIFF header
+  const riff = buffer.toString('ascii', 0, 4);
+  const wave = buffer.toString('ascii', 8, 12);
+  if (riff !== 'RIFF' || wave !== 'WAVE') {
+    throw new Error(`Invalid WAV file: ${filePath}`);
+  }
+
+  let offset = 12;
+  let audioFormat = 1;
+  let numChannels = 1;
+  let sampleRate = 44100;
+  let bitsPerSample = 16;
+  let dataOffset = -1;
+  let dataSize = 0;
+
+  while (offset < buffer.length - 8) {
+    const chunkId = buffer.toString('ascii', offset, offset + 4);
+    const chunkSize = buffer.readUInt32LE(offset + 4);
+    offset += 8;
+
+    if (chunkId === 'fmt ') {
+      audioFormat = buffer.readUInt16LE(offset);
+      numChannels = buffer.readUInt16LE(offset + 2);
+      sampleRate = buffer.readUInt32LE(offset + 4);
+      bitsPerSample = buffer.readUInt16LE(offset + 14);
+    } else if (chunkId === 'data') {
+      dataOffset = offset;
+      dataSize = chunkSize;
+      break;
+    }
+    offset += chunkSize;
+  }
+
+  if (dataOffset === -1) {
+    throw new Error(`No data chunk found in WAV file: ${filePath}`);
+  }
+
+  const bytesPerSample = bitsPerSample / 8;
+  const numFrames = Math.floor(dataSize / (numChannels * bytesPerSample));
+  const monoSamples = new Float32Array(numFrames);
+
+  if (audioFormat === 3) {
+    // IEEE Float 32-bit
+    for (let i = 0; i < numFrames; i++) {
+      let sum = 0;
+      for (let ch = 0; ch < numChannels; ch++) {
+        const bytePos = dataOffset + (i * numChannels + ch) * 4;
+        sum += buffer.readFloatLE(bytePos);
+      }
+      monoSamples[i] = sum / numChannels;
+    }
+  } else if (audioFormat === 1) {
+    // PCM 16-bit
+    for (let i = 0; i < numFrames; i++) {
+      let sum = 0;
+      for (let ch = 0; ch < numChannels; ch++) {
+        const bytePos = dataOffset + (i * numChannels + ch) * 2;
+        sum += buffer.readInt16LE(bytePos) / 32768.0;
+      }
+      monoSamples[i] = sum / numChannels;
+    }
+  } else {
+    throw new Error(`Unsupported WAV audio format ${audioFormat}`);
+  }
+
+  return { samples: monoSamples, sampleRate };
+}
+
+/**
+ * Benchmark Dataset 3: Authentic Acoustic Sitar Pluck Recording (sitar_D4_long.wav).
+ * Sa = D4 (293.66 Hz).
+ * Real recording displaying authentic jawari bridge resonance, subtle vibrato, and natural string decay.
+ */
+export function createRealSitarBenchmark(wavPath?: string): GroundTruthDataset {
+  const saPitch = 'D4';
+  const saFreq = 293.66;
+  const resolvedPath = wavPath || path.resolve(__dirname, 'sitar_D4_long.wav');
+
+  const { samples, sampleRate } = loadWavFile(resolvedPath);
+  const durationSec = samples.length / sampleRate;
+
+  // Ground truth: 1 sustained note S (D4) starting at ~0.02s pluck onset, decaying until tail
+  const notes: GroundTruthNote[] = [
+    {
+      startTime: 0.05,
+      endTime: Math.min(2.8, durationSec),
+      swara: 'S',
+      octave: 0,
+      frequency: saFreq,
+      isOrnamenteed: false,
+    },
+  ];
+
+  const hopSec = 512 / sampleRate;
+  const numFrames = Math.floor(durationSec / hopSec);
+  const pitchTrack: GroundTruthPitchFrame[] = [];
+
+  for (let i = 0; i < numFrames; i++) {
+    const t = i * hopSec;
+    if (t >= 0.05 && t <= 2.8) {
+      pitchTrack.push({ timestamp: t, frequency: saFreq });
+    } else {
+      pitchTrack.push({ timestamp: t, frequency: 0 });
+    }
+  }
+
+  return {
+    name: 'Real Acoustic Sitar Recording (D4 Sustained Pluck, 44.1kHz)',
+    instrument: 'sitar',
+    saPitch,
+    saFrequency: saFreq,
+    durationSeconds: durationSec,
+    notes,
+    pitchTrack,
+    audioSamples: samples,
+    sampleRate,
+  };
 }

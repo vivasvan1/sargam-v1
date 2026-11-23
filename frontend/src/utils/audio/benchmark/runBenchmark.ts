@@ -8,6 +8,7 @@ import { PYinPitchDetector } from '../pitch/pyinDetector';
 import {
   createSitarGatBenchmark,
   createSitarMeendBenchmark,
+  createRealSitarBenchmark,
 } from './audioReferenceDatasets';
 import { evaluatePitchAndNotes } from './evaluator';
 
@@ -18,6 +19,7 @@ console.log('=================================================================\n
 const benchmarks = [
   createSitarGatBenchmark(),
   createSitarMeendBenchmark(),
+  createRealSitarBenchmark(),
 ];
 
 for (const bench of benchmarks) {
