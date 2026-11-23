@@ -13,14 +13,84 @@ import type {
   ContinuousPitchContour,
   PitchContourPoint,
   TranscribedNoteEvent,
+  AudioSourceType,
 } from './types';
 import { frequencyToSwara } from './sargamTranscriber';
 
+export interface AcousticProfile {
+  minNoteDurationSec: number;
+  pitchStabilityCents: number;
+  onsetRmsFactor: number;
+  pitchTransitionCents: number;
+  minMeendGlideCents: number;
+  detectSyllableDips: boolean;
+}
+
+export const INSTRUMENT_PROFILES: Record<AudioSourceType, AcousticProfile> = {
+  vocal: {
+    minNoteDurationSec: 0.09, // prevents vocal vibrato/gamak from over-segmenting
+    pitchStabilityCents: 55, // vocalists exhibit ~30-50 cents natural vibrato
+    onsetRmsFactor: 1.6, // vocal syllables have gentler attacks than plucked strings
+    pitchTransitionCents: 65,
+    minMeendGlideCents: 110,
+    detectSyllableDips: true, // consonant / syllable re-articulations on sustained notes
+  },
+  sitar: {
+    minNoteDurationSec: 0.07,
+    pitchStabilityCents: 45,
+    onsetRmsFactor: 2.2, // sharp metallic mizrab pluck transient
+    pitchTransitionCents: 60,
+    minMeendGlideCents: 130,
+    detectSyllableDips: false,
+  },
+  sarod: {
+    minNoteDurationSec: 0.07,
+    pitchStabilityCents: 45,
+    onsetRmsFactor: 2.0, // coconut shell plectrum (jawa)
+    pitchTransitionCents: 60,
+    minMeendGlideCents: 120,
+    detectSyllableDips: false,
+  },
+  flute: {
+    minNoteDurationSec: 0.09,
+    pitchStabilityCents: 50,
+    onsetRmsFactor: 1.7,
+    pitchTransitionCents: 65,
+    minMeendGlideCents: 110,
+    detectSyllableDips: true,
+  },
+  harmonium: {
+    minNoteDurationSec: 0.08,
+    pitchStabilityCents: 35, // very stable mechanical reed pitch
+    onsetRmsFactor: 1.8,
+    pitchTransitionCents: 55,
+    minMeendGlideCents: 999, // no meend on keyboard/reeds
+    detectSyllableDips: false,
+  },
+  violin: {
+    minNoteDurationSec: 0.08,
+    pitchStabilityCents: 50,
+    onsetRmsFactor: 1.8,
+    pitchTransitionCents: 65,
+    minMeendGlideCents: 110,
+    detectSyllableDips: false,
+  },
+  general: {
+    minNoteDurationSec: 0.08,
+    pitchStabilityCents: 50,
+    onsetRmsFactor: 1.8,
+    pitchTransitionCents: 65,
+    minMeendGlideCents: 120,
+    detectSyllableDips: true,
+  },
+};
+
 export interface NoteSegmentationOptions {
   saFrequency: number;
-  minNoteDurationSec?: number; // default: 0.08 (80ms)
-  pitchStabilityCents?: number; // default: 45 cents
-  onsetRmsFactor?: number; // default: 2.2
+  instrument?: AudioSourceType;
+  minNoteDurationSec?: number; // override profile default if set
+  pitchStabilityCents?: number; // override profile default if set
+  onsetRmsFactor?: number; // override profile default if set
 }
 
 /**
@@ -54,7 +124,11 @@ export function segmentNotesFromContour(
   options: NoteSegmentationOptions
 ): { notes: TranscribedNoteEvent[]; contour: ContinuousPitchContour } {
   const saFreq = options.saFrequency;
-  const minDur = options.minNoteDurationSec ?? 0.08;
+  const instrument = options.instrument || 'vocal';
+  const profile = INSTRUMENT_PROFILES[instrument] || INSTRUMENT_PROFILES.general;
+  const minDur = options.minNoteDurationSec ?? profile.minNoteDurationSec;
+  const onsetFactor = options.onsetRmsFactor ?? profile.onsetRmsFactor;
+  const transitionThreshold = profile.pitchTransitionCents;
   const contour = buildContinuousPitchContour(frames, saFreq);
 
   if (frames.length === 0) {
@@ -105,22 +179,37 @@ export function segmentNotesFromContour(
     const currentMeanCents = runningCentsSum / (runningCount || 1);
     const centsDiffFromMean = Math.abs(pt.centsFromSa - currentMeanCents);
 
-    // Energy pluck detection (sitar da/ra stroke)
+    // 1. Pluck / transient detection (sharp attack)
     const prevPt = contour[i - 1];
     const hasSharpPluck =
-      prevPt && prevPt.rms > 0.005 && pt.rms > prevPt.rms * (options.onsetRmsFactor ?? 2.2);
+      prevPt && prevPt.rms > 0.004 && pt.rms > prevPt.rms * onsetFactor;
 
-    // Substantial pitch transition (>= 70 cents)
-    const hasPitchTransition = centsDiffFromMean >= 70;
+    // 2. Vocal / Flute syllable re-articulation detection:
+    // When a vocalist sings new words/syllables on sustained notes,
+    // a brief dip in RMS occurs (consonant or breath inflection) followed by re-aspiration.
+    let hasSyllableDip = false;
+    if (profile.detectSyllableDips && i >= 3 && prevPt) {
+      const pPrev = contour[i - 2];
+      const isValley = prevPt.rms < pPrev.rms * 0.72 && pt.rms > prevPt.rms * 1.35;
+      if (isValley && pt.rms > 0.008) {
+        hasSyllableDip = true;
+      }
+    }
+
+    // 3. Substantial pitch transition between swaras
+    const hasPitchTransition = centsDiffFromMean >= transitionThreshold;
 
     const currentDuration = pt.time - contour[segStartIdx].time;
 
-    if ((hasSharpPluck || hasPitchTransition) && currentDuration >= minDur) {
+    if ((hasSharpPluck || hasSyllableDip || hasPitchTransition) && currentDuration >= minDur) {
       // Check if this was a continuous meend glide
       const startCents = contour[segStartIdx].centsFromSa;
       const endCents = contour[i - 1].centsFromSa;
       const totalGlideCents = Math.abs(endCents - startCents);
-      const isMeendGlide = !hasSharpPluck && totalGlideCents >= 140;
+      const isMeendGlide =
+        !hasSharpPluck &&
+        !hasSyllableDip &&
+        totalGlideCents >= profile.minMeendGlideCents;
 
       rawNotes.push({
         startIdx: segStartIdx,

@@ -3,6 +3,17 @@
  * Decouples continuous pitch tracking from discrete beat-grid and Tala notation.
  */
 
+export type AudioSourceType =
+  | 'vocal'
+  | 'sitar'
+  | 'flute'
+  | 'harmonium'
+  | 'sarod'
+  | 'violin'
+  | 'general';
+
+export type QuantizationMode = 'free' | 'flexible' | 'fixed';
+
 export interface PitchContourPoint {
   time: number; // in seconds
   frequency: number; // in Hz (0 if unvoiced)

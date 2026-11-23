@@ -9,6 +9,7 @@ import { YinPitchDetector } from '../pitchDetector';
 import { PYinPitchDetector } from '../pitch/pyinDetector';
 import { loadSaragaBenchmark } from './audioReferenceDatasets';
 import { evaluatePitchAndNotes } from './evaluator';
+import { transcribeAudioToSargam } from '../sargamTranscriber';
 
 const DATASET_ROOT = path.resolve(__dirname, '../../../../../benchmark_data/saraga/saraga1.5_hindustani');
 
@@ -100,6 +101,14 @@ for (const t of testTracks) {
   if (dataset.phrases && dataset.phrases.length > 0) {
     console.log(`| Ground Truth Annotated Phrases        | ${dataset.phrases.map((p) => p.phrase).join(', ')}`);
   }
+
+  // 3. Evaluate Vocal Audio Transcription (Free & Flexible notation)
+  const vocalTrans = transcribeAudioToSargam(samples, sampleRate, dataset.saPitch, dataset.saFrequency, {
+    instrument: 'vocal',
+    quantizationMode: 'free',
+    algorithm: 'pyin',
+  });
+  console.log(`| Transcribed Vocal Sargam (Natural)    | ${vocalTrans.notes.slice(0, 14).map((n) => n.token).join(' ')}`);
   console.log('--------------------------------------------------------------------------------\n');
 }
 

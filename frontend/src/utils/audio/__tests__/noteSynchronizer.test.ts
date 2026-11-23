@@ -114,4 +114,55 @@ const parsed = parseMusicCell(res2.sargamCode.split('\n'));
 assert(parsed.directives.sa === 'D4', 'Parsed @sa is D4');
 assert(parsed.directives.raga === 'Raag Yaman', 'Parsed @raga is Raag Yaman');
 
+// Test 4: Free / Event-Driven Notation Recalculation
+console.log('Test 4: Free / Event-Driven natural duration recalculation...');
+const res4 = recalculateTranscriptionFromEvents(
+  baseEvents,
+  [],
+  'D4',
+  293.66,
+  {
+    bpm: 50,
+    quantizationMode: 'free',
+    instrument: 'vocal',
+  }
+);
+assert(res4.notes.length === 3, `Expected 3 free notes, got ${res4.notes.length}`);
+assert(res4.notes[0].durationBeats === 0.5, 'First note naturally 0.5 beats');
+assert(res4.sargamCode.includes('||'), 'Contains phrase terminal ||');
+
+// Test 5: Flexible Mode Hold Merging
+console.log('Test 5: Flexible mode merges held notes without artificial chopping...');
+const heldEvents: TranscribedNoteEvent[] = [
+  {
+    id: 'h1',
+    startTime: 0.0,
+    endTime: 1.2,
+    durationSeconds: 1.2, // 1 full beat at 50 bpm (beatSec = 1.2s)
+    swara: 'S',
+    octave: 0,
+    medianFrequencyHz: 293.66,
+    centsFromSa: 0,
+    confidence: 0.95,
+    pitchContour: [],
+  },
+];
+const res5 = recalculateTranscriptionFromEvents(
+  heldEvents,
+  [],
+  'D4',
+  293.66,
+  {
+    bpm: 50,
+    talaId: 'tintal',
+    pickupBeat: 1,
+    gridResolution: 0.5,
+    quantizationMode: 'flexible',
+    instrument: 'vocal',
+  }
+);
+assert(res5.notes.length === 1, `Expected 1 merged note, got ${res5.notes.length}`);
+assert(res5.notes[0].durationBeats === 1.0, `Expected duration 1.0, got ${res5.notes[0].durationBeats}`);
+assert(res5.notes[0].token === 'S', `Expected token S (no :1 suffix), got ${res5.notes[0].token}`);
+
 console.log('All Phase 3 Note Synchronizer tests passed successfully!');

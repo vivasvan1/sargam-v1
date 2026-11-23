@@ -11,6 +11,8 @@ import type {
   ContinuousPitchContour,
   TranscribedNoteEvent,
   TalaConfig,
+  AudioSourceType,
+  QuantizationMode,
 } from './types';
 
 export type { TalaConfig, RagaDefinition };
@@ -87,9 +89,11 @@ export interface TranscribedNote {
 
 export interface TranscriptionOptions {
   bpm?: number;
-  talaId?: string; // 'tintal', 'ektaal', etc. (default: 'tintal')
+  talaId?: string; // 'none', 'tintal', 'ektaal', etc. (default: 'tintal')
   pickupBeat?: number; // 1 (Sam), 12 (Tintal standard pickup), 9 (Khali), etc.
   gridResolution?: 0.5 | 0.25; // 0.5 (dugun = 2 notes/beat) or 0.25 (chaugun)
+  quantizationMode?: QuantizationMode; // 'free' = event-driven natural durations; 'flexible' = merges identical held slots; 'fixed' = legacy rigid slotting
+  instrument?: AudioSourceType; // 'vocal' | 'sitar' | 'flute' | 'harmonium' | 'sarod' | 'violin' | 'general'
   initialSilenceSec?: number; // seconds of initial silence to skip
   clarityThreshold?: number;
   silenceThreshold?: number;
@@ -195,20 +199,26 @@ export function transcribeAudioToSargam(
   const raga = RAGA_PRESETS[ragaKey];
 
   // 1. Analyze audio pitch frames with pYIN / YIN
+  const instrument = options.instrument || 'vocal';
   const algorithm = options.algorithm || 'pyin';
+
+  // Instrument-adaptive pitch detection thresholds
+  const defaultClarity = instrument === 'vocal' || instrument === 'flute' ? 0.40 : 0.45;
+  const defaultSilence = instrument === 'vocal' || instrument === 'flute' ? 0.005 : 0.008;
+
   const frames: PitchFrame[] = detectAudioPitch(samples, {
     sampleRate,
     frameSize: 2048,
     hopSize: 512,
     threshold: 0.15,
-    clarityThreshold: options.clarityThreshold || 0.45,
-    silenceThreshold: options.silenceThreshold || 0.008,
+    clarityThreshold: options.clarityThreshold || defaultClarity,
+    silenceThreshold: options.silenceThreshold || defaultSilence,
     algorithm,
   });
 
   const { notes: rawEvents, contour } = segmentNotesFromContour(frames, {
     saFrequency,
-    minNoteDurationSec: 0.08,
+    instrument,
   });
 
   // Apply optional Raga-aware scoring & varjit note correction
@@ -239,11 +249,18 @@ export function transcribeAudioToSargam(
   if (options.initialSilenceSec !== undefined && options.initialSilenceSec >= 0) {
     audioStartTime = options.initialSilenceSec;
   } else {
+    // Dynamic noise floor / onset threshold adapted to vocal or acoustic instruments
+    const voicedFrames = frames.filter((f) => f.isVoiced && f.frequency > 0);
+    const minVoicedRms =
+      voicedFrames.length > 0
+        ? Math.max(0.004, voicedFrames.map((f) => f.rms).sort((a, b) => a - b)[Math.floor(voicedFrames.length * 0.1)] * 0.7)
+        : 0.008;
+
     // Find first sustained run of voiced frames (>= 120ms with consistent musical energy)
     for (let i = 0; i < frames.length - 10; i++) {
       let voicedCount = 0;
       for (let j = 0; j < 10; j++) {
-        if (frames[i + j].isVoiced && frames[i + j].frequency > 0 && frames[i + j].rms > 0.015) {
+        if (frames[i + j].isVoiced && frames[i + j].frequency > 0 && frames[i + j].rms >= minVoicedRms) {
           voicedCount++;
         }
       }
@@ -258,16 +275,146 @@ export function transcribeAudioToSargam(
   const playableDurationSec = Math.max(0.1, audioEndTime - audioStartTime);
   const totalSubBeats = Math.ceil(playableDurationSec / subBeatSec);
 
-  // 3. Grid-quantized frame classification into sub-beat slots (Vocal / Flute continuous melody)
+  // Header directives
+  const headerLines: string[] = [`@sa ${saPitch}`];
+  if (tala.id !== 'none') {
+    headerLines.push(`@tala ${tala.name}`);
+    if (tala.pattern) {
+      headerLines.push(`@tala_pattern ${tala.pattern}`);
+    }
+  }
+  if (raga.id !== 'none') {
+    headerLines.push(`@raga ${raga.name}`);
+  }
+  headerLines.push(`@tempo ${bpm}`);
+
+  const quantizationMode =
+    options.quantizationMode || (tala.id === 'none' ? 'free' : 'flexible');
+
+  const notes: TranscribedNote[] = [];
+
+  // ===========================================================================
+  // MODE 1: FREE / EVENT-DRIVEN NOTATION (Natural Durations, No Rigid 2/4 Grid)
+  // ===========================================================================
+  if (quantizationMode === 'free' || tala.id === 'none') {
+    let prevEnd = audioStartTime;
+
+    for (let i = 0; i < noteEvents.length; i++) {
+      const ev = noteEvents[i];
+      const gap = ev.startTime - prevEnd;
+
+      // Natural breath / silence pause between phrases (>= 0.4s)
+      if (gap >= 0.4) {
+        const restDurBeats = Math.max(0.5, Math.round((gap / beatSec) * 2) / 2);
+        notes.push({
+          type: 'rest',
+          token: restDurBeats === 1.0 ? '_' : `_:${restDurBeats}`,
+          startTime: prevEnd,
+          endTime: ev.startTime,
+          durationBeats: restDurBeats,
+        });
+      }
+
+      const durSec = Math.max(0.08, ev.endTime - ev.startTime);
+      const rawBeats = durSec / beatSec;
+      // Quantize to clean musical quarter-beat fractions (0.25, 0.5, 0.75, 1.0, 1.5, 2.0, etc.)
+      const durBeats = Math.max(0.25, Math.round(rawBeats * 4) / 4);
+
+      let ornamentSuffix = '';
+      if (ev.ornament) {
+        if (ev.ornament.type === 'meend' && ev.ornament.targetSwara) {
+          ornamentSuffix = `+meend(${ev.ornament.targetSwara})`;
+        } else if (ev.ornament.type === 'kan' && ev.ornament.targetSwara) {
+          ornamentSuffix = `+kan(${ev.ornament.targetSwara})`;
+        }
+      }
+
+      const swaraStr = formatSwaraWithOctave(ev.swara, ev.octave);
+      const durStr = durBeats === 1.0 ? '' : `:${durBeats}`;
+
+      notes.push({
+        type: 'note',
+        swara: ev.swara,
+        octave: ev.octave,
+        token: `${swaraStr}${durStr}${ornamentSuffix}`,
+        startTime: ev.startTime,
+        endTime: ev.endTime,
+        durationBeats: durBeats,
+      });
+
+      prevEnd = ev.endTime;
+    }
+
+    if (notes.length === 0) {
+      return {
+        sargamCode: [...headerLines, '', '_ ||'].join('\n'),
+        notes: [],
+        events: noteEvents,
+        contour,
+        bpm,
+        saPitch,
+        saFrequency,
+        tala,
+        raga,
+        totalDurationSeconds: 0,
+        totalDurationBeats: 0,
+        algorithm,
+      };
+    }
+
+    // Group free notation into phrases separated by | and end with ||
+    const phraseLines: string[] = [];
+    let currentPhrase: string[] = [];
+    let phraseBeats = 0;
+
+    for (let i = 0; i < notes.length; i++) {
+      currentPhrase.push(notes[i].token);
+      phraseBeats += notes[i].durationBeats;
+
+      const isRest = notes[i].type === 'rest';
+      const isLongPhrase = phraseBeats >= 8;
+      if ((isRest || isLongPhrase) && i < notes.length - 1) {
+        currentPhrase.push('|');
+        phraseLines.push(currentPhrase.join(' '));
+        currentPhrase = [];
+        phraseBeats = 0;
+      }
+    }
+
+    if (currentPhrase.length > 0) {
+      currentPhrase.push('||');
+      phraseLines.push(currentPhrase.join(' '));
+    }
+
+    const sargamCode = [...headerLines, '', phraseLines.join('\n\n')].join('\n');
+    return {
+      sargamCode,
+      notes,
+      events: noteEvents,
+      contour,
+      bpm,
+      saPitch,
+      saFrequency,
+      tala,
+      raga,
+      totalDurationSeconds: notes.length > 0 ? notes[notes.length - 1].endTime : 0,
+      totalDurationBeats: notes.reduce((sum, n) => sum + n.durationBeats, 0),
+      algorithm,
+    };
+  }
+
+  // ===========================================================================
+  // MODE 2: METERED TALA NOTATION (FLEXIBLE OR FIXED)
+  // ===========================================================================
   interface SubBeatSlot {
     subBeatIndex: number;
     swara: string;
     octave: number;
-    duration: number; // e.g. 0.5 or 0.25
+    duration: number; // e.g. 0.5, 0.25, 1.0
     isSilence: boolean;
   }
 
-  const slots: SubBeatSlot[] = [];
+  const rawSlots: SubBeatSlot[] = [];
   let prevActiveSwara = 'S';
   let prevActiveOctave = 0;
 
@@ -290,7 +437,7 @@ export function transcribeAudioToSargam(
     if (voicedFrames.length === 0) {
       // Sustain previous vocal/flute note across breath/decay if energy is present
       if (avgRms > 0.006 && prevActiveSwara) {
-        slots.push({
+        rawSlots.push({
           subBeatIndex: sb,
           swara: prevActiveSwara,
           octave: prevActiveOctave,
@@ -298,7 +445,7 @@ export function transcribeAudioToSargam(
           isSilence: false,
         });
       } else {
-        slots.push({
+        rawSlots.push({
           subBeatIndex: sb,
           swara: '_',
           octave: 0,
@@ -309,7 +456,7 @@ export function transcribeAudioToSargam(
       continue;
     }
 
-    // Check for fast stroke inside this 0.5 beat (two 0.25 notes, e.g. D,:0.25 D,:0.25)
+    // Check for fast stroke inside this 0.5 beat (two 0.25 notes)
     const halfLen = Math.floor(slotFrames.length / 2);
     const firstHalfVoiced = slotFrames.slice(0, halfLen).filter((f) => f.isVoiced);
     const secondHalfVoiced = slotFrames.slice(halfLen).filter((f) => f.isVoiced);
@@ -326,15 +473,14 @@ export function transcribeAudioToSargam(
       const n2 = frequencyToSwara(f2, saFrequency, n1.octave);
 
       if (hasDistinctSecondAttack || (n1.swara !== n2.swara && Math.abs(f1 - f2) > 10)) {
-        // Two distinct 0.25 notes!
-        slots.push({
+        rawSlots.push({
           subBeatIndex: sb,
           swara: n1.swara,
           octave: n1.octave,
           duration: 0.25,
           isSilence: false,
         });
-        slots.push({
+        rawSlots.push({
           subBeatIndex: sb,
           swara: n2.swara,
           octave: n2.octave,
@@ -351,7 +497,7 @@ export function transcribeAudioToSargam(
     prevActiveSwara = swara;
     prevActiveOctave = octave;
 
-    slots.push({
+    rawSlots.push({
       subBeatIndex: sb,
       swara,
       octave,
@@ -360,19 +506,39 @@ export function transcribeAudioToSargam(
     });
   }
 
-  // 4. Convert slots into tokens with explicit durations (:0.5, :0.25) and ornaments
-  const notes: TranscribedNote[] = [];
+  // In Flexible mode: merge consecutive identical notes into prolonged durations (e.g. 1.0, 1.5, 2.0)
+  // Removes artificial chopping into repetitive 0.5 or 0.25 notes
+  const slots: SubBeatSlot[] = [];
+  for (const slot of rawSlots) {
+    if (quantizationMode === 'flexible' && slots.length > 0) {
+      const last = slots[slots.length - 1];
+      if (
+        !last.isSilence &&
+        !slot.isSilence &&
+        last.swara === slot.swara &&
+        last.octave === slot.octave &&
+        last.duration + slot.duration <= 4.0 // Cap single merged duration to 4 beats
+      ) {
+        last.duration += slot.duration;
+        continue;
+      }
+    }
+    slots.push({ ...slot });
+  }
 
+  // Convert slots into tokens with ornaments
+  let currentSlotTime = audioStartTime;
   for (let s = 0; s < slots.length; s++) {
     const slot = slots[s];
+    const slotDurationSec = slot.duration * beatSec;
+    const slotStart = currentSlotTime;
+    const slotEnd = slotStart + slotDurationSec;
+    currentSlotTime = slotEnd;
+
     if (slot.isSilence) {
       continue;
     }
 
-    const slotStart = audioStartTime + s * subBeatSec;
-    const slotEnd = slotStart + subBeatSec;
-
-    // Check if any segmented event overlaps and has a meend or kan ornament
     const matchedEvent = noteEvents.find(
       (ev) =>
         (slotStart >= ev.startTime - 0.05 && slotStart < ev.endTime) ||
@@ -389,32 +555,17 @@ export function transcribeAudioToSargam(
     }
 
     const swaraStr = formatSwaraWithOctave(slot.swara, slot.octave);
+    const durStr = slot.duration === 1.0 ? '' : `:${slot.duration}`;
     notes.push({
       type: 'note',
       swara: slot.swara,
       octave: slot.octave,
-      token: `${swaraStr}:${slot.duration}${ornamentSuffix}`,
+      token: `${swaraStr}${durStr}${ornamentSuffix}`,
       startTime: slotStart,
       endTime: slotEnd,
       durationBeats: slot.duration,
     });
   }
-
-  // 5. Build clean, idiomatic sargam-v1 notation grouped by Tala avartan
-  const headerLines: string[] = [`@sa ${saPitch}`];
-
-  if (tala.id !== 'none') {
-    headerLines.push(`@tala ${tala.name}`);
-    if (tala.pattern) {
-      headerLines.push(`@tala_pattern ${tala.pattern}`);
-    }
-  }
-
-  if (raga.id !== 'none') {
-    headerLines.push(`@raga ${raga.name}`);
-  }
-
-  headerLines.push(`@tempo ${bpm}`);
 
   if (notes.length === 0) {
     return {

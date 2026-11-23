@@ -149,4 +149,23 @@ const parsed = parseMusicCell(transcription.sargamCode.split('\n'));
 assert(parsed.directives.sa === 'D4', 'Parsed @sa is D4');
 assert(parsed.directives.tala === 'Tintal(16)', 'Parsed @tala is Tintal(16)');
 
+// 4. Free / Event-Driven Vocal Alap Transcription
+console.log('Test 4: Free / Event-driven Vocal transcription without beat grid...');
+const freeVocal = transcribeAudioToSargam(
+  melodyBuffer,
+  sampleRate,
+  'D4',
+  saD4,
+  {
+    bpm: 50,
+    instrument: 'vocal',
+    quantizationMode: 'free',
+  }
+);
+assert(freeVocal.notes.length > 0, 'Generated free vocal notes');
+assert(freeVocal.sargamCode.includes('@sa D4'), 'Contains @sa D4');
+assert(freeVocal.sargamCode.includes('||'), 'Ends with ||');
+const parsedFree = parseMusicCell(freeVocal.sargamCode.split('\n'));
+assert(parsedFree.directives.sa === 'D4', 'Parsed free @sa is D4');
+
 console.log('All Transcriber v2 tests passed successfully!');

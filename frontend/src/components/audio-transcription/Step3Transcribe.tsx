@@ -36,7 +36,11 @@ import { RAGA_PRESETS } from '@/utils/audio/raga/ragaDefinitions';
 import { PitchContourVisualizer } from './PitchContourVisualizer';
 import { NoteInspector } from './NoteInspector';
 import { recalculateTranscriptionFromEvents } from '@/utils/audio/noteSynchronizer';
-import type { TranscribedNoteEvent } from '@/utils/audio/types';
+import type {
+  TranscribedNoteEvent,
+  AudioSourceType,
+  QuantizationMode,
+} from '@/utils/audio/types';
 
 interface Step3TranscribeProps {
   audioBuffer: AudioBuffer;
@@ -54,6 +58,8 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
   onBack,
 }) => {
   const [bpm, setBpm] = useState<number>(50); // Default 50 BPM for Indian classical compositions
+  const [instrument, setInstrument] = useState<AudioSourceType>('vocal');
+  const [quantizationMode, setQuantizationMode] = useState<QuantizationMode>('flexible');
   const [talaId, setTalaId] = useState<string>('tintal');
   const [pickupBeat, setPickupBeat] = useState<number>(12); // Default Beat 12 for Tintal
   const [gridResolution, setGridResolution] = useState<0.5 | 0.25>(0.5);
@@ -157,6 +163,8 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
             talaId,
             pickupBeat,
             gridResolution,
+            quantizationMode,
+            instrument,
             algorithm,
             ragaId,
             enableRagaCorrection,
@@ -308,6 +316,8 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
         talaId,
         pickupBeat,
         gridResolution,
+        quantizationMode,
+        instrument,
         ragaId,
         algorithm,
       }
@@ -590,8 +600,11 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
                 {RAGA_PRESETS[ragaId]?.name}
               </Badge>
             )}
+            <Badge variant="secondary" className="text-xs font-medium capitalize">
+              Audio Source: {instrument}
+            </Badge>
             <Badge variant="secondary" className="text-xs font-medium">
-              Style: Sitar / Vocal (Indian Classical)
+              Notation: {quantizationMode === 'free' ? 'Free Rhythm (Natural)' : quantizationMode === 'flexible' ? 'Flexible Grid' : 'Fixed Slots'}
             </Badge>
           </div>
         </div>
@@ -641,8 +654,60 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
           </div>
         </div>
 
-        {/* Settings Grid: 5 columns on sm/md/lg screens */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        {/* Settings Grid: responsive across mobile/tablet/desktop */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">Audio Source</label>
+            <Select value={instrument} onValueChange={(val: any) => setInstrument(val)}>
+              <SelectTrigger className="w-full h-9 text-xs">
+                <SelectValue placeholder="Audio Source" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vocal" className="text-xs">
+                  Vocal (Classical Voice)
+                </SelectItem>
+                <SelectItem value="sitar" className="text-xs">
+                  Sitar (Plucked / Jawari)
+                </SelectItem>
+                <SelectItem value="flute" className="text-xs">
+                  Bansuri (Flute)
+                </SelectItem>
+                <SelectItem value="harmonium" className="text-xs">
+                  Harmonium (Reeds)
+                </SelectItem>
+                <SelectItem value="sarod" className="text-xs">
+                  Sarod (Fretless Pluck)
+                </SelectItem>
+                <SelectItem value="violin" className="text-xs">
+                  Violin / Sarangi (Bowed)
+                </SelectItem>
+                <SelectItem value="general" className="text-xs">
+                  General Monophonic
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">Notation Style</label>
+            <Select value={quantizationMode} onValueChange={(val: any) => setQuantizationMode(val)}>
+              <SelectTrigger className="w-full h-9 text-xs">
+                <SelectValue placeholder="Notation Style" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="flexible" className="text-xs">
+                  Flexible Grid (Held Notes)
+                </SelectItem>
+                <SelectItem value="free" className="text-xs">
+                  Free Rhythm (Natural / Alap)
+                </SelectItem>
+                <SelectItem value="fixed" className="text-xs">
+                  Fixed Slots (Dugun/Chaugun)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-1">
             <label className="text-[11px] font-medium text-muted-foreground">Pitch Algorithm</label>
             <Select value={algorithm} onValueChange={(val: any) => setAlgorithm(val)}>
@@ -651,7 +716,7 @@ export const Step3Transcribe: React.FC<Step3TranscribeProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="pyin" className="text-xs">
-                  pYIN (Probabilistic - Sitar / Classical)
+                  pYIN (Probabilistic)
                 </SelectItem>
                 <SelectItem value="yin" className="text-xs">
                   Standard YIN
