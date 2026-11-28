@@ -409,15 +409,20 @@ function buildOgSvgWithFont(font: any, meta: ExtractedMeta): string {
   let textPaths = '';
 
   // 1. Raag Hero Title & Subtitle (Left Header)
-  textPaths += renderTextPath(font, displayRaag, 60, 96, 54, '#ffffff');
+  let titleText = meta.cellTitle || '';
+  if (!titleText && meta.title && meta.title.toLowerCase() !== displayRaag.toLowerCase()) {
+    titleText = meta.title;
+  }
 
-  const subtitle = meta.cellTitle ? `${meta.cellTitle} • ${meta.title}` : meta.title;
-  if (subtitle && !subtitle.toLowerCase().includes(displayRaag.toLowerCase())) {
-    textPaths += renderTextPath(font, subtitle, 60, 138, 24, '#94a3b8');
-  } else if (meta.cellTitle) {
-    textPaths += renderTextPath(font, meta.cellTitle, 60, 138, 24, '#94a3b8');
-  } else if (meta.title && meta.title !== displayRaag) {
-    textPaths += renderTextPath(font, meta.title, 60, 138, 24, '#94a3b8');
+  if (titleText) {
+    const raagSize = 48;
+    const titleWidth = font.getAdvanceWidth(titleText, 48);
+    const titleSize = titleWidth > 1040 ? Math.max(28, Math.floor(48 * (1040 / titleWidth))) : 48;
+
+    textPaths += renderTextPath(font, displayRaag, 60, 74, raagSize, '#ffffff');
+    textPaths += renderTextPath(font, titleText, 60, 136, titleSize, '#ffffff');
+  } else {
+    textPaths += renderTextPath(font, displayRaag, 60, 98, 54, '#ffffff');
   }
 
   // 2. Badges on Top Right (Classical attributes)
@@ -463,9 +468,9 @@ function buildOgSvgWithFont(font: any, meta: ExtractedMeta): string {
     const badgeWidth = textWidth + 32;
     const badgeX = rightX - badgeWidth;
     badgeRects += `
-    <rect x="${badgeX}" y="60" width="${badgeWidth}" height="42" rx="10" fill="${b.bgCol}" stroke="${b.strokeCol}" stroke-width="1.5" />
+    <rect x="${badgeX}" y="50" width="${badgeWidth}" height="42" rx="10" fill="${b.bgCol}" stroke="${b.strokeCol}" stroke-width="1.5" />
     `;
-    textPaths += renderTextPath(font, b.label, badgeX + badgeWidth / 2, 87, 18, b.textCol, 'center');
+    textPaths += renderTextPath(font, b.label, badgeX + badgeWidth / 2, 77, 18, b.textCol, 'center');
     rightX = badgeX - 12;
   }
 
@@ -474,25 +479,25 @@ function buildOgSvgWithFont(font: any, meta: ExtractedMeta): string {
 
   if (sec2) {
     // Two sections (e.g. Aroha & Avroha)
-    textPaths += renderTextPath(font, sec1.title.toUpperCase(), 90, 212, 28, '#fbbf24');
-    const r1 = renderNotesRow(font, sec1.notes, 232, true, 90);
+    textPaths += renderTextPath(font, sec1.title.toUpperCase(), 90, 214, 28, '#fbbf24');
+    const r1 = renderNotesRow(font, sec1.notes, 236, true, 90);
     notationRects += r1.rects;
     textPaths += r1.paths;
 
-    textPaths += renderTextPath(font, sec2.title.toUpperCase(), 90, 372, 28, '#a5b4fc');
-    const r2 = renderNotesRow(font, sec2.notes, 392, false, 90);
+    textPaths += renderTextPath(font, sec2.title.toUpperCase(), 90, 374, 28, '#a5b4fc');
+    const r2 = renderNotesRow(font, sec2.notes, 396, false, 90);
     notationRects += r2.rects;
     textPaths += r2.paths;
   } else {
     // Single section (e.g. Tan 1, Drut Gat)
     const title = (sec1.title || meta.cellTitle || 'Notation').toUpperCase();
-    textPaths += renderTextPath(font, title, 90, 215, 30, '#fbbf24');
+    textPaths += renderTextPath(font, title, 90, 218, 30, '#fbbf24');
 
     if (sec1.notes.length > 8) {
       const row1Tokens = sec1.notes.slice(0, 8);
       const row2Tokens = sec1.notes.slice(8, 16);
-      const r1 = renderNotesRow(font, row1Tokens, 248, true, 90);
-      const r2 = renderNotesRow(font, row2Tokens, 372, false, 90);
+      const r1 = renderNotesRow(font, row1Tokens, 250, true, 90);
+      const r2 = renderNotesRow(font, row2Tokens, 374, false, 90);
       notationRects += r1.rects + r2.rects;
       textPaths += r1.paths + r2.paths;
     } else {
@@ -535,7 +540,7 @@ function buildOgSvgWithFont(font: any, meta: ExtractedMeta): string {
     ${badgeRects}
     
     <!-- Notation Card Canvas -->
-    <rect x="60" y="165" width="1080" height="375" rx="18" fill="rgba(255, 255, 255, 0.04)" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1.5" />
+    <rect x="60" y="170" width="1080" height="370" rx="18" fill="rgba(255, 255, 255, 0.04)" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1.5" />
     
     <!-- Note Pill Rectangles -->
     ${notationRects}
