@@ -270,7 +270,7 @@ function extractNotebookMeta(notebook: any, entry: any = {}, targetCellId?: stri
       if (tokens.length > 0) {
         sections.push({
           title: sec.title,
-          notes: tokens.slice(0, 12),
+          notes: tokens.slice(0, 16),
         });
       }
     }
@@ -298,7 +298,8 @@ function renderNotesRow(
   tokens: string[],
   startY: number,
   isAmber: boolean,
-  startX: number = 90
+  startX: number = 90,
+  cardRight: number = 1140
 ): { rects: string; paths: string } {
   let x = startX;
   let rects = '';
@@ -320,18 +321,65 @@ function renderNotesRow(
     gap = 14;
   }
 
-  for (const t of tokens) {
-    if (t.startsWith('|')) {
-      const cleanBar = t.replace(/="[^"]*"/g, '');
-      paths += renderTextPath(font, cleanBar, x + 6, startY + (pillHeight * 0.7), fontSize - 4, '#94a3b8', 'left');
-      x += 46;
+  const maxX = cardRight - 20;
+  const ellipsisAdvance = font.getAdvanceWidth('...', fontSize);
+  const ellipsisGap = 10;
+  const ellipsisTotal = ellipsisGap + ellipsisAdvance;
+
+  let lastPillEnd = startX;
+
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    const isBar = t.startsWith('|');
+    let width = 0;
+    if (isBar) {
+      width = 46;
     } else {
       const textWidth = font.getAdvanceWidth(t, fontSize);
-      const width = Math.max(pillHeight, textWidth + pad);
+      width = Math.max(pillHeight, textWidth + pad);
+    }
+
+    const isLast = i === tokens.length - 1;
+
+    if (isLast) {
+      if (x + width > maxX) {
+        paths += renderTextPath(
+          font,
+          '...',
+          lastPillEnd > startX ? lastPillEnd + ellipsisGap : x,
+          startY + pillHeight * 0.69,
+          fontSize,
+          textColor,
+          'left'
+        );
+        break;
+      }
+    } else {
+      if (x + width + ellipsisTotal > maxX) {
+        paths += renderTextPath(
+          font,
+          '...',
+          lastPillEnd > startX ? lastPillEnd + ellipsisGap : x,
+          startY + pillHeight * 0.69,
+          fontSize,
+          textColor,
+          'left'
+        );
+        break;
+      }
+    }
+
+    if (isBar) {
+      const cleanBar = t.replace(/="[^"]*"/g, '');
+      paths += renderTextPath(font, cleanBar, x + 6, startY + pillHeight * 0.7, fontSize - 4, '#94a3b8', 'left');
+      x += 46;
+      lastPillEnd = x;
+    } else {
       rects += `
         <rect x="${x}" y="${startY}" width="${width}" height="${pillHeight}" rx="14" fill="${pillBg}" stroke="${strokeColor}" stroke-width="2" />
       `;
-      paths += renderTextPath(font, t, x + width / 2, startY + (pillHeight * 0.69), fontSize, textColor, 'center');
+      paths += renderTextPath(font, t, x + width / 2, startY + pillHeight * 0.69, fontSize, textColor, 'center');
+      lastPillEnd = x + width;
       x += width + gap;
     }
   }

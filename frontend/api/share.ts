@@ -174,26 +174,14 @@ function extractNotebookMeta(notebook: any, entry: any = {}, targetCellId?: stri
       if (tokens.length > 0) {
         sections.push({
           title: sec.title,
-          notes: tokens.slice(0, 12),
+          notes: tokens.slice(0, 16),
         });
       }
     }
   }
 
-  const descParts: string[] = [];
-  if (raag) descParts.push(raag);
-  if (cellTitle) descParts.push(cellTitle);
-  if (thaat) descParts.push(`Thaat: ${thaat}`);
-  if (vadi) descParts.push(`Vadi: ${vadi}`);
-  if (samvadi) descParts.push(`Samvadi: ${samvadi}`);
-  if (tala) descParts.push(`Tala: ${tala}`);
-  if (sa) descParts.push(`Sa: ${sa}`);
-  if (author) descParts.push(`By ${author}`);
-
-  const description =
-    descParts.length > 0
-      ? `${descParts.join(' • ')} | Interactive Indian Classical Music Notebook`
-      : 'Indian classical music notation notebook. Open to play, edit and practice interactive swara visualizer.';
+  const authorName = (author || '').trim().replace(/^by\s+/i, '');
+  const description = authorName ? `Written by ${authorName}` : 'Written by Vivasvan Patel';
 
   return {
     title,
@@ -290,8 +278,7 @@ export default async function handler(req: any, res: any) {
     let title = 'Speede Sargam Notebook';
     let raag = '';
     let cellTitle = '';
-    let description =
-      'Indian classical music notation notebook. Open to play, edit, and practice interactive swara visualizer.';
+    let description = 'Written by Vivasvan Patel';
     let imageUrl = `${origin}/notebook_preview.jpg`;
     let canonicalUrl = `${origin}/`;
 
@@ -330,11 +317,12 @@ export default async function handler(req: any, res: any) {
     const escapedImg = escapeHtml(imageUrl);
     const escapedUrl = escapeHtml(canonicalUrl);
 
-    // Strip any pre-existing og: and twitter: meta tags to prevent duplicates
+    // Strip any pre-existing og:, twitter:, and description meta tags to prevent duplicates
     let html = baseHtml
       .replace(/<title>.*?<\/title>/i, `<title>${escapedTitle}</title>`)
       .replace(/<meta\s+property=["']og:[^"']*["'][^>]*>/gi, '')
-      .replace(/<meta\s+name=["']twitter:[^"']*["'][^>]*>/gi, '');
+      .replace(/<meta\s+name=["']twitter:[^"']*["'][^>]*>/gi, '')
+      .replace(/<meta\s+name=["']description["'][^>]*>/gi, '');
 
     const metaTags = `
     <!-- Dynamic Open Graph / WhatsApp / Instagram / Facebook -->

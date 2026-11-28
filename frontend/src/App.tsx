@@ -263,6 +263,17 @@ function App() {
     const twTitle = document.querySelector('meta[name="twitter:title"]');
     if (twTitle) twTitle.setAttribute('content', rawTitle);
 
+    const authorName =
+      (notebook.metadata?.author || '').trim().replace(/^by\s+/i, '') ||
+      'Vivasvan Patel';
+    const descText = `Written by ${authorName}`;
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute('content', descText);
+    const twDesc = document.querySelector('meta[name="twitter:description"]');
+    if (twDesc) twDesc.setAttribute('content', descText);
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', descText);
+
     if (driveFileId) {
       const shareUrl = `${window.location.origin}/?fileId=${encodeURIComponent(driveFileId)}`;
       const ogUrl = document.querySelector('meta[property="og:url"]');
@@ -280,7 +291,7 @@ function App() {
           `${window.location.origin}/api/og?fileId=${encodeURIComponent(driveFileId)}`
         );
     }
-  }, [notebook.metadata?.title, driveFileId]);
+  }, [notebook.metadata?.title, notebook.metadata?.author, driveFileId]);
 
   // Initialize Google API on mount
   useEffect(() => {
